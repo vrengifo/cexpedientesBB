@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="dimensionElement containerElement" src="../visualElement/visualElement.xml"/>
+
+		<d:element name="infoBoxBase" extends="b:dimensionElement b:containerElement" abstract="true">
+			
+
+			
+
+			<d:resource type="text/javascript"><![CDATA[
+				if(!window.btl) window.btl = {};
+
+				btl.infoBoxBase = {};
+
+				btl.infoBoxBase.current = null;
+
+				// If the event occurred outside the infoBox, close it.
+				btl.infoBoxBase.handleMouseDown = function btl_infoBox_handleMouseDown(eEvent) {
+					if( btl.infoBoxBase.current != null) {
+						var bInsideBox = false;
+						var oElement = eEvent.target;
+						while(oElement && !bInsideBox){
+							if(oElement == btl.infoBoxBase.current) {
+								bInsideBox = true;
+								break;
+							}
+							oElement = oElement.getProperty('parentNode');
+						}
+						if(!bInsideBox) {
+							btl.infoBoxBase.current.close();
+						}
+					}
+				};
+
+				btl.infoBoxBase.handleKeyDown = function btl_infoBox_handleKeyDown(eEvent) {
+					if( btl.infoBoxBase.current != null) {
+						if(eEvent.keyIdentifier == 'U+001B') {// escape
+							 btl.infoBoxBase.current.close();
+						} else {
+							var bInsideBox = false;
+							var oElement = eEvent.target;
+							var oTrigger = btl.infoBoxBase.current.getProperty("listeners");
+							while(oElement && !bInsideBox){
+								if(oElement == btl.infoBoxBase.current || bb.array.indexOf(oTrigger, oElement) != -1) {
+									bInsideBox = true;
+									break;
+								}
+								oElement = oElement.getProperty('parentNode');
+							}
+							if(!bInsideBox) {
+								btl.infoBoxBase.current.close();
+							}
+						}
+					}
+				};
+
+				btl.infoBoxBase.handleOpen = function btl_infoBoxBase_handleOpen(eEvent){
+					var oElm = eEvent.currentTarget;
+					if(oElm._.__infoBox)
+						oElm._.__infoBox.open(oElm);
+				};
+			]]></d:resource>
+
+			<d:attribute name="open">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					if (btl.isTrueValue(name, value))
+						this.open();
+					else
+						this.close();
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="for" default="..">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					var sFor = this.getAttribute('for');
+					var aListeners = bb.document.evaluate(sFor, this);
+					this.setProperty('listeners', aListeners);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:property name="listeners">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					if (this._._listeners) {
+						this.removeHandlersFromListeners(this._._listeners);
+					}
+					this._._listeners = value;
+					this.addHandlersToListeners(this._._listeners);
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="open">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					if (value)
+						this.open()
+					else
+						this.close();
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					if(this._['_open'] === undefined)
+						this._['_open'] = btl.isTrueValue('open', this.getAttribute('open'));
+					return this._['_open'];
+				]]></d:getter>
+			</d:property>
+
+			<d:method name="removeHandlersFromListeners">
+				
+				<d:argument name="listeners">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					for (var i = 0, iMax = listeners.length; iMax > i ; i++) {
+						listeners[i]._.__infoBox = null;
+						listeners[i].removeEventListener('click', btl.infoBoxBase.handleOpen, false);
+						listeners[i].removeEventListener('DOMActivate', btl.infoBoxBase.handleOpen, false);
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="addHandlersToListeners">
+				
+				<d:argument name="listeners">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					for (var i = 0, iMax = listeners.length; iMax > i ; i++) {
+						listeners[i]._.__infoBox = this;
+						listeners[i].addEventListener('click', btl.infoBoxBase.handleOpen, false);
+						listeners[i].addEventListener('DOMActivate', btl.infoBoxBase.handleOpen, false);
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="open">
+				
+				<d:argument name="destination">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					//not the current opened and not null set close it, because only one visible!
+					if (btl.infoBoxBase.current && btl.infoBoxBase.current != this)
+						btl.infoBoxBase.current.close();
+
+					// if no destination is given as argument, show the infoBox for the first listener
+					if (destination === undefined)
+						destination = this.getProperty('listeners')[0];
+
+					if(destination && !this._['_open']){
+						/*set to current active infoBox*/
+						btl.infoBoxBase.current = this;
+
+						// add event listeners to document
+						bb.document.addEventListener('mousedown', btl.infoBoxBase.handleMouseDown, true);
+						bb.document.addEventListener('keydown', btl.infoBoxBase.handleKeyDown, true);
+
+						// bypass the controller and set attribute at true for state sync
+						this.modelNode.setAttribute('open', 'true');
+
+						// store the property value
+						this._['_open'] = true;
+
+						// dispatch open event
+						bb.command.fireEvent(this, 'open', false, false);
+
+						return true;
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="close">
+				
+				<d:body type="text/javascript"><![CDATA[
+					if (this._['_open']){
+						btl.infoBoxBase.current = null;
+						// remove event listeners from document
+						bb.document.removeEventListener('mousedown', btl.infoBoxBase.handleMouseDown, true);
+						bb.document.removeEventListener('keydown', btl.infoBoxBase.handleKeyDown, true);
+
+						// bypass the controller and set attribute at false for state sync
+						this.modelNode.setAttribute('open', 'false');
+
+						// store the property value
+						this._['_open'] = false;
+
+						// dispatch close event
+						bb.command.fireEvent(this, 'close', false, false);
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:destructor type="text/javascript"><![CDATA[
+				// Close (if necessary)
+				this.close();
+
+				// Remove all references to this element to prevent memory leaks
+				var aContext = this.getProperty('listeners');
+
+				for (var i = 0, iMax = aContext.length; iMax > i ; i++) {
+					if(aContext[i]) if(aContext[i]._) {//check if context is present and not destroyed
+						aContext[i]._.__infoBox = null;
+						aContext[i].removeEventListener('click', btl.infoBoxBase.handleOpen, false);
+						aContext[i].removeEventListener('DOMActivate', btl.infoBoxBase.handleOpen, false);
+					}
+				}
+			]]></d:destructor>
+
+			<d:handler event="construct" type="text/javascript"><![CDATA[
+				bb.ui.reflow.add(this);
+			]]></d:handler>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				//this handler is responsible for correctly setting the handlers
+				var sFor = this.getAttribute('for');
+				var aListeners = bb.document.evaluate(sFor, this);
+				this.setProperty('listeners', aListeners);
+			]]></d:handler>
+
+			<d:handler event="reflow" type="text/javascript"><![CDATA[
+				if (btl.isTrueValue('open', this.getAttribute('open')))
+					this.open();
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

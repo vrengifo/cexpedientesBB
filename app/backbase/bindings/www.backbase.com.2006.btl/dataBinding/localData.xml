@@ -1,0 +1,486 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+	<d:uses interface="iDataCommunicator" src="dataBinding.xml"/>
+
+	<d:behavior name="localData" implements="b:iDataCommunicator">
+		
+
+		
+
+		<d:resource type="text/javascript"><![CDATA[if (!btl.localData)
+	btl.localData = {};
+
+btl.localData.performRequest = function btl_localData_performRequest(oDataSource, oRequestAction, oData, bJSON, oTypeHandler, oNode) {
+	// modify local source
+	switch (oRequestAction.type) {
+	case 'delete':
+		return btl.localData.performDeleteRequest(oDataSource, oRequestAction, oData, bJSON, oTypeHandler);
+	case 'update':
+		return btl.localData.performUpdateRequest(oDataSource, oRequestAction);
+	case 'create':
+		return btl.localData.performCreateRequest(oDataSource, oRequestAction, oData, bJSON, oTypeHandler, oNode);
+	case 'sort':
+	case 'read':
+		return btl.localData.performReadRequest(oDataSource, oRequestAction, oData, bJSON, oTypeHandler);
+	}
+	return null;
+}
+
+btl.localData.performCreateRequest = function btl_localData_performCreateRequest(oDataSource, oRequestAction, oData, bJSON, oTypeHandler, oNode) {
+	//only bulk creating
+	var aCreated = {};
+
+	var oIdField = btl.dataSource.getDataField(oDataSource, 'identifier');
+
+	var oNewRecord = oDataSource._._recordTemplate ? oDataSource._._recordTemplate.getRecord() : null;//check
+
+	var saveData;
+	if (bJSON) {
+		if (oData instanceof Array) {
+			saveData = function( oNewRec, sId) {
+				oData.push(oNewRec);
+			}
+		} else if (oData instanceof Object) {
+			saveData = function(oNewRec, sId) {
+				oData[ sId] = oNewRec;
+			}
+		} else { //not supported type
+			return { 'records' : aCreated };
+		}
+	} else if (oNode) { //xml
+		if (!oNode.nodeType && 'length' in oNode) { //node list
+			oNode = oNode[oNode.length - 1].parentNode;
+		}
+		var oXMLTypeHandler = btl.dataSource.types.getType('application/xml');
+		saveData = function(oNewRec, sId) {
+			oNode.appendChild( oNewRec);
+			oDataSource._.oRecords.addRecord(new btl.dataBinding.Record(oNewRec, oXMLTypeHandler, sId, oIdField));
+		}
+		if (!oNewRecord) {//must be presented for XML data
+			btl.dataBinding.fireErrorEvent(oDataSource, 0, 'No record template was provided to create a new record');
+			return { 'records' : aCreated };
+		}
+	} else {
+		return { 'records' : aCreated};
+	}
+	function copyData(obj, data) { //need for names mapping
+		if (data instanceof Object) {
+			for (var sItemName in data) {
+				if (data.hasOwnProperty(sItemName)) {
+					var oQuery = btl.dataSource.getDataField(oDataSource, sItemName);
+				 	oTypeHandler.setValue(obj, oQuery, data[sItemName]);
+				}
+			}
+		}
+	}
+	var bNoIdInRequest = oRequestAction.records instanceof Array;
+	for (var sItemIndex in oRequestAction.records) {
+		var sRecId;
+		var oNewRecord = oDataSource._._recordTemplate ? oDataSource._._recordTemplate.getRecord() : {};
+		copyData(oNewRecord, oRequestAction.records[sItemIndex]);
+		if( bNoIdInRequest){ //get id from a record or create new one
+			if( oIdField.select.length){//read from field
+				sRecId = oTypeHandler.getValue( oNewRecord, oIdField);
+				if (sRecId != '' && sRecId != null) {
+					if (oDataSource._.oRecords.hasRecord(sRecId)) {//exists
+						btl.dataBinding.fireErrorEvent( oDataSource, 0, 'Record id - '+ sRecId + ' already exists');
+						continue;
+					}
+				} else { //create and save
+					sRecId = oDataSource._.oLocalData.sId + (oDataSource._.oLocalData.iLastId++);
+					oTypeHandler.setValue( oNewRecord, oIdField, sRecId);
+				}
+			} else { //create new
+				sRecId = oDataSource._.oLocalData.sId + (oDataSource._.oLocalData.iLastId++);
+			}
+		} else {
+			var bSaveId = false;
+			if( oIdField.select.length){//try read id and skip a key
+				sRecId = oTypeHandler.getValue( oNewRecord, oIdField);
+				if( sRecId == '' || sRecId === null){
+					bSaveId = true;
+					sRecId = sItemIndex;
+				}
+			} else
+				sRecId = sItemIndex;
+			if (oDataSource._.oRecords.hasRecord(sRecId)) { //exists
+				btl.dataBinding.fireErrorEvent( oDataSource, 0, 'Record id - '+ sRecId + ' already exists');
+				continue;
+			}
+			if (bSaveId)
+				oTypeHandler.setValue(oNewRecord, oIdField, sRecId);
+		}
+		//id is found
+		saveData(oNewRecord, sRecId);
+		aCreated[sRecId] = oNewRecord;
+	}
+	var oRecords = new btl.dataBinding.RecordList();
+	var oResponseAction = new btl.dataBinding.Action(oRequestAction.type, oRecords);
+	oResponseAction.setAttribute('records', aCreated);
+	return oResponseAction;
+}
+
+btl.localData.performReadRequest = function btl_localData_performReadRequest(oDataSource, oRequestAction, oData, bJSON, oTypeHandler) {
+	// unserialize for proceeding
+	// for the latest optimization if (!oDataSource._.bRecordsLoaded)
+	var oIdField = btl.dataSource.getDataField(oDataSource, 'identifier');
+	var	oReadDelta = oTypeHandler.unserialize(oData, oIdField, oDataSource);
+
+	var oReadDeltaAction = oReadDelta.getAction('read');
+	var oRecords = oReadDeltaAction.records;
+	var oResponseAction = new btl.dataBinding.Action(oRequestAction.type, oRecords);
+
+	var aIndexes;
+	var iTotalRecords;
+	var bSelected = false,
+		bSorted = false;
+
+	// read particular records
+	if (oRequestAction.hasAttribute('records')) {
+		aIndexes = oRequestAction.getAttribute('records');
+	}
+	
+	// select filtering
+	// XXX: not documented at all...
+	if (oRequestAction.hasAttribute('select')) {
+		// condition - a string for smartEvaluate or key/value pairs (assume RegExp type if the value starts with '/')
+		// example: { 'parentId': 'film-1', 'genre': '/Drama/i' }
+		if (oData) {
+			aIndexes = [];
+			bSelected = true;
+			var hSelect = oRequestAction.getAttribute('select');
+
+			var aFilters = [];
+			var aFields = [];
+			var aRe = [];  //array of regexp
+			var aStr = []; //array of strings
+			var oRegexp = /^\/(.*)\/([gim]*)/;
+			for (var sKey in hSelect) {
+				var sCondition = hSelect[sKey];
+				var oFilter = {};
+				var aResult = oRegexp.exec(sCondition);
+				oFilter.filter = aResult && aResult.length ? new RegExp(aResult[1], aResult[2]) : sCondition;
+				oFilter.field = btl.dataSource.getDataField(oDataSource, sKey, oRequestAction);
+				aFilters.push(oFilter);
+			}
+			//loop through all records
+			iTotalRecords = 0;
+			var aRecords = oRecords.getRecordList();
+			for (var r = 0, len = aRecords.length; r < len; r++) {
+				var oRecord = aRecords[r];
+				var bMatch = true;
+				for (var i = 0, iMax = aFilters.length; i < iMax && bMatch; i++) {
+					var oFilter = aFilters[i];
+					var sValue = oRecord.getFieldValue(oFilter.field);
+					bMatch = oFilter.filter instanceof RegExp ? oFilter.filter.test(sValue) : sValue == oFilter.filter;
+				}
+				if (bMatch) {
+					aIndexes[aIndexes.length] = oRecord.identifier;
+					iTotalRecords++;
+				}
+			}
+		}
+	}
+	
+	// sorting
+	if (oRequestAction.hasAttribute('sortDirection') && oRequestAction.hasAttribute('sortField')) { //sorted
+		var sSortDir = oRequestAction.getAttribute('sortDirection');
+		var oSortField = btl.dataSource.getDataField(oDataSource, oRequestAction.getAttribute('sortField'), oRequestAction);
+		if (sSortDir && sSortDir.length && oSortField.name && oSortField.name.length) {
+			var aArray = [];
+			bSorted = true;
+			if (aIndexes){ //selected
+				for (var i = 0, len = aIndexes.length; i < len; i++) {
+					aArray.push({ 'id' : aIndexes[i],
+						  'value' : oRecords.getRecord(aIndexes[i]).getFieldValue(oSortField)});
+				}
+			} else { //not selected
+				var aRecords = oRecords.getRecordList();
+				for (var i = 0, len = aRecords.length; i < len; i++) {
+					var oRecord = aRecords[i];
+					aArray.push({ 'id' : oRecord.identifier,
+							  'value' : oRecord.getFieldValue(oSortField)});
+				}
+				iTotalRecords = aArray.length;
+			}
+			var aResult = btl.dataBinding.sorters.sortObjectArray(aArray, oSortField.type, sSortDir == 'descending');
+			aIndexes = [];
+			for (var i = 0, len = aResult.length; i < len; i++)
+				aIndexes[i] = aResult[i].id;
+		}
+	}
+	
+	// partial requests
+	if (oRequestAction.hasAttribute('rangeStart') && oRequestAction.hasAttribute('rangeEnd')) {
+		var iStart = oRequestAction.getAttribute('rangeStart');
+		var iLast = oRequestAction.getAttribute('rangeEnd') + 1;
+		if (!aIndexes) { //unsorted and unselected
+			aIndexes = [];
+			var aRecords = oRecords.getRecordList();
+			for (var i = iStart, len = Math.min(aRecords.length, iLast); i < len; i++)
+				aIndexes.push(aRecords[i].identifier);
+			iTotalRecords = aRecords.length;
+		} else if (aIndexes) { //sorted or selected
+			aIndexes = aIndexes.slice(iStart, iLast);
+		}
+	}
+	
+	if (!isNaN(iTotalRecords))
+		oResponseAction.setAttribute('totalRecords', iTotalRecords);
+
+	if (aIndexes)
+		oResponseAction.setAttribute('indexes', aIndexes);
+	
+	return oResponseAction;
+}
+
+btl.localData.performUpdateRequest = function btl_localData_performUpdateRequest(oDataSource, oRequestAction) {
+	//do nothing, it is already changed by setValue
+	var aRecordIds = oRequestAction.records.getRecordIds();
+	var oRecords = new btl.dataBinding.RecordList();
+	var oResponseAction = new btl.dataBinding.Action(oRequestAction.type, oRecords);
+	oResponseAction.setAttribute('records', aRecordIds);
+	return oResponseAction;
+}
+
+btl.localData.performDeleteRequest = function btl_localData_performDeleteRequest(oDataSource, oRequestAction, oData, bJSON) {
+	var aRecordIds = oRequestAction.getAttribute('records');
+	var aDeleted = [];
+	if (bJSON && oData instanceof Object) { // json - object or array
+		for (var i = 0, iMax = aRecordIds.length; i < iMax; i++) {
+			delete oData[aRecordIds[i]];
+			aDeleted[aDeleted.length] = aRecordIds[i];
+		}
+	} else { //xml
+		for (var i = 0, iMax = aRecordIds.length; i < iMax; i++) {
+			if (oDataSource._.oRecords.hasRecord(aRecordIds[i])) {
+				var oCurNode = oDataSource._.oRecords.getRecord(aRecordIds[i]).source;
+				var oParent = oCurNode.parentNode;
+				if (oParent) {
+					oParent.removeChild(oCurNode);
+					aDeleted[aDeleted.length] = aRecordIds[i];
+				}
+			}
+		}
+	}
+	var oRecords = new btl.dataBinding.RecordList();
+	var oResponseAction = new btl.dataBinding.Action(oRequestAction.type, oRecords);
+	oResponseAction.setAttribute('records', aDeleted);
+	return oResponseAction;
+}
+
+]]></d:resource>
+		
+		<d:attribute name="dataSelect">
+			
+		</d:attribute>
+
+		<d:attribute name="dataType" default="application/xml">
+			
+			<d:mapper type="text/javascript"><![CDATA[
+				if (value in {'application/xml':true, 'application/json' : true, 'text/xml':true, 'text/json' : true})
+					btl.dataBinding.setType(this, value);
+				else
+					bb.command.trace( this, 'Data type: ' + value + ' is not supported.', 3)
+			]]></d:mapper>
+		</d:attribute>
+
+		<d:attribute name="asynchronous" default="true">
+			
+		</d:attribute>
+
+		<d:property name="dataRoot">
+			
+			<d:getter type="text/javascript"><![CDATA[
+				if (this.hasAttribute('dataSelect')) {
+					var sDataSelect = this.getAttribute('dataSelect');
+					var oData = bb.evaluateSmart(sDataSelect, this.modelNode, this.modelNode);
+				} else {
+					var sDataSelect = 'b:dataContainer/*';
+					var oData = bb.evaluateSmart(sDataSelect, this.modelNode, function(sPrefix) { return sPrefix == 'b' ? btl.namespaceURI : null });
+				}
+				if (!oData) {
+					var sError = 'Data not found (result of "' + sDataSelect +'" )';
+					btl.dataBinding.fireErrorEvent(this, 0, sError);
+					bb.command.trace(this, sError);
+					return null;
+				}
+				return oData;
+			]]></d:getter>
+		</d:property>
+
+		<d:method name="sendRequest">
+			<d:argument name="action"/>
+			<d:argument name="observer"/>
+			<d:body type="text/javascript"><![CDATA[
+				if (this.getAttribute('asynchronous') == 'true') {
+					var oThis = this;
+					window.setTimeout(
+						function() {
+							//Still alive?
+							if (oThis._) {
+								oThis.performRequest(action, observer)
+							}
+					}, 10)
+				} else {
+					this.performRequest(action, observer)
+				}
+			]]></d:body>
+		</d:method>
+
+		<d:method name="performRequest">
+			
+			<d:argument name="action"/>
+			<d:argument name="observer"/>
+			<d:body type="text/javascript"><![CDATA[
+				var oData = this.getProperty('dataRoot');
+				var sDataType = this.dataType;
+				var oTypeHandler = btl.dataSource.types.getType(sDataType);
+
+				if (!oData) {
+					btl.dataSource.requestQueueContinue(this);
+					return;
+				}
+				
+				//xml records container
+				var bJSON = this.dataType == "application/json" || this.dataType == "text/json";
+				if (!bJSON) {
+					var oRootNode = oData.nodeType == 9 ? oData.documentElement : oData;
+					if (this.hasAttribute('recordSelect')) {
+						// use parent node of last record as append location
+						var oNode = bb.xml.selectNodes(oRootNode, this.getAttribute('recordSelect'), this.modelNode);
+						var oNode = oNode.length && oNode[oNode.length - 1].parentNode || oRootNode;
+					} else {
+						var oNode = oRootNode;
+					}
+				}
+				var oResponseActionGroup = new btl.dataBinding.ActionGroup();
+
+				// modify local source
+				var oResponseAction = btl.localData.performRequest(this, action, oData, bJSON, oTypeHandler, oNode);
+				if (oResponseAction)
+					oResponseActionGroup.addAction(oResponseAction);
+				
+				this.acceptData(oResponseActionGroup, observer);
+				//Continue with the queue
+				btl.dataSource.requestQueueContinue(this);
+			]]></d:body>
+		</d:method>
+
+		<d:method name="pushData">
+			
+			<d:argument name="url">
+				
+			</d:argument>
+			<d:argument name="asynchronous">
+				
+			</d:argument>
+			<d:argument name="user">
+				
+			</d:argument>
+			<d:argument name="password">
+				
+			</d:argument>
+			<d:body type="text/javascript"><![CDATA[
+				var oXHR = new XMLHttpRequest;
+				var oSource = this;
+	
+				oXHR.onreadystatechange = function() {
+					if (oXHR.readyState == 4) {
+	
+						var oEvent = bb.document.createEvent('Events');
+						if (oXHR.status == 0 || (oXHR.status >= 200 && oXHR.status < 300)) {
+							oEvent.initEvent('dataResponse', true, false);
+							oEvent.XMLHttpRequest = oXHR;
+							oSource.dispatchEvent(oEvent);
+						} else {
+							oEvent.initEvent('error', true, false);
+							oEvent.XMLHttpRequest = oXHR;
+							oEvent.message = oXHR.statusText;
+							oEvent.code = oXHR.status;
+							oSource.dispatchEvent(oEvent);
+						}
+					}
+				};
+				oXHR.open('POST', url, asynchronous ? true : false, user ? user : '', password ? password : '');
+				oXHR.setRequestHeader('Accept', 'application/x-backbase+xml,application/xhtml+xml,application/xml,text/xml,*'+'/'+'*;q=0.5');
+	
+				var sData = '';
+				if (this.dataType == 'application/xml' || this.dataType == 'text/xml') {
+					oXHR.setRequestHeader('Content-Type', this.dataType);
+					var oData = this.getProperty('dataRoot');
+					if (!oData.nodeType && 'length' in oData) { //node list
+						sData = [];
+						for (var i = 0; i < oData.length; i++)
+							sData.push(bb.xml.serialize(oData[i]));
+						sData = '<data>' + sData.join('') + '</data>';
+					} else {
+						sData = bb.xml.serialize(oData);
+					}
+				} else {
+					oXHR.setRequestHeader('Content-Type', this.dataType);
+					sData =	this.typeHandler.serialize(this.getProperty('dataRoot'));
+				}
+	
+				oXHR.send(sData);
+			]]></d:body>
+		</d:method>
+
+		<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+			this._.oLocalData = { sId: 'rec_', iLastId: 1 }; //local data specific
+			//find a template for new record creation
+			var oDataSchema;
+			var aNodes = this.getProperty('childNodes');
+			for (var i=0, iMax = aNodes.length; iMax > i; i++) {
+				if (bb.instanceOf(aNodes[i], btl.namespaceURI, 'dataSchema')) {
+					oDataSchema = aNodes[i];
+					break;
+				}
+			}
+			if (oDataSchema) {
+				aNodes = oDataSchema.getProperty('childNodes');
+				for (var i=0, iMax = aNodes.length; iMax > i; i++) {
+					if (bb.instanceOf(aNodes[i], btl.namespaceURI, 'dataRecordTemplate')) {
+						this._._recordTemplate = aNodes[i];
+						break;
+					}
+				}
+			}
+		]]></d:handler>
+	</d:behavior>
+
+	<!-- ############################################# dataRecordTemplate ################################## -->
+	<d:element name="dataRecordTemplate">
+		
+
+		<d:method name="__children">
+			
+			<d:body type="text/javascript"/>
+		</d:method>
+
+		<d:method name="getRecord">
+			
+			<d:body type="text/javascript"><![CDATA[
+				var oNode = bb.xml.selectSingleNode(this.modelNode, "*");
+				if( oNode && oNode.nodeType == 1){//xml data
+					//create a clone
+					return oNode.cloneNode(true);
+				} else {//javascript
+					return eval('(' + this.getProperty('textContent') + ')');
+				}
+			]]></d:body>
+		</d:method>
+
+		<d:constructor type="text/javascript"><![CDATA[
+			try {
+				this.getRecord(); //check for bug in the template
+			} catch( e){
+				bb.command.trace(this, "Check the record template.", 3);
+			}
+		]]></d:constructor>
+	</d:element>
+
+</d:namespace>
+</d:tdl>

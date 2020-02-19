@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="boxBase" src="../boxBase.xml"/>
+
+		<d:element name="box" extends="b:boxBase">
+			<d:resource type="text/css"><![CDATA[
+				.btl-box {
+					background-color: #F5F5F7;
+				}
+				/* fixes */
+				.btl-box {
+					box-sizing: border-box;
+					-moz-box-sizing: border-box;
+					-khtml-box-sizing: border-box;
+				}
+				.ie .btl-box {
+					/* needed to make opacity work */
+					zoom: 1.0;
+				}
+			]]></d:resource>
+			<d:template type="application/xhtml+xml">
+				<div class="btl-box btl-bevel"><d:content/></div>
+			</d:template>
+		</d:element>
+	</d:namespace>
+</d:tdl>

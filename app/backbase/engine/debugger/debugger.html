@@ -1,0 +1,26 @@
+<!-- -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" style="height:100%;overflow:hidden;">
+	<head>
+		<title>Backbase Debugger</title>
+		<link rel="stylesheet" type="text/css" href="bindings/debugger.css" />
+	</head>
+	<body style="height:100%;margin:0;overflow:hidden;" class="bb-debugger"><div style="z-index:999;position:absolute;left:50%;top:50%;margin-left:-100px;margin-top:-25px; background:white; border:3px solid #000;width:200px; height:30px;text-align:center;"> Debugger disconnected, please wait until page is loaded.</div>
+
+		<script type="text/backbase+xml"
+			xmlns:xi="http://www.w3.org/2001/XInclude"
+			xmlns:e="http://www.backbase.com/2006/xel"
+			xmlns:b="http://www.backbase.com/2006/btl"
+			xmlns:c="http://www.backbase.com/2006/command"
+			xmlns:d="http://www.backbase.com/2006/tdl"
+			xmlns:t="http://www.backbase.com/2007/debugger"
+			style="width:100%; height:100%;zoom:1.0;">
+				<xi:include href="config.xml" />
+				<b:skinSettings />
+				<div style="width:100%;height:100%; zoom:1.0;" e:behavior="t:debugger">
+					<xi:include href="include.xml" />
+				</div>
+		</script>
+		<script type="text/javascript" src="../backbase.js" release="true"></script>
+	</body>
+</html>

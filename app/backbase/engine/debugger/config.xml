@@ -1,0 +1,23 @@
+<tdl xmlns="http://www.backbase.com/2006/tdl" xmlns:xi="http://www.w3.org/2001/XInclude">
+	<namespace name="http://www.backbase.com/2006/btl" xml:base="../../bindings/www.backbase.com.2006.btl/">
+		<uses element="skinSettings" src="skinSettings/chameleon/skinSettings.xml" />
+		<uses element="stretch" src="stretch/stretch.xml" />
+		<uses element="window" src="window/chameleon/window.xml" />
+		<uses element="navBox" src="navBox/chameleon/navBox.xml" />
+		<uses element="tabBox" src="tabBox/chameleon/tabBox.xml" />
+		<uses element="toolBar" src="toolBar/chameleon/toolBar.xml" />
+		<uses element="panelSet" src="panelSet/chameleon/panelSet.xml" />
+	</namespace>
+	<uses namespace="http://www.w3.org/1999/xhtml" src="../../bindings/www.w3.org.1999.xhtml/xhtml.xml" />
+	<xi:include href="../../bindings/www.backbase.com.2006.btl/codeHighlighter/codeHighlighter.xml" />
+	<xi:include href="bindings/debugger.xml" />
+	<namespace name="http://www.backbase.com/2007/debugger" xml:base="bindings/">
+		<uses element="tree modelTree viewTree treeInspect" src="tree.xml" />
+		<uses element="controllerNode viewNode tdlAttributes" src="tdl.xml" />
+		<uses element="position" src="position.xml" />
+		<uses element="consoleView console" src="console.xml" />
+		<uses element="reportContainer reportsViewer" src="reportsViewer.xml" />
+		<uses element="computedStyle" src="style.xml" />
+		<uses element="netInspector" src="net.xml" />
+	</namespace>
+</tdl>

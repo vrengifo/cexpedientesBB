@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:d="http://www.backbase.com/2006/tdl" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client" xmlns:bf="http://www.backbase.com/2007/forms"  >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+		<d:uses element="element" src="../../www.backbase.com.2006.btl/element/element.xml"/>
+		<d:uses element="positionElement dimensionElement visualElement" src="../../www.backbase.com.2006.btl/visualElement/visualElement.xml"/>
+		<d:uses element="focusableElement" src="../../www.backbase.com.2006.btl/focus/focus.xml"/>
+	</d:namespace>
+
+	<d:namespace name="http://www.backbase.com/2007/forms">
+		<d:uses interface="iFileInput iFileInputParameter" src="forms.xml"/>
+		<d:uses element="inputBase" src="formsBase.xml"/>
+
+		<d:element name="fileInput" extends="b:positionElement b:visualElement b:focusableElement bf:inputBase" implements="bf:iFileInput">
+			
+			<d:resource type="text/javascript"><![CDATA[
+				btl._fileinput_onload_handler_ie = function() {
+					btl._fileinput_dispatch_load_event(bb.getControllerFromView(event.srcElement));
+				};
+				btl._fileinput_onload_handler_w3c = function(e) {
+					btl._fileinput_dispatch_load_event(bb.getControllerFromView(e.currentTarget));
+				};
+				btl._fileinput_dispatch_load_event = function(node) {
+					bb.command.fireEvent( node, 'load', false, false);
+				};
+				btl._fileinput_dispatch_change_event = function() {
+					bb.command.fireEvent( bb.getControllerFromView(this), 'change', true, false);
+				}
+			]]></d:resource>
+
+			<d:resource type="text/css"><![CDATA[
+				.btl-fileInput-form {
+					display: inline;
+					padding: 0;
+					margin: 0;
+					zoom: 1.0; /* needed to set opacity in IE */
+				}
+			]]></d:resource>
+
+			<d:template type="text/javascript">
+				if (bb.browser.ie)
+					var iframe = document.createElement('&lt;iframe src="javascript:false;" name="' + bb.string.escapeXml('_iframe_' + this.getProperty('name')) + '"&gt;');
+				else
+					var iframe = document.createElement('iframe');
+				iframe.style.display = 'none';
+				var fileinput = document.createElement('input');
+				fileinput.type = 'file';
+				fileinput.onchange = btl._fileinput_dispatch_change_event;
+				var div = document.createElement('div');
+				if (bb.browser.ie)
+					var form = document.createElement('&lt;form enctype="multipart/form-data"&gt;');
+				else
+					var form = document.createElement('form');
+				form.className = 'btl-fileInput-form'
+				form.method = 'POST';
+				form.enctype = 'multipart/form-data';
+				form.appendChild(fileinput);
+				form.appendChild(iframe);
+				form.appendChild(div);
+				var oSpan = document.createElement('span');
+				var oInput = document.createElement('input');
+				oInput.type = 'hidden';
+
+				oSpan.appendChild(oInput);
+				oSpan.appendChild(form);
+				this.__form = form;
+
+				return [oSpan, div];
+			</d:template>
+
+			<d:attribute name="name">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					var form = this.__form;
+					var fileinput = form.firstChild;
+					var iframe = form.childNodes[1];
+					var iframename = '_iframe_' + value;
+					fileinput.setAttribute('name', value);
+					this.viewNode.firstChild.setAttribute('name', value);
+					iframe.setAttribute('name', iframename);
+					form.setAttribute('target', iframename);
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="action" onmap="this.__form.action = this.getProperty('action')">
+				
+			</d:attribute>
+
+			<d:attribute name="value">
+				
+			</d:attribute>
+
+			<d:property name="focusElement" onget="return this.__form.firstChild"/>
+
+			<d:property name="parameters">
+				<d:getter type="text/javascript"><![CDATA[
+					var aChildren = this.getElementsByTagName('*')
+					var aParameters = [];
+					for (var i = 0, iMax = aChildren.length; iMax > i; i++){
+						if( bb.instanceOf(aChildren[i], 'http://www.backbase.com/2007/forms', 'iFileInputParameter') )
+							aParameters[aParameters.length] = aChildren[i];
+					}
+					return aParameters;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="responseXML">
+				<d:getter type="text/javascript"><![CDATA[
+					var iframe = this.__form.childNodes[1];
+					if (bb.browser.ie)
+						return iframe.contentWindow.document.XMLDocument;
+					else
+						return iframe.contentDocument;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="responseHTML">
+				<d:getter type="text/javascript"><![CDATA[
+					var iframe = this.__form.childNodes[1];
+					return iframe.contentDocument || iframe.contentWindow.document;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="action" onset="this.setAttribute('action',  value);">
+				<d:getter type="text/javascript"><![CDATA[
+					return bb.uri.resolveUri(this.getAttribute('action'), this.getProperty('baseURI'))
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="name" onget="return this.getAttribute('name')" onset="this.setAttribute('name',  value)"/>
+
+			<d:property name="value" onget="return this.__form.firstChild.value"/>
+
+			<d:method name="reset">
+				
+				<d:body type="text/javascript"><![CDATA[
+					this.__form.reset();
+				]]></d:body>
+			</d:method>
+
+			<d:method name="submit">
+				<d:body type="text/javascript"><![CDATA[
+					var form = this.__form;
+					var iframe = form.childNodes[1];
+					if ('addEventListener' in iframe) {
+						iframe.addEventListener('load', btl._fileinput_onload_handler_w3c, false);
+					} else {
+						iframe.detachEvent('onload', btl._fileinput_onload_handler_ie);
+						iframe.attachEvent('onload', btl._fileinput_onload_handler_ie);
+					}
+					form.action = this.getProperty('action');
+					form.submit();
+				]]></d:body>
+			</d:method>
+
+			<d:method name="disableView">
+				<d:body type="text/javascript"><![CDATA[
+					this.__form.firstChild.disabled = true;
+					this.callSuper('disableView');
+				]]></d:body>
+			</d:method>
+
+			<d:method name="enableView">
+				<d:body type="text/javascript"><![CDATA[
+					this.__form.firstChild.disabled = false;
+					this.callSuper('enableView');
+				]]></d:body>
+			</d:method>
+		</d:element>
+
+		<d:element name="fileInputParameter" extends="b:element" implements="bf:iFileInputParameter">
+			
+
+			<d:template type="application/xhtml+xml">
+				<input type="hidden"/>
+			</d:template>
+
+			<d:attribute name="name" onmap="this.viewNode.setAttribute(name, value)">
+				
+			</d:attribute>
+
+			<d:attribute name="value" onmap="this.viewNode.setAttribute(name, value)">
+				
+			</d:attribute>
+
+			<d:property name="name" onget="return this.getAttribute('name')" onset="this.setAttribute('name',  value)"/>
+
+			<d:property name="value" onget="return this.viewNode[name]" onset="this.viewNode[name] = value"/>
+		</d:element>
+	</d:namespace>
+</d:tdl>

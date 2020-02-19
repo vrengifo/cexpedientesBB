@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+		<d:uses element="dataGridBase dataGridColGroupBase dataGridColBase" behavior="dataGridRowFocusAndSelect dataGridEditCell dataGridFreezingUI" src="../dataGridBase.xml"/>
+
+ 		<d:element name="dataGrid" extends="b:dataGridBase">
+ 			<d:resource type="text/css"><![CDATA[.btl-dataGrid {
+	position: relative;
+	outline: none;
+}
+td.btl-grid-header {
+	font-weight: bold;
+}
+td.btl-grid-data {
+	padding: 1px 5px;
+}
+/* header */
+.btl-grid-header-table,
+.btl-grid-scrollers { /* for space above/below scrollbar on the right */
+	background-image: url(media/columnHeaderBackground.png);
+	background-repeat: repeat-x;
+	background-position: top left;
+	background-color: #EDEDED;
+}
+.btl-dataGrid-fridge {
+	position: absolute;
+	top: 0;
+	left: 0;
+	overflow: hidden;
+	background-color: white;
+	-moz-outline: none;
+}]]></d:resource>
+
+			<d:resource type="text/javascript"><![CDATA[if (!btl.dataGrid) {
+	btl.dataGrid = {};
+};
+
+btl.dataGrid.Grid = function(oController, sRenderMode) {
+	btl.grid.Grid.call(this, oController, sRenderMode);
+	this.hClassNames.header = 'btl-grid-header btl-bevel-left-right btl-bevel-bottom';
+	this.hClassNames.cell = 'btl-grid-data btl-groove-right btl-groove-bottom';
+};
+
+btl.dataGrid.Grid.prototype = new btl.grid.Grid();
+
+btl.dataGrid.Grid.prototype.getTemplate = function() {
+	var oDiv = document.createElement('div');
+	oDiv.className = 'btl-dataGrid btl-bevel';
+	oDiv.style.width = this.controller.getAttribute('width');
+	oDiv.style.height = this.controller.getAttribute('height');
+	return oDiv;
+};
+
+btl.gridBase.Grid.prototype.createFridge = function(oSrcContainer) {
+	return new btl.dataGrid.Fridge(this, oSrcContainer);
+};
+
+btl.dataGrid.Fridge = function(oGrid, oSrcContainer) {
+	btl.gridBase.Fridge.call(this, oGrid, oSrcContainer);
+};
+
+btl.dataGrid.Fridge.prototype = new btl.gridBase.Fridge();
+
+btl.dataGrid.Fridge.prototype.getTemplate = function() {
+	var oDiv = document.createElement('div');
+	oDiv.className = 'btl-dataGrid-fridge btl-bevel-right';
+	oDiv.style.display = 'none';
+	return oDiv;
+};
+
+btl.dataGrid.Grid.prototype.createResizeShadow = function() {
+	return new btl.dataGrid.ResizeShadow();
+};
+
+btl.dataGrid.ResizeShadow = function() {
+	btl.gridBase.ResizeShadow.call(this);
+};
+
+btl.dataGrid.ResizeShadow.prototype = new btl.gridBase.ResizeShadow();
+
+btl.dataGrid.ResizeShadow.prototype.getTemplate = function() {
+	var oDiv = document.createElement('div');
+	oDiv.className = 'btl-grid-resize-shadow btl-chameleon-infoBackground btl-bevel-right';
+	oDiv.style.display = 'none';
+	bb.html.setStyle(oDiv, 'opacity', '0.5');
+	return oDiv;
+};]]></d:resource>
+
+			<d:method name="createGrid">
+				<d:argument name="renderMode"/>
+				<d:body type="text/javascript"><![CDATA[
+					return new btl.dataGrid.Grid(this, renderMode);
+				]]></d:body>
+			</d:method>
+ 		</d:element>
+
+		<d:element name="dataGridColGroup" extends="b:dataGridColGroupBase"/>
+
+		<d:element name="dataGridCol" extends="b:dataGridColBase"/>
+
+		<d:behavior name="dataGridRowFocusAndSelect" extends="b:dataGridRowFocusAndSelect">
+			
+			<d:resource type="text/javascript"><![CDATA[
+				/* overwriting styling settings for dataGridRowFocusAndSelect */
+				btl.dataGridRowFocusAndSelect.UI.prototype.getClassNames = function() {
+					return {
+						'focusedItem' : ['btl-grid-focusedItem', 'btl-grid-focusedItem-normal'],
+						'selectedRow' : ['btl-grid-selectedRow', 'btl-chameleon-highlightBackground', 'btl-chameleon-highlightText']
+					};
+				};
+			]]></d:resource>
+		</d:behavior>
+
+		<d:behavior name="dataGridEditCell" extends="b:dataGridEditCell">
+			
+			<d:resource type="text/javascript"><![CDATA[
+				btl.dataGridEditCell.UI.prototype.getClassNames = function() {
+					var hClassNames = {
+						'editItem' : ['btl-grid-editItem', 'btl-chameleon-highlightBackground', 'btl-chameleon-highlightText']
+					};
+
+					/* workaround(?) to avoid the same color in case the dataGridRowFocusAndSelect behavior is used */
+					if (this.dataGrid.instanceOf('http://www.backbase.com/2006/btl', 'dataGridRowFocusAndSelect')) {
+						hClassNames.editItem = ['btl-grid-editItem', 'btl-chameleon-infoBackground', 'btl-chameleon-infoText'];
+					}
+
+					return hClassNames;
+				};
+			]]></d:resource>
+		</d:behavior>
+
+		<d:behavior name="dataGridFreezingUI" extends="b:dataGridFreezingUI">
+			
+			<d:resource type="text/css"><![CDATA[
+				/* fridge splitter styling */
+				.btl-grid-fridgeSplitter-normal,
+				.btl-grid-fridgeSplitter-hover,
+				.btl-grid-fridgeSplitter-press {
+					overflow: visible;
+					cursor: w-resize;
+					border-width: 0 1px;
+					border-style: none solid;
+					/* border color is set by btl-border or chameleon skin colors */
+					box-sizing: border-box;
+					-moz-box-sizing: border-box;
+					-khtml-box-sizing: border-box;
+				}
+				.btl-grid-fridgeSplitter-normal {
+					background-color: #EDEDED;
+				}
+			]]></d:resource>
+			<d:resource type="text/javascript"><![CDATA[
+				/* overwriting styling settings for FridgeSplitter */
+				btl.dataGridFreezingUI.FridgeSplitter.prototype.classNames = {
+					'normal' : ['btl-grid-fridgeSplitter', 'btl-grid-fridgeSplitter-normal', 'btl-border-left-right'],
+					'hover'   : ['btl-grid-fridgeSplitter', 'btl-grid-fridgeSplitter-hover', 'btl-chameleon-infoBorder', 'btl-chameleon-infoBackground'],
+					'press'   : ['btl-grid-fridgeSplitter', 'btl-grid-fridgeSplitter-press', 'btl-chameleon-highlightBorder', 'btl-chameleon-highlightBackground']
+				};
+			]]></d:resource>
+		</d:behavior>
+	</d:namespace>
+</d:tdl>

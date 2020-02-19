@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl"  xmlns:bf="http://www.backbase.com/2007/forms" xmlns:x="http://www.w3.org/1999/xhtml">
+
+	<d:namespace name="http://www.backbase.com/2007/forms">
+		<d:uses interface="iInputMultiple" src="../www.backbase.com.2007.forms/forms/forms.xml"/>
+		<d:uses element="formBase inputBase inputListBase optionBase" src="../www.backbase.com.2007.forms/forms/formsBase.xml"/>
+	</d:namespace>
+
+	<d:namespace name="http://www.w3.org/1999/xhtml">
+
+		<d:uses element="form xhtmlControlElement input select option button" src="xhtml.xml"/>
+
+		<d:element name="form" extends="x:form bf:formBase">
+			<d:resource type="text/javascript"><![CDATA[
+				/*
+				 * Note: to debug problems during submission, add the following line below to
+				 *       prevent the browser from doing a browser-submit:
+				 *
+				 *       oBrowserEvent.preventDefault();
+				 */
+				xhtml.handlers.submit = function(oBrowserEvent) {
+					oBrowserEvent = oBrowserEvent || event;
+					var oForm = bb.getControllerFromView(this);
+					var bSubmit = true;
+					try {
+						bSubmit = !bb.command.fireEvent( oForm, 'submit', true, true).defaultPrevented;
+
+						if (bSubmit) {
+							var bHasDest = oForm.hasAttributeNS(BBForms.namespaceURI, 'destination') ||
+									oForm.hasAttribute('destination');
+							if (bHasDest){
+								// When there is a destination attribute, don't do a browser-submit.
+								bSubmit = false;
+								if (bb.activeElement &&
+										(bb.activeElement.instanceOf(xhtml.namespaceURI, 'input') ||
+										bb.activeElement.instanceOf(xhtml.namespaceURI, 'button')) &&
+										(bb.activeElement.getProperty('type') == 'submit' ||
+										bb.activeElement.getProperty('type') == 'image')) {
+									bb.activeElement._._successful = true;
+									oForm.submit();
+									bb.activeElement._._successful = false;
+								} else {
+									oForm.submit();
+								}
+							}
+						}
+					} catch( e ){ //If the submit handler has an error dont submit!
+						bSubmit = false;
+					}
+
+					if (!bSubmit) {
+						if(oBrowserEvent.preventDefault)
+							oBrowserEvent.preventDefault();
+
+						oBrowserEvent.returnValue = false;
+						return false;
+					}
+				};
+			]]></d:resource>
+			<d:handler event="submit" type="text/javascript"><![CDATA[
+				//If not valid do not submit
+				if(!this.validate())
+					event.preventDefault();
+			]]></d:handler>
+		</d:element>
+		<d:element name="option" extends="x:option bf:optionBase"/>
+		<d:element name="xhtmlControlElement" extends="x:xhtmlControlElement bf:inputBase" abstract="true"/>
+
+		<d:element name="input" extends="x:input">
+			<d:method name="validate">
+				<d:body type="text/javascript"><![CDATA[
+					var type = this.getProperty('type');
+					if (type == 'radio' || type == 'checkbox' && this.getProperty('required') == 1) {
+						var validity = false;
+						if (type == 'checkbox') {
+							validity = this.getProperty('successful');
+						} else if (type == 'radio') {
+							var name = this.getProperty('name');
+							var form = this.getProperty('form');
+							var elements = form.getProperty('elements');
+							var radios = [];
+							var bRequired = false;
+							for (var i=0, length=elements.length; i < length; i++) {
+								if (name == elements[i].getProperty('name')) {
+									radios[radios.length] = elements[i];
+									// it is required if any of the radios with the same name is required
+									bRequired = bRequired || elements[i].getProperty('required') == 1;
+								}
+							}
+
+							// it should only check for successful if it is actually required.
+							if (bRequired) {
+								for (var i=0, length=radios.length; i < length; i++) {
+									if ( radios[i].getProperty('successful') ) {
+										validity = true;
+										break;
+									}
+								}
+							} else {
+								validity = true;
+							}
+						}
+						if (!validity) {
+							var event = bb.document.createEvent('CustomEvent');
+							event.initCustomEventNS(null, 'invalid', true, false, 1);
+							this.dispatchEvent(event);
+							return false;
+						}
+					}
+					return this.callSuper('validate');
+				]]></d:body>
+			</d:method>
+
+			<d:property name="successful">
+				<d:getter type="text/javascript"><![CDATA[
+					var successful = this.getProperty('name') != '' && !this.getProperty('disabled');
+					if (!successful)
+						return successful;
+					var type = this.getProperty('type');
+					if (type == 'reset')
+						return false;
+					if (type == 'submit' || type == 'image')
+						return this._._successful == true; // set by the submit event
+					if (type == 'checkbox' || type == 'radio')
+						successful = successful && this.getProperty('checked');
+					return successful;
+				]]></d:getter>
+			</d:property>
+		</d:element>
+
+		<d:element name="button" extends="x:button">
+			<d:property name="successful">
+				<d:getter type="text/javascript"><![CDATA[
+					var successful = this.getProperty('name') != '' && !this.getProperty('disabled');
+					if (!successful)
+						return successful;
+					var type = this.getProperty('type');
+					if (type == 'reset')
+						return false;
+					if (type == 'submit')
+						return this._._successful == true; // set by the submit event
+					return successful;
+				]]></d:getter>
+			</d:property>
+		</d:element>
+
+		<d:element name="select" extends="x:select bf:inputListBase" implements="bf:iInputMultiple">
+			<d:property name="options">
+				<d:getter type="text/javascript"><![CDATA[
+					var options = this.viewNode.options;
+					var rv = [];
+					for (var i=0; i<options.length; i++) {
+						rv[rv.length] = bb.getControllerFromView(options[i]);
+					}
+					return rv;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="successful">
+				<d:getter type="text/javascript"><![CDATA[
+					var successful = this.getProperty('name') != '' && !this.getProperty('disabled');
+					return successful && this.getProperty('selectedIndex') != -1;
+				]]></d:getter>
+			</d:property>
+		</d:element>
+	</d:namespace>
+</d:tdl>

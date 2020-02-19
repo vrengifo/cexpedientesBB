@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+		<d:uses element="element" src="../element/element.xml"/>
+
+		<d:element name="formField" extends="b:element" abstract="true">
+			
+
+			<d:attribute name="name"/>
+
+			<d:property name="name" onget="return this.getAttribute('name')" onset="this.setAtribute('name', value)"/>
+
+			<d:property name="value"/>
+		</d:element>
+	</d:namespace>
+</d:tdl>

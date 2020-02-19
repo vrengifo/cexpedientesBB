@@ -1,0 +1,400 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="buttonBase" src="../buttonBase.xml"/>
+
+		<d:element name="button" extends="b:buttonBase">
+			
+
+			<d:resource type="text/css"><![CDATA[.btl-button {
+	cursor: pointer;
+	padding: 0;
+	margin: 0;
+	vertical-align: text-bottom;
+}
+.ie .btl-button {
+	display: inline-block;
+	zoom: 1.0; /* needed to make opacity work */
+}
+.gecko .btl-button {
+	-moz-box-align: start;
+	display: -moz-inline-grid;
+	vertical-align: bottom; /* fixes jumpy button */
+}
+.webkit .btl-button {
+	display: inline-block;
+}
+
+.opera .btl-button {
+	display: inline-block;
+	vertical-align: middle;
+}
+.btl-button-table {
+	margin: 0;
+}
+.btl-button-top-left,
+.btl-button-top-left2,
+.btl-button-top,
+.btl-button-top2,
+.btl-button-top-right,
+.btl-button-top-right2,
+.btl-button-right,
+.btl-button-bottom-right,
+.btl-button-bottom-right2,
+.btl-button-bottom,
+.btl-button-bottom2,
+.btl-button-bottom-left,
+.btl-button-bottom-left2,
+.btl-button-left,
+.btl-button-content {
+	/* drastically override possible settings from outside */
+	padding: 0 !important;
+	border-style: none !important;
+}
+.btl-button-corner,
+.btl-button-corner2 {
+	overflow: hidden;
+	width: 3px;
+	margin: 0;
+	padding: 0;
+}
+.btl-button-corner {
+	height: 1px;
+}
+.btl-button-corner2 {
+	height: 2px;
+}
+.btl-button-top-left,
+.btl-button-top-right,
+.btl-button-bottom-left,
+.btl-button-bottom-right {
+	width: 3px;
+	height: 1px;
+}
+.btl-button-top-left2,
+.btl-button-bottom-left2 {
+	width: 3px;
+	height: 2px;
+}
+.btl-button-top-left,
+.btl-button-top-left2,
+.btl-button-top-right,
+.btl-button-top-right2,
+.btl-button-bottom-left,
+.btl-button-bottom-left2,
+.btl-button-bottom-right,
+.btl-button-bottom-right2,
+.btl-button-top,
+.btl-button-top2,
+.btl-button-bottom,
+.btl-button-bottom2 {
+	background-image: url(media/buttonCornersTopBottomBorder.png);
+	background-repeat: repeat-x;
+	line-height: 0 !important;
+	font-size: 0 !important;
+}
+.btl-button-left,
+.btl-button-right {
+	background-image: url(media/buttonLeftRightBorder.png);
+	background-repeat: repeat-y;
+}
+.btl-button-top-left        { background-position: 0 0; }
+.btl-button-top-left2       { background-position: 0 -1px; }
+.btl-button-top             { background-position: 0 -48px; }
+.btl-button-top2            { background-position: 0 -49px; }
+.btl-button-top-right       { background-position: 0 -12px; }
+.btl-button-top-right2      { background-position: 0 -13px; }
+.btl-button-right           { background-position: -12px 0; }
+.btl-button-bottom-right    { background-position: 0 -26px; }
+.btl-button-bottom-right2   { background-position: 0 -24px; }
+.btl-button-bottom          { background-position: 0 -62px; }
+.btl-button-bottom2         { background-position: 0 -60px; }
+.btl-button-bottom-left     { background-position: 0 -38px; }
+.btl-button-bottom-left2    { background-position: 0 -36px; }
+.btl-button-left            { background-position: 0 0; }
+
+.btl-button .btl-button-table .btl-button-content{
+	background-color: #E8EAEC;
+	background-position: 0 0;
+	background-image: url(media/buttonBackground.png);
+	background-repeat: repeat-x;
+	white-space: nowrap;
+	text-align: center;
+}
+/* focus */
+.btl-button-contentContainer {
+	width: 100%;
+	height: 100%;
+	position: relative;
+}
+.ie .btl-button-contentContainer {
+	/* fix for bug 10448 */
+	position: static;
+}
+.btl-button-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+/* extra settings for IE5_5 cause if there is no background-color, events aren't dispached */
+.ie5_5 .btl-button-overlay {
+	filter: alpha(opacity=1);
+	background-color: #FFF;
+}
+
+.ie .btl-button-contentContainer,
+.ie .btl-button-padding {
+	 /* only for IE to avoid performance decrease.. in FF it would actually make the button collapse in some cases */
+	overflow: hidden;
+}
+.btl-button-textEffect {
+	padding: 1px;
+}
+.btl-button-focusIndicator {
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+.btl-button-focus .btl-button-focusIndicator{
+	border: 1px dotted black;
+}
+.btl-button-padding {
+	width: 100%;
+	height: 100%;
+	position: relative;
+}
+.btl-button-focusIndicator,
+.btl-button-padding {
+	box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	-khtml-box-sizing: border-box;
+}
+/* hover */
+.btl-button-hover .btl-button-top-left        { background-position: 0 -3px; }
+.btl-button-hover .btl-button-top-left2       { background-position: 0 -4px; }
+.btl-button-hover .btl-button-top             { background-position: 0 -51px; }
+.btl-button-hover .btl-button-top2            { background-position: 0 -52px; }
+.btl-button-hover .btl-button-top-right       { background-position: 0 -15px; }
+.btl-button-hover .btl-button-top-right2      { background-position: 0 -16px; }
+.btl-button-hover .btl-button-right           { background-position: -15px 0; }
+.btl-button-hover .btl-button-bottom-right    { background-position: 0 -29px; }
+.btl-button-hover .btl-button-bottom-right2   { background-position: 0 -27px; }
+.btl-button-hover .btl-button-bottom          { background-position: 0 -65px; }
+.btl-button-hover .btl-button-bottom2         { background-position: 0 -63px; }
+.btl-button-hover .btl-button-bottom-left     { background-position: 0 -41px; }
+.btl-button-hover .btl-button-bottom-left2    { background-position: 0 -39px; }
+.btl-button-hover .btl-button-left            { background-position: -3px 0; }
+
+/* active */
+.btl-button-active .btl-button-top-left        { background-position: 0 -6px; }
+.btl-button-active .btl-button-top-left2       { background-position: 0 -7px; }
+.btl-button-active .btl-button-top             { background-position: 0 -54px; }
+.btl-button-active .btl-button-top2            { background-position: 0 -55px; }
+.btl-button-active .btl-button-top-right       { background-position: 0 -18px; }
+.btl-button-active .btl-button-top-right2      { background-position: 0 -19px; }
+.btl-button-active .btl-button-right           { background-position: -18px 0; }
+.btl-button-active .btl-button-bottom-right    { background-position: 0 -32px; }
+.btl-button-active .btl-button-bottom-right2   { background-position: 0 -30px; }
+.btl-button-active .btl-button-bottom          { background-position: 0 -68px; }
+.btl-button-active .btl-button-bottom2         { background-position: 0 -66px; }
+.btl-button-active .btl-button-bottom-left     { background-position: 0 -44px; }
+.btl-button-active .btl-button-bottom-left2    { background-position: 0 -42px; }
+.btl-button-active .btl-button-left            { background-position: -6px 0; }
+.btl-button-active .btl-button-textEffect {
+	padding: 2px 0px 0px 2px;
+}
+.btl-button-active .btl-button-content{
+	background-position: 0 100%;
+	background-image: url(media/buttonBackgroundActive.png);
+	background-repeat: repeat-x;
+}
+
+/* disabled */
+.btl-disabled .btl-button-top-left        { background-position: 0 -9px; }
+.btl-disabled .btl-button-top-left2       { background-position: 0 -10px; }
+.btl-disabled .btl-button-top             { background-position: 0 -57px; }
+.btl-disabled .btl-button-top2            { background-position: 0 -58px; }
+.btl-disabled .btl-button-top-right       { background-position: 0 -21px; }
+.btl-disabled .btl-button-top-right2      { background-position: 0 -22px; }
+.btl-disabled .btl-button-right           { background-position: -21px 0; }
+.btl-disabled .btl-button-bottom-right    { background-position: 0 -35px; }
+.btl-disabled .btl-button-bottom-right2   { background-position: 0 -33px; }
+.btl-disabled .btl-button-bottom          { background-position: 0 -71px; }
+.btl-disabled .btl-button-bottom2         { background-position: 0 -69px; }
+.btl-disabled .btl-button-bottom-left     { background-position: 0 -47px; }
+.btl-disabled .btl-button-bottom-left2    { background-position: 0 -45px; }
+.btl-disabled .btl-button-left            { background-position: -9px 0; }
+
+.btl-disabled .btl-button-content { color: #ccc; }
+]]></d:resource>
+			<d:resource type="image/png" src="media/buttonBackground.png"/>
+			<d:resource type="image/png" src="media/buttonBackgroundActive.png"/>
+			<d:resource type="image/png" src="media/buttonCornersTopBottomBorder.png"/>
+			<d:resource type="image/png" src="media/buttonLeftRightBorder.png"/>
+
+			<d:template type="application/xhtml+xml">
+				<span class="btl-button"><table class="btl-button-table" cellspacing="0" cellpadding="0" border="0">
+						<tbody>
+							<tr>
+								<td class="btl-button-top-left"><div class="btl-button-corner"/></td>
+								<td class="btl-button-top"/>
+								<td class="btl-button-top-right"><div class="btl-button-corner"/></td>
+							</tr>
+							<tr>
+								<td class="btl-button-top-left2"><div class="btl-button-corner2"/></td>
+								<td class="btl-button-top2"/>
+								<td class="btl-button-top-right2"><div class="btl-button-corner2"/></td>
+							</tr>
+							<tr>
+								<td class="btl-button-left"/>
+								<td class="btl-button-content"><div class="btl-button-contentContainer"><div class="btl-button-focusIndicator"><input class="btl-invisibleFocusInput" type="button" readonly="readonly"/></div><div class="btl-button-textEffect"><div class="btl-button-padding"><d:content/></div></div><div class="btl-button-overlay"/></div></td>
+								<td class="btl-button-right"/>
+							</tr>
+							<tr>
+								<td class="btl-button-bottom-left2"><div class="btl-button-corner2"/></td>
+								<td class="btl-button-bottom2"/>
+								<td class="btl-button-bottom-right2"><div class="btl-button-corner2"/></td>
+							</tr>
+							<tr>
+								<td class="btl-button-bottom-left"><div class="btl-button-corner"/></td>
+								<td class="btl-button-bottom"/>
+								<td class="btl-button-bottom-right"><div class="btl-button-corner"/></td>
+							</tr>
+						</tbody>
+					</table></span>
+			</d:template>
+			<!-- If there is whitespace between the table and the span, the button moves text on the right when the button is clicked. -->
+
+			<d:attribute name="width">
+				<d:mapper type="text/javascript"><![CDATA[
+					// TODO: add check for removing attribute
+					if (bb.browser.gecko && bb.browser.version < 1.9) {
+						this.viewNode.firstChild.style.width = value;
+					} else {
+						this.viewNode.style.width = value;
+						this.viewNode.firstChild.style.width = '100%';
+					}
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="padding" default="1px 3px"/>
+
+			<d:attribute name="opacity">
+				<d:mapper type="text/javascript"><![CDATA[
+					bb.html.setStyle(this.viewNode, name, value);
+					if (bb.browser.ie)
+						bb.html.setStyle(this.viewGate.parentNode, name, value);
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:property name="height">
+				<d:setter type="text/javascript"><![CDATA[
+					if (bb.browser.gecko && bb.browser.version < 1.9) {
+						this.viewNode.firstChild.style.height = value;
+					} else {
+						this.viewNode.style.height = value;
+						this.viewNode.firstChild.style.height = '100%';
+					}
+					this._._height = value;
+				]]></d:setter>
+			</d:property>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				//fix for mozilla, if set in IE as well.. the button is too high
+				if(bb.browser.gecko)
+					this.viewNode.getElementsByTagName('td')[7].style.height = '100%';
+
+				bb.html.disableUserSelect(this.viewNode);
+			]]></d:constructor>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				if(bb.browser.opera) {//Force repaint in Opera (see bug 6423)
+					var oStyle = this.viewNode.style;
+					var currentDisplay = oStyle.display;
+					setTimeout(function(){if(oStyle){oStyle.display="none";oStyle.display=currentDisplay}},"0");
+				}
+			]]></d:handler>
+
+			<d:handler event="mouseenter" type="text/javascript"><![CDATA[
+				bb.html.addClass(this.viewNode, 'btl-button-hover');
+				var oBody = this.viewNode.getElementsByTagName('tbody')[0];
+				bb.html.addClass(oBody.rows[1], 'btl-chameleon-highlightBackgroundAsBorder');
+				bb.html.addClass(oBody.rows[2], 'btl-chameleon-highlightBackgroundAsBorder');
+				bb.html.addClass(oBody.rows[3], 'btl-chameleon-highlightBackgroundAsBorder');
+			]]></d:handler>
+
+			<d:handler event="mouseleave" type="text/javascript"><![CDATA[
+				bb.html.removeClass(this.viewNode, ['btl-button-hover', 'btl-button-active']);
+				// reset press effect by moving the content back
+				var oBody = this.viewNode.getElementsByTagName('tbody')[0];
+				bb.html.removeClass(oBody.rows[1], ['btl-chameleon-activeBackgroundAsBorder', 'btl-chameleon-highlightBackgroundAsBorder']);
+				bb.html.removeClass(oBody.rows[2], ['btl-chameleon-activeBackgroundAsBorder', 'btl-chameleon-highlightBackgroundAsBorder']);
+				bb.html.removeClass(oBody.rows[3], ['btl-chameleon-activeBackgroundAsBorder', 'btl-chameleon-highlightBackgroundAsBorder']);
+			]]></d:handler>
+
+			<d:handler event="mousedown" type="text/javascript"><![CDATA[
+				bb.html.addClass(this.viewNode, 'btl-button-active');
+				// do press effect by moving the content a bit
+				var oBody = this.viewNode.getElementsByTagName('tbody')[0];
+				bb.html.replaceClass(oBody.rows[1], 'btl-chameleon-highlightBackgroundAsBorder', 'btl-chameleon-activeBackgroundAsBorder');
+				bb.html.replaceClass(oBody.rows[2], 'btl-chameleon-highlightBackgroundAsBorder', 'btl-chameleon-activeBackgroundAsBorder');
+				bb.html.replaceClass(oBody.rows[3], 'btl-chameleon-highlightBackgroundAsBorder', 'btl-chameleon-activeBackgroundAsBorder');
+
+				this.focus();
+				event.preventDefault();
+			]]></d:handler>
+
+			<d:handler event="mouseup" type="text/javascript"><![CDATA[
+				bb.html.removeClass(this.viewNode, 'btl-button-active');
+				// reset press effect by moving the content back
+				var oBody = this.viewNode.getElementsByTagName('tbody')[0];
+				bb.html.replaceClass(oBody.rows[1], 'btl-chameleon-activeBackgroundAsBorder', 'btl-chameleon-highlightBackgroundAsBorder');
+				bb.html.replaceClass(oBody.rows[2], 'btl-chameleon-activeBackgroundAsBorder', 'btl-chameleon-highlightBackgroundAsBorder');
+				bb.html.replaceClass(oBody.rows[3], 'btl-chameleon-activeBackgroundAsBorder', 'btl-chameleon-highlightBackgroundAsBorder');
+			]]></d:handler>
+
+			<d:handler event="keydown" type="text/javascript"><![CDATA[
+				if ( event.keyIdentifier == 'Enter' || event.keyIdentifier == 'U+0020' ){ //enter+space
+					// set property to allow click event to be dispatched when space/enter is pressed
+					this.__dispatchClick = true;
+					bb.html.addClass(this.viewNode, 'btl-button-active');
+					// do press effect by moving the content a bit
+					var oBody = this.viewNode.getElementsByTagName('tbody')[0];
+					bb.html.addClass(oBody.rows[1], 'btl-chameleon-activeBackgroundAsBorder');
+					bb.html.addClass(oBody.rows[2], 'btl-chameleon-activeBackgroundAsBorder');
+					bb.html.addClass(oBody.rows[3], 'btl-chameleon-activeBackgroundAsBorder');
+				}
+			]]></d:handler>
+
+			<d:handler event="keyup" type="text/javascript"><![CDATA[
+				bb.html.removeClass(this.viewNode, 'btl-button-active');
+				var oBody = this.viewNode.getElementsByTagName('tbody')[0];
+				var oBody = this.viewNode.getElementsByTagName('tbody')[0];
+				bb.html.removeClass(oBody.rows[1], 'btl-chameleon-activeBackgroundAsBorder');
+				bb.html.removeClass(oBody.rows[2], 'btl-chameleon-activeBackgroundAsBorder');
+				bb.html.removeClass(oBody.rows[3], 'btl-chameleon-activeBackgroundAsBorder');
+			]]></d:handler>
+
+			<d:handler event="focus" type="text/javascript"><![CDATA[
+				bb.html.addClass(this.viewNode, 'btl-button-focus');
+			]]></d:handler>
+
+			<d:handler event="blur" type="text/javascript"><![CDATA[
+				bb.html.removeClass(this.viewNode, 'btl-button-focus');
+				bb.html.removeClass(this.viewNode, 'btl-button-active');
+				var oBody = this.viewNode.getElementsByTagName('tbody')[0];
+				var oBody = this.viewNode.getElementsByTagName('tbody')[0];
+				bb.html.removeClass(oBody.rows[1], 'btl-chameleon-activeBackgroundAsBorder');
+				bb.html.removeClass(oBody.rows[2], 'btl-chameleon-activeBackgroundAsBorder');
+				bb.html.removeClass(oBody.rows[3], 'btl-chameleon-activeBackgroundAsBorder');
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

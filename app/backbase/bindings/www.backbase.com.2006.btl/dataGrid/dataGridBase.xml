@@ -1,0 +1,3729 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+		<d:uses element="gridBase" src="../gridBase/gridBase.xml"/>
+		<d:uses element="fieldEditor" src="../fieldEditor/fieldEditor.xml"/>
+		<d:uses element="dataPagedObserver" src="../dataBinding/dataBinding.xml"/>
+
+		<d:interface name="iDataGridSelectAndFocus">
+			
+
+			
+
+			<d:attribute name="selectType">
+				
+			</d:attribute>
+
+			<d:property name="focusedItem">
+				
+			</d:property>
+
+			<d:property name="selectedItems">
+				
+			</d:property>
+		</d:interface>
+
+		<d:interface name="iDataGridEditItem">
+			
+
+			<d:property name="editedItem">
+				
+			</d:property>
+
+			<d:property name="editedRecord">
+				
+			</d:property>
+		</d:interface>
+
+ 		<d:element name="dataGridBase" extends="b:dataPagedObserver b:gridBase">
+			
+
+			
+
+			
+
+			
+
+			<d:resource type="text/css" name="grid_css"><![CDATA[.btl-grid-editor-host { /*TO-DO: remove*/
+	display: none;
+}
+.btl-grid-view-host {
+	display: none;
+	left: 1px;
+	top: 1px;
+	table-layout: fixed;
+	border-spacing: 0;
+	border-style: none none none none;
+	width: 1px;
+	height: 1px;
+}
+.btl-grid-page-holder {
+	border-bottom: 1px solid #CCCCCC;
+	outline: none;
+	color: #CCCCCC;
+	text-align: center;
+	overflow: hidden;
+}
+.btl-grid-changed {
+	color: #999;
+}
+.btl-grid-deleted * {
+	background-color: #FEE;
+}
+.btl-grid-header-content {
+	position: relative;
+}
+.ie.BackCompat .btl-grid-header-content {
+	position: static;
+}
+.ie .btl-grid-header-content {
+	overflow: hidden;
+	height: 100%;
+	width: 100%;
+}
+.gecko1_8 .btl-grid-header-content {
+	overflow:hidden;
+}
+.btl-grid-header-sorted-descending .btl-grid-header-sort-indicator {
+	background-position: 0 0;
+	visibility: inherit;
+}
+.btl-grid-header-sorted-ascending .btl-grid-header-sort-indicator {
+	background-position: 0 -5px;
+	visibility: inherit;
+}
+.btl-grid-header-sort-indicator {
+	position: absolute;
+	right: 5px;
+	top: 50%;
+	height: 5px;
+	width: 7px;
+	visibility: hidden;
+	background-image: url(media/sortArrow.png);
+	font-size: 0;
+}]]></d:resource>
+			<d:resource type="image/gif" name="freezing_arrow" src="media/arrow_collapse.gif"/>
+			<d:resource type="text/javascript"><![CDATA[// --------------------------- btlGrid ---------------------------
+if( !btl.grid){
+	btl.grid = {}
+
+	btl.grid.Grid = function(oController, sRenderMode) {
+		btl.gridBase.Grid.call(this, oController, sRenderMode);
+		this.requested = []; //array of requested pages
+		/**
+		 * Object to store properties during editing
+		 */
+		this.oEdit = {
+				hChanged : {}, //fast cache of changed records
+				hDeleted : {}  //fast cache of deleted records
+			};
+	}
+	btl.grid.Grid.prototype = new btl.gridBase.Grid();
+
+	//TODO: used for RenderOptions, which should be turned into a real object
+	btl.grid.Grid.prototype.NONE = btl.grid.NONE = -1;
+	btl.grid.Grid.prototype.VALUE = btl.grid.VALUE = 0;
+	btl.grid.Grid.prototype.INDEX = btl.grid.INDEX = 1;
+
+	btl.grid.Grid.prototype.idAttrName = 'btl_id';
+
+	/**
+	 * Finds children of specified btl type
+	 * @param {Object} elm     Parent element (controller node)
+	 * @param {String} type    Type of elements to find
+	 * @param {Array}  result  Optional array to push the result
+	 */
+	btl.grid.getChildrenByType = function btl_gridBase_getChildrenByType(oElm, sTag, aResult) {
+	// if sTag is array then we are looking for sTag[1] as oElm child and inside sTag[0] elements
+		var aRes = aResult instanceof Array ? aResult : [];
+		if (!oElm)
+			return aRes;
+		var aChildren = oElm.getProperty('childNodes')
+		if (sTag instanceof Array && sTag.length > 1) { //recursive
+			for (var i = 0, iLimit = aChildren.length; i < iLimit; i++) {
+				if (aChildren[i] && bb.instanceOf(aChildren[i], btl.namespaceURI, sTag[1]))
+					aRes[aRes.length] = aChildren[i];
+				else if (aChildren[i] && bb.instanceOf(aChildren[i], btl.namespaceURI, sTag[0]))
+					btl.grid.getChildrenByType(aChildren[i], sTag, aRes);
+			}
+		} else
+			for (var i = 0, iLimit = aChildren.length; i < iLimit; i++) {
+				if (aChildren[i] && bb.instanceOf(aChildren[i], btl.namespaceURI, sTag))
+					aRes[aRes.length] = aChildren[i];
+			}
+		return aRes;
+	}
+
+	/**
+	 * Marks the item selected or non selected.
+	 * @param {Object} items	Item(s) to mark
+	 * @param {Boolean} select  State to put on
+	 * @return true if the state is changed
+	 */
+	btl.grid.Grid.prototype.setSelected = function btl_grid_Grid_setSelected( vItems, bSelect) {
+		if (!(vItems instanceof Array))
+			vItems = [vItems];
+		var bChanged = false;
+		for (var i = 0, iMax = vItems.length; i < iMax; i++) {
+			var oIndex = this.getTableIndex(vItems[i]);
+			if (oIndex) {
+				var oDataRow = this.getDataElement(oIndex);
+				var oFridgeRow = this.getFridgeElement(oIndex);
+				if (bSelect) {
+					bChanged = bb.html.addClass(oDataRow, this.focusAndSelectUI.classNames.selectedRow) || bChanged;
+					if (oFridgeRow)
+						bb.html.addClass(oFridgeRow, this.focusAndSelectUI.classNames.selectedRow);
+				} else {
+					bChanged = bb.html.removeClass(oDataRow, this.focusAndSelectUI.classNames.selectedRow) || bChanged;
+					if (oFridgeRow)
+						bb.html.removeClass(oFridgeRow, this.focusAndSelectUI.classNames.selectedRow);
+				}
+			}
+		}
+		if (bChanged)
+			this.controller._._selectedItems = null; //reset property to refill on request
+
+		return bChanged;
+	};
+
+	/**
+	 * Highlight the cell and its fridge spouse.
+	 * @param {Object} cell	 cell to highlight
+	 * @return array of highlighted cells or null
+	 */
+	btl.grid.Grid.prototype.highlight = function btl_grid_Grid_highlight( oCell) {
+		var bChanged = false;
+		var oIndex = this.getTableIndex(oCell);
+		if (oIndex) {
+			var oDataCell = this.getDataElement(oIndex);
+			var oFridgeCell = this.getFridgeElement(oIndex);
+			var arr = [oDataCell];
+
+			bChanged = bb.html.addClass( oDataCell, this.dataGridEditCellUI.classNames.editItem);
+
+			if (oFridgeCell) {
+				arr.push(oFridgeCell);
+				bb.html.addClass(oFridgeCell, this.dataGridEditCellUI.classNames.editItem);
+			}
+
+			return bChanged ? arr : null;
+		}
+		return null;
+	};
+
+	/**
+	 * Dehighlight the cell(s).
+	 * @param {Array} cells	 cells to dehighlight (array returned by Grid.highlight method)
+	 * @return true if they are dehighlighted
+	 */
+	btl.grid.Grid.prototype.dehighlight = function btl_grid_Grid_dehighlighted( aCells) {
+		var bChanged = false;
+		if (aCells)
+			for (var i = 0; i < aCells.length; i++) {
+				bChanged = bb.html.removeClass(aCells[i], this.dataGridEditCellUI.classNames.editItem) || bChanged;
+			}
+
+		return bChanged;
+	};
+
+	/**
+	 * Loads a range of pages
+	 * @param pageStart Page number (>0)
+	 * @param pageEnd Page number (>pageStart)
+	 */
+	btl.grid.Grid.prototype.loadPages = function btl_grid_Grid_loadPages(iPageStart, iPageEnd, bClear) {
+		this.controller.setProperty('busy', true);
+		this.requested.push({ start: iPageStart, end: iPageEnd });
+		var iRows = this.controller.getProperty('rows');
+		this.loadRange((iPageStart - 1) * iRows, iPageEnd * iRows - 1, bClear);
+	}
+
+	/**
+	 * Loads a range of records
+	 * @param rangeStart Range start index
+	 * @param rangeEnd Range end index
+	 */
+	btl.grid.Grid.prototype.loadRange = function btl_grid_Grid_loadRange(iRangeStart, iRangeEnd, bClear) {
+		var oState = this.controller.getProperty('state');
+		oState.rangeStart = iRangeStart;
+		oState.rangeEnd = iRangeEnd;
+		btl.dataSource.actionRequest(this.controller, 'read', {'attributes': oState}, bClear);
+	}
+
+	/**
+	 * Get a grid row by index
+	 * @param oIndex The index (object returned by getItemIndex)
+	 * @return A row, or null if it can not be found.
+	 */
+	btl.grid.Grid.prototype.getDataElement = function btl_grid_Grid_getDataElement(oIndex) {
+		return oIndex.getElementFromPort(this.dataContainer.body);
+	}
+
+	/**
+	 * Get a fridge row by index
+	 * @param oIndex The index (object returned by getItemIndex)
+	 * @return A row, or null if it can not be found.
+	 */
+	btl.grid.Grid.prototype.getFridgeElement = function btl_grid_Grid_getFridgeElement(oIndex) {
+		if (this.fridge.isEmpty())
+			return null;
+		return oIndex.getElementFromPort(this.fridge.body);
+	}
+
+	/**
+	 * Checks if the item is selected
+	 * @param {Object} item  Item to check
+	 * @return true or false
+	 */
+	btl.grid.Grid.prototype.isSelected = function btl_grid_Grid_isSelected(oItem) {
+		return Boolean(oItem && bb.selector.match(oItem, this.focusAndSelectUI.selectors.selectedRow));
+	};
+
+	/**
+	 * Returns array of items between start and end
+	 * @param {Object} start  The first item of the range to return
+	 * @param {Object} end    The last item of the range to return
+	 * @return Array of items
+	 */
+	btl.grid.Grid.prototype.getItemsRange = function btl_grid_Grid_getItemsRange(eStart, eEnd) {
+	//TODO:implement for cells range
+		var aItems = []; //array of items to return
+		if (eStart && eEnd) {
+			var oStart = this.getTableIndex(eStart);
+			var oEnd = this.getTableIndex(eEnd);
+			if (!oStart || !oEnd) {
+				bb.command.trace( this.controller, 'btl.grid.Grid.prototype.getItemsRange: no index found.', 3);
+				return aItems;
+			}
+			if (oStart.port != oEnd.port) {
+				bb.command.trace( this.controller, 'btl.grid.Grid.prototype.getItemsRange: start and end elements belong to different views.', 3);
+				return aItems;
+			}
+			if ( oStart.type != oEnd.type) {
+				bb.command.trace( this.controller, 'btl.grid.Grid.prototype.getItemsRange: start and end elements have different dimensions.', 3);
+				return aItems;
+			}
+			switch (oStart.type) {
+				case oStart.TYPE_CELL:
+					break;
+				case oStart.TYPE_ROW:
+					var iDelta = oStart.table < oEnd.table || (oStart.table == oEnd.table && oStart.row < oEnd.row) ? 1 : -1;
+					//collect the rest of the start table
+					for (var t = oStart.table, tMax = oEnd.table + iDelta; tMax != t; t += iDelta) {
+						//1 because row# 0 is a sizer
+						var eTbl = oStart.port.getTable(t);
+						var iFirstRow = t == oStart.table ? oStart.row : iDelta > 0 ? 1 : eTbl.rows.length - 1;
+						var iLastRow = t == oEnd.table ? oEnd.row : iDelta > 0 ? eTbl.rows.length - 1 : 1;
+						for (var r = iFirstRow, rMax = iLastRow + iDelta; rMax != r; r += iDelta) {
+							aItems.push(eTbl.rows[r]);
+						}//for
+					}//for
+					break;
+				case  oStart.TYPE_TABLE:
+					var iDelta = oStart.table <= oEnd.table ? 1 : -1;
+					for (var t = oStart.table, tMax = oEnd[1] + iDelta; tMax != t; t += iDelta)
+						aItems.push(oStart.port.getTable(t));
+					break;
+			}
+		}
+		return aItems;
+	};
+
+	/**
+	 *
+	 * @param oGrid Grid
+	 * @param oElm Current element (dataGridColBase/dataGridColGroupBase)
+	 * @param aResult Array to save info
+	 * @param iDeep
+	 */
+	btl.grid.Grid.prototype.buildHeaderStructure = function btl_grid_Grid_buildHeaderStructure() {
+		var oGrid = this.controller;
+		var oThis = this;
+		var iNumberOfCols = 0, iId=0, oColumns = {}, iHCount = 0;
+		var sTag = ['dataGridColGroupBase', 'dataGridColBase'];
+
+		//recurrsive collecting header information (header groups and columns)
+		//returns the maximal deepth
+		function browseHeader( oGrid, oParent, aResult, iDeep){
+			var iRet = iDeep;
+			var aRes = aResult instanceof Array ? aResult : []
+
+			if( !oParent ) return iRet;
+			var aChildren = oParent.getProperty('childNodes')
+
+			for(var i = 0, iLimit = aChildren.length; i < iLimit; i++){
+				if(aChildren[i].modelNode.nodeType != 1) continue;
+				//idea: mark elements to render with special class, then move outside rendered elements into a grid - see btl.grid.Grid.prototype.renderHeaderContent
+				var sRenderClass = aChildren[i].viewNode ? ' btl-grid-header-render' : '';
+				if (aChildren[i] && bb.instanceOf(aChildren[i], btl.namespaceURI, sTag[1])) {
+					iId++
+					var sId = 'h' + iId;
+					var sLabel = aChildren[i].getAttribute('label');
+					var sName = aChildren[i].getAttribute('name') || sLabel;
+					var obj = {
+								'iDeep' : iDeep,
+								'sLabel' : sLabel,
+								'sTitle' : aChildren[i].getAttribute('title'),
+								'sClass' : aChildren[i].getAttribute('class') + sRenderClass + (
+												btl.isTrueValue( 'resizable', aChildren[i].getAttribute('resizable')) ? '' : (' ' + oThis.hClassNames.no_resize)),
+								'grid' : oGrid,
+								'oParent' : oParent,
+								'controller' : aChildren[i],
+								'columnId' : sId,
+								'sName' : sName,
+								'cell' : null
+								};
+					iNumberOfCols++;
+					aChildren[i]._._info = obj;   //save info
+					aRes[aRes.length] = aChildren[i];
+					oColumns[ sId] = obj;
+					iHCount++; //number of header elements
+					//set parent properties
+				} else if(aChildren[i] && bb.instanceOf(aChildren[i], btl.namespaceURI, sTag[0])){
+					iId++
+					var sId = 'h' + iId;
+					var iRowSpan = aChildren[i].getAttribute('rowspan');
+					iRowSpan = isNaN(iRowSpan) || (iRowSpan*1 <= 0)? 1 : iRowSpan*1;
+					var sName = aChildren[i].getAttribute('name') || aChildren[i].getAttribute('label')
+
+					var obj = { 'iDeep' : iDeep,
+								'sLabel' : aChildren[i].getAttribute('label'),
+								'sTitle' : aChildren[i].getAttribute('title'),
+								'sClass' : aChildren[i].getAttribute('class') + sRenderClass,
+								'aColumns' : [],
+								'iRowspan' : iRowSpan,
+								'grid' : oGrid,
+								'parent' : oParent,
+								'controller' : aChildren[i],
+								'columnId' : sId,
+								'sName' : sName,
+								'cell' : null
+								};
+					aChildren[i]._._info = obj;   //save info
+					iRet = Math.max( browseHeader(oGrid, aChildren[i], obj.aColumns, iDeep + iRowSpan), iRet);
+					obj.iLastColumn = iNumberOfCols - 1;
+					aRes[aRes.length] = aChildren[i];
+					oColumns[ sId] = obj;
+					iHCount++;
+				}
+			}
+			//if( iDeep)
+			return iRet;
+		}//function browseHeader
+		var aHeaders = [];
+		var iRet = browseHeader( oGrid, oGrid, aHeaders, 0);
+
+		this.oGridColumns = oColumns;
+
+		//actual rendering headers into table elements
+		var aStr = [];
+		iRet++;
+		var sHeaderId = this.idAttrName;
+
+		//recursive glue header rows
+		//every aStr element is an array of html strings for the corresponding depth
+		function glue( arr, iDeep){
+			if( !aStr[iDeep])
+				aStr[iDeep] = []
+			var iNum = 0
+			for(var i=0; i < arr.length; i++){
+				var iRowSpan = arr[i]._._info.iRowspan ? arr[i]._._info.iRowspan : iRet - iDeep;
+				var iColSpan = 1
+				var sClass = [' class="' + oThis.hClassNames.header];
+				if( arr[i]._._info.sClass )
+					sClass.push( arr[i]._._info.sClass)
+				if( arr[i]._._info.aColumns){
+					iColSpan = glue( arr[i]._._info.aColumns, iDeep + iRowSpan)
+					iNum += iColSpan
+				} else {
+						iNum++
+				}
+				var sTitle = arr[i]._._info.sTitle ? ('title="' + arr[i]._._info.sTitle + '" ') : '';
+				aStr[iDeep].push( '<td ' + sTitle + sHeaderId + '="' + arr[i]._._info.columnId + '" ' + sClass.join(' ') + '"' + ( iRowSpan > 1 ? (' rowspan="' + iRowSpan + '" ') : '')
+										+ ( iColSpan > 1 ? (' colspan="' + iColSpan + '" ') : '') + '>' + arr[i]._._info.sLabel + '</td>')
+			}
+			return iNum;
+		}
+		//get html for every row
+		glue( aHeaders, 0);
+		//stitch them together
+		var str = [];
+		for(var i=0; aStr[i]; )
+			str.push('<tr>' + aStr[i++].join('') + '</tr>')
+		return str.join('');
+	}
+
+	/**
+	 * Initiates the current grid render options
+	 */
+	btl.grid.Grid.prototype.buildRenderOptions = function btl_grid_Grid_buildRenderOptions() {
+		var oGrid = this.controller;
+		var oSource = oGrid.getProperty('dataSource');
+
+		var aColumns = [];
+		var aColRow = []; //'<colgroup>'
+		var aSizerRow = ['<tr class="' + this.hClassNames.columnSizerRow + '">'];
+		var sDefaultWidth = oGrid.getProperty('defaultColumnWidth');
+		var bInitColumnSize = !this.initialized;
+
+		var aCol = oGrid.getProperty('columns');
+		var bHasIndex = false;//has index column
+
+		for(var i=0; i < aCol.length; i++){
+			var oColOpt = aCol[i].getProperty('renderOptions');
+
+			if (typeof oColOpt.vFormat == 'string')
+				oColOpt.vFormat = btl.dataSource.getFormat( oSource, oColOpt.sQuery, oColOpt.vFormat);
+
+			oColOpt.bHidden = aCol[i].getProperty('hidden');
+
+			bHasIndex = bHasIndex || (oColOpt.iRender == this.INDEX);
+
+			aColumns.push( oColOpt);
+			aColRow.push( '<col ' + (oColOpt.sDataClass ? ' class="' + oColOpt.sDataClass + '"' : '') +
+				(oColOpt.sAlign ? ' align="' + oColOpt.sAlign + '"' : '') +
+				(oColOpt.sVAlign ? ' valign="' + oColOpt.sVAlign + '"' : '') +
+				' />');
+
+			var oCol = this.columns.getColumn(i);
+			var sWidth = (oCol ? oCol.getWidth() : oColOpt.sWidth) || sDefaultWidth;
+			this.aRestoreWidths[i] = sWidth;
+			aSizerRow.push( '<td style="width:' + (oColOpt.bHidden ? '0px' : sWidth) + '" ' + (oColOpt.bResizable ? '' : (' class="' + this.hClassNames.no_resize + '" '))+ '></td>');
+		}
+
+		aSizerRow.push('</tr>');
+
+		this.oRenderOptions = {
+				'sColRow' 	: aColRow.join(''),
+				'sSizerRow' : aSizerRow.join(''),
+				'aColumns'  : aColumns,  //column render options
+				'bHasIndex' : bHasIndex, //has index column(s)
+				'oSource'   : oSource
+				};
+	}
+
+	/**
+	 * Renders header table
+	 */
+	btl.grid.Grid.prototype.renderHeader = function btl_grid_Grid_renderHeader() {
+		var html = [];
+		html.push(this.renderer.getHeadStartTemplate());
+		html.push(this.renderer.getTableStartTemplate());
+		//html.push(this.oRenderOptions.sColRow);
+		html.push(this.oRenderOptions.sSizerRow);
+		html.push(this.buildHeaderStructure());
+		html.push(this.renderer.getTableEndTemplate());
+		html.push(this.renderer.getHeadEndTemplate());
+		this.renderer.write(html.join(''));
+	}//renderHeader
+
+	/**
+	 * Renders body tables
+	 * @param {Array} records  - array of record ids to be rendered
+	 * @param {integer} start  - first index in array to start a table rendering
+	 * @param {integer} length - number of records to render
+	 */
+	btl.grid.Grid.prototype.renderTable = function btl_grid_Grid_renderTable(aRecords, iStart, iLength) {
+		var aHtml = [];
+		var oGrid = this.controller;
+
+		var oRenderOpt = this.oRenderOptions;
+		var oSource = oRenderOpt.oSource;
+		if (!oRenderOpt.aColumns.length)
+			return; // no columns info
+
+		aHtml.push(this.renderer.getTableStartTemplate());
+		aHtml.push(oRenderOpt.sColRow);
+		aHtml.push(oRenderOpt.sSizerRow);
+
+		var iMax = iStart + iLength;
+		if( iMax > aRecords.length) iMax = aRecords.length;
+
+		for(var i = iStart; iMax > i; i++){
+			aHtml.push('<tr ' + this.idAttrName + '="');
+			aHtml.push( aRecords[i]);
+			aHtml.push('" class="' + this.hClassNames.row + '">');
+			var iCell = 0;
+			for(var j = 0, jMax = oRenderOpt.aColumns.length; j < jMax; j++){
+				var opt = oRenderOpt.aColumns[j];
+				aHtml.push('<td class="' + this.hClassNames.cell + (opt.sDataClass ? ' ' + opt.sDataClass : '') + '">'); //' btl-grid-column-' + aColNames[j] +
+				if(opt.iRender == this.VALUE && opt.sQuery != '')
+					aHtml.push( btl.dataSource.getValue(oSource, aRecords[i], opt.sQuery, opt.vFormat));
+				else if(opt.iRender == this.INDEX)
+					aHtml.push(i + 1);
+				else if(opt.iRender == this.NONE)
+					;
+
+				aHtml.push('</td>');
+			}//for( j
+			aHtml.push('</tr>');
+		}//for( i
+		aHtml.push(this.renderer.getTableEndTemplate());
+		this.renderer.write(aHtml.join(''));
+	}//renderTable
+
+	/**
+	 *   render all necessary tables
+	 *   completly render grid data
+	 */
+	btl.grid.Grid.prototype.renderGrid = function btl_grid_Grid_renderGrid(aRecords) {
+		var iNRowsPerTable = this.controller._._iChunkSize;
+		this.renderer.open();
+		var bFirst = !this.initialized;
+		//refresh render options
+		this.buildRenderOptions();
+
+		if (bFirst){ //first initial rendering
+			this.renderHeader();
+		}
+		this.renderer.write(this.renderer.getBodyStartTemplate());
+		//render body
+		if (aRecords.length){//non empty data
+			for (var i = 0, iMax = aRecords.length; iMax > i; i += iNRowsPerTable){
+				this.renderTable(aRecords, i, iNRowsPerTable);
+			}
+		} else { //render empty table
+			this.renderTable([], 0, iNRowsPerTable);
+		}
+		this.renderer.write(this.renderer.getBodyEndTemplate());
+		this.renderer.close();
+		this.renderer.ready();
+	}
+	
+	/**
+	 * Render all necessary tables, spanning several pages
+	 * @param records The record identifiers array
+	 * @param pageStart The first page
+	 * @param pageEnd The last page
+	 */
+	btl.grid.Grid.prototype.renderGridPages = function(aRecords, iPageStart, iPageEnd) {
+		var iRows = aRecords.length / (iPageEnd - iPageStart + 1),
+			i = 0;
+		for (var iPage = iPageStart; iPage <= iPageEnd; iPage++) {
+			var aPageRecords = aRecords.slice(i, i + iRows);
+			this.renderGridPage(aPageRecords, iPage);
+			i = i + iRows;
+		}
+	}
+	/**
+	 * Render all necessary tables
+	 * Renders grid pages and page holders in livescrolling mode only
+	 * @param aRecords The record identifiers array
+	 * @param iPage The page number
+	 */
+	btl.grid.Grid.prototype.renderGridPage = function btl_grid_Grid_renderGridPage(aRecords, iPage) {	
+		if (!this.initialized){ //first initial rendering
+			this.renderGrid(aRecords);
+			return;
+		}
+		var oPage = this.pageHolders.pages[iPage];
+		if (!oPage) {
+			bb.command.trace(this.controller, "No page holder for a page " + iPage, 3);
+			return;
+		}
+
+		var iNRowsPerTable = this.controller._._iChunkSize;
+		//refresh render options
+		this.buildRenderOptions();
+
+		oPage.reset();
+		this.renderer.open();
+		//render body
+		if (aRecords.length){//non empty data
+			for (var i = 0, iMax = aRecords.length; iMax > i; i += iNRowsPerTable){
+				this.renderTable(aRecords, i, iNRowsPerTable);
+			}
+		} else { //render empty table
+			this.renderTable([], 0, iNRowsPerTable);
+		}
+		this.renderer.close(oPage.viewNode);
+		oPage.ready();
+		this.renderer.ready();
+		var iMaxPages = parseInt(this.controller.getAttribute('maxPages'));
+		if (iMaxPages)
+			this.pageHolders.unload(iMaxPages);
+	}
+
+	/**
+	 * Creates page holders - elements to substitutes not loaded pages
+	 */
+	btl.grid.Grid.prototype.createPageHolders = function btl_grid_Grid_createPageHolders() {
+		if (this.pageHolders || !this.dataContainer.body.tables || !this.dataContainer.body.tables.length) return;
+		var oGrid = this.controller;
+		var iNPages = oGrid.getProperty('totalPages');
+		var iCurPage = oGrid.getProperty('page');
+		
+		var oLastTable = this.dataContainer.body.tables[this.dataContainer.body.tables.length - 1];
+		var sPageHeight = (oLastTable.offsetTop + oLastTable.offsetHeight - this.dataContainer.body.tables[0].offsetTop)  + 'px';
+		
+		this.pageHolders = new btl.grid.PageHolders( this, sPageHeight);
+				
+		var oInsertPoint = this.dataContainer.body.tables[0];
+		var iPage = 1;
+		for (; iPage < iCurPage; iPage++) {
+			this.pageHolders.addPage(iPage, oInsertPoint);
+		}
+		this.pageHolders.addPage(iPage).ready( this.dataContainer.body.tables);
+		iPage++;
+		for (; iPage <= iNPages; iPage++){
+			this.pageHolders.addPage(iPage);
+		}
+		this.scrollers.scrollBar.updateScrollHeight();
+		//jump to the current page
+		if (iCurPage > 1 && oInsertPoint) {
+			this.dataContainer.body.setPosition( oInsertPoint.offsetTop);
+//			this.scrollers.scrollBar.setPosition( oInsertPoint.offsetTop);
+		}		
+	}
+	btl.grid.Grid.prototype.updatePageHolders = function btl_grid_Grid_updatePageHolders() {
+		if (this.pageHolders) {
+			var iNPages = oGrid.getProperty('totalPages');
+			var iN = this.pageHolders.pages.length; //number of page holders
+			if (iN > 0) iN--;
+			for(var i = 0; i < iNPages - iN; i++)//add new
+				this.pageHolders.addPage(i + iN + 1);
+
+			for(var i = iN + 1; i > iNPages; i--){//delete extra
+				var oPage = this.pageHolders.pop();
+				oPage.unload( true);
+				if( oPage.viewNode.parentNode)
+					oPage.viewNode.parentNode.removeChild(oPage.viewNode);
+			}
+			this.scrollers.scrollBar.updateScrollHeight();
+		}
+	}
+	btl.grid.Grid.prototype.destroyPageHolders = function btl_grid_Grid_destroyPageHolders() {
+		if (this.pageHolders) {
+			this.pageHolders.clear();
+			delete this.pageHolders;
+			this.scrollers.scrollBar.updateScrollHeight();
+		}
+	}
+	/**
+	 * Finishes initial rendering
+	 */
+	btl.grid.Grid.prototype.ready = function btl_grid_Grid_ready() {
+		this.renderHeaderContent();
+		var bLivescrolling = this.controller.getProperty('livescrolling');
+		if ( bLivescrolling && !this.pageHolders){
+			this.createPageHolders();
+		}
+		this.navigation = new btl.grid.Navigation( this, this.dataContainer.body, bLivescrolling);
+	}
+	
+	/**
+	 * Renders XHTML and BTL in header cells, moves fieldEditor to the editorHost
+	 */
+	btl.grid.Grid.prototype.renderHeaderContent = function btl_grid_Grid_renderHeaderContent() {
+		//collect rendered header elements and move them to header cells
+		//header cells to render
+		var aCells = bb.selector.queryAll( this.dataContainer.header.viewNode, "TD.btl-grid-header-render");
+
+		//elements to show
+		//header group elements(SPAN) can be inside each other and redrawing happens when inner elements are removed from outter ones
+		//to avoid this content is shown after restructuring is finished
+		var aShow = [];
+
+		for (var i = 0; i < aCells.length; i++) {
+			var oHeadCell = this.oGridColumns[ aCells[i].getAttribute( this.idAttrName)];
+			bb.html.removeClass(aCells[i], 'btl-grid-header-render');
+			if ( oHeadCell) {
+				var oCol = oHeadCell.controller;
+
+				var oSpan = document.createElement('span');
+				oSpan.innerHTML = aCells[i].innerHTML; //save label
+				oCol.viewGate.appendChild(oSpan);
+				aCells[i].innerHTML = '';
+				aCells[i].appendChild( oCol.viewNode);
+				aCells[i].column = oCol;			//attach controller to a header cell
+				oCol.viewNode.style.display = '';
+			}
+		}
+		if (!this.fridge.isEmpty()){
+			this.fridge.update();
+		}
+	}
+
+	/**
+	 * Sets a fieldEditor element as a column editor.
+	 * @param {Controller} column dataGridColBase element to attach to
+	 * @param {Controller} editor fieldEditor element to be attached
+	 * @return {Controller} The attached editor
+	 */
+	btl.grid.Grid.prototype.attachFieldEditor = function btl_grid_Grid_attachFieldEditor( oColumn, oEditor) {
+		if ( !oEditor) {//find a fieldEditor
+			var arr = oColumn.getProperty('childNodes');
+			for ( var j = 0; j < arr.length; j++)
+				if (arr[j] && bb.instanceOf(arr[j], btl.namespaceURI, 'fieldEditor')) {
+					oEditor = arr[j];
+					break;
+				}
+		}
+		if ( !oEditor) {//create default
+			oEditor = oColumn.appendChild( btl.fieldEditor.createDefaultEditor(oColumn.getProperty("dataType").toLowerCase()));
+		}
+		var oRow = this.editorsHost;
+		if (oColumn._._editor) {//remove old
+			oRow.removeChild( oColumn._._editor.viewNode.parentNode);
+		}
+		if (oEditor) {//attach new one
+			oRow.appendChild( document.createElement('td')).appendChild(oEditor.viewNode);
+			oEditor.viewNode.style.display = '';
+		}
+		oColumn._._editor = oEditor;
+		return oEditor;
+	}
+
+	/**
+	 * Disables selecting text in a grid.
+	 */
+	btl.grid.Grid.prototype.disableUserSelect = function btl_grid_Grid_disableUserSelect() {
+		bb.html.disableUserSelect(this.dataContainer.header.viewNode);
+		bb.html.disableUserSelect(this.dataContainer.body.viewNode);
+		bb.html.disableUserSelect(this.fridge.viewNode);
+		if (!this.fridge.isEmpty()) {
+			bb.html.disableUserSelect(this.fridge.header.viewNode);
+			bb.html.disableUserSelect(this.fridge.body.viewNode);
+		}
+	};
+
+	/**
+	 * Enables selecting text in a grid.
+	 */
+	btl.grid.Grid.prototype.enableUserSelect = function btl_grid_Grid_enableUserSelect() {
+		bb.html.enableUserSelect(this.dataContainer.header.viewNode);
+		bb.html.enableUserSelect(this.dataContainer.body.viewNode);
+		bb.html.enableUserSelect(this.fridge.viewNode);
+		if (!this.fridge.isEmpty()) {
+			bb.html.enableUserSelect(this.fridge.header.viewNode);
+			bb.html.enableUserSelect(this.fridge.body.viewNode);
+		}
+	};
+
+	/**
+	 * Returns dataGridColBase elements in the current order.
+	 * @param {Object} row Grid row.
+	 * @return Array of dataGridColBase controllers
+	 */
+	btl.grid.Grid.prototype.getColumns = function btl_grid_Grid_getColumns() {
+		var oColumns = this.columns;
+		var aRet = [];
+		for (var i = 0, len = oColumns.getLength(); i < len; i++)
+			aRet[i] = oColumns.getColumn(i).tableIndex.getElement().column;
+		return aRet;
+	}
+
+	/**
+	 * Returns a requested row.
+	 * @param {recordId} recordId.
+	 * @return row element
+	 */
+	btl.grid.Grid.prototype.getRow = function btl_grid_Grid_getRow( recordId) {
+		return bb.selector.query(this.dataContainer.body.viewNode, this.hSelectors.row + '[' + this.idAttrName + '="' + recordId + '"]');
+	}
+
+	/**
+	 * Updates changed record
+	 * @param {String} id ID of changed record
+	 */
+	btl.grid.Grid.prototype.updateRecord = function btl_grid_Grid_updateRecord( sId) {
+		var oRow = null;
+		// TODO: make a method getRowById...
+		if (this.oEdit.hChanged.hasOwnProperty(sId)) {
+			oRow = this.oEdit.hChanged[sId];
+			delete this.oEdit.hChanged[sId];
+		} else {//find the row
+			oRow = this.getRow(sId);
+		}
+		if (oRow) {
+			var oIndex = this.getTableIndex(oRow);
+			if (oIndex)
+				this.updateRow(oIndex, sId);
+		}
+	}
+
+	/**
+	 * Update a row from the datasource
+	 * @param oRow The row
+	 * @param sId The row ID in the datasource
+	 */
+	btl.grid.Grid.prototype.updateRow = function btl_grid_Grid_updateRow(oIndex, sId) {
+		var oRow = this.getDataElement(oIndex);
+		if (oRow) {
+			var oSource = this.controller.getProperty('dataSource');
+			var aCols = this.controller.getProperty('columns');
+			for (var j=0; j < aCols.length; j++) {
+				var opt = aCols[j].getProperty('renderOptions');
+				if (opt.iRender == this.VALUE) {
+					oRow.cells[j].innerHTML = opt.sQuery != '' ? btl.dataSource.getValue(oSource, sId, opt.sQuery, opt.vFormat) : '';
+				}
+				bb.html.removeClass(oRow.cells[j], this.hClassNames.changed);
+			}
+		}
+		this.dataContainer.body.signalRowUpdated(oIndex);
+	}
+
+	/**
+	 * Updates changed cell
+	 * @param {Object} cell cell to update content
+	 */
+	btl.grid.Grid.prototype.updateCell = function btl_grid_Grid_updateCell( oCell) {
+		var oSource = this.controller.getProperty( 'dataSource');
+
+		var oRow = oCell.parentNode;
+		if ( oRow) {
+			var oCol = this.controller.getProperty( 'columns')[oCell.cellIndex];
+			if (oCol) {
+				var oRenderOpt = oCol.getProperty('renderOptions');
+				if( oRenderOpt.iRender == this.VALUE && oRenderOpt.sQuery != '') {
+					oCell.innerHTML = btl.dataSource.getValue(oSource, this.controller.getRecordId( oRow), oRenderOpt.sQuery, oRenderOpt.vFormat);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Deletes record
+	 * @param {String} id ID of record
+	 */
+	btl.grid.Grid.prototype.deleteRecord = function btl_grid_Grid_deleteRecord( sId) {
+		var oSource = this.controller.getProperty( 'dataSource');
+		var oRow = null;
+
+		// TODO: make a method getRowById...
+		if (this.oEdit.hDeleted.hasOwnProperty(sId)) {
+			oRow = this.oEdit.hDeleted[sId];
+			delete this.oEdit.hDeleted[sId];
+		} else {//find the row
+			oRow = this.getRow(sId);
+		}
+		if (oRow && oRow.parentNode && oRow.parentNode.nodeType == 1) {
+			var oIndex = this.getTableIndex(oRow);
+			if (oIndex)
+				this.dataContainer.body.removeRow(oIndex);
+		}
+	}
+
+	/**
+	 * Deletes data
+	 */
+	btl.grid.Grid.prototype.deleteData = function btl_grid_Grid_deleteData() {
+		//nothing to delete
+		if (!this.initialized)
+			return;
+
+		this.dataContainer.body.clear();
+	}
+
+	/**
+	 * Changes livescrolling setting
+	 */
+	btl.grid.Grid.prototype.setLivescrolling = function btl_grid_Grid_setLivescrolling( bEnable) {
+		if (bEnable) {
+			this.createPageHolders();
+			this.navigation.bLivescrolling = true;
+			
+		} else {
+			this.destroyPageHolders();
+			this.navigation.bLivescrolling = false;
+		}
+	}
+	/**
+	 *  Data port navigation
+	 */
+	btl.grid.Navigation = function( oGrid, oPort, bLivescrolling) {
+		this.grid = oGrid;
+		this.port = oPort;
+		this.bLivescrolling = bLivescrolling;
+	}
+
+	btl.grid.Navigation.prototype = {}
+	
+	/**
+	 * Returns a new TableIndex object that is at a specified offset from another.
+	 * @param {TableIndex} oIndex
+	 * @param {Number} iOffset
+	 * @return
+	 * does not work with livescrolling
+	 */
+	btl.grid.Navigation.prototype.getOffsetRow = function(oRow, iOffset) {		
+		var oTableIndex = this.port.getTableIndex(oRow);
+
+		var oSuccess = oTableIndex && oTableIndex.offsetRow(iOffset);
+		return oSuccess ? oTableIndex.getElement() : null;
+	}
+
+	btl.grid.Navigation.prototype.getFirstRow = function() {
+		return this.port.tables[0].rows[1] || null;
+	}
+
+	btl.grid.Navigation.prototype.getLastRow = function() {
+		var oTable = this.port.tables[this.port.tables.length - 1];
+		return oTable.rows.length ? oTable.rows[oTable.rows.length - 1] : null;
+	}
+
+	btl.grid.Navigation.prototype.getPreviousRow = function(oRow) {
+		return this.getOffsetRow(oRow, -1);
+	}
+
+	btl.grid.Navigation.prototype.getNextRow = function(oRow) {
+		return this.getOffsetRow(oRow, 1);
+	}
+
+	/**
+	 * Gets the row that is one page before the specified row
+	 * @param oRow The context row
+	 * @return The row one page before the specified row
+	 */
+	btl.grid.Navigation.prototype.getPreviousPageRow = function(oRow) {
+		var iTop = this.port.getRowOffset(oRow) - this.port.viewNode.offsetHeight;
+		var oLastRow = oRow;
+		while (oRow && this.port.getRowOffset(oRow) >= iTop) {
+			oLastRow = oRow;
+			oRow = this.getPreviousRow(oRow);
+		}
+		return oLastRow;
+	}
+
+	/**
+	 * Gets the row that is one page after the specified row
+	 * @param oRow The context row
+	 * @return The row one page after the specified row
+	 */
+	btl.grid.Navigation.prototype.getNextPageRow = function(oRow) {
+		var iBottom = this.port.getRowOffset(oRow) + this.port.viewNode.offsetHeight;
+		var oLastRow = oRow;
+		while (oRow && this.port.getRowOffset(oRow) <= iBottom) {
+			oLastRow = oRow;
+			oRow = this.getNextRow(oRow);
+		}
+		return oLastRow;
+	}
+
+	/**
+	 * Find the row that is at the specified offset.
+	 * @param iOffset A vertical offset relative to the Port
+	 * @return The row at the offset, or the row closest to it.
+	 * works only with loaded pages
+	 */
+	btl.grid.Navigation.prototype.getRowAtOffset = function(iOffset) {
+		// XXX: Can be optimised by doing a binary search
+		for (var i = 0, len = this.port.tables.length; i < len; i++) {
+			if (this.port.tables[i].offsetTop > iOffset)
+				break;
+		}
+		var oTable = this.port.tables[i - 1];
+		iOffset = iOffset - oTable.offsetTop;
+		for (var j = 0, len = oTable.rows.length; j < len; j++) {
+			if (oTable.rows[j].offsetTop > iOffset)
+				break;
+		}
+		return oTable.rows[j - 1];
+	}
+
+	/**
+	 * Gets the first row on the currently visible page.
+	 * @param eItem Row node to start searching from.
+	 * @return The first row on the currently visible page.
+	 */
+	btl.grid.Navigation.prototype.getFirstRowOnPage = function() {
+		var iTop = this.port.getPosition();
+		var oRow = this.getRowAtOffset(iTop);
+		if (this.port.getRowOffset(oRow) < iTop)
+			oRow = this.getNextRow(oRow) || oRow;
+		return oRow;
+	}
+
+	/**
+	 * Gets the last row on the currently visible page.
+	 * @param eItem Row node to start searching from.
+	 * @return The last row on the currently visible page.
+	 */
+	btl.grid.Navigation.prototype.getLastRowOnPage = function() {
+		var iBottom = this.port.getPosition() + this.port.viewNode.offsetHeight - 1;
+		var oRow = this.getRowAtOffset(iBottom);
+		if (this.port.getRowOffset(oRow) + oRow.offsetHeight - 1 > iBottom)
+			oRow = this.getPreviousRow(oRow) || oRow;
+		return oRow;
+	}
+
+	/**
+	 * Returns the first visible row, or the row one page above it if that is the row passed.
+	 * @param eItem
+	 * @return
+	 */
+	btl.grid.Navigation.prototype.getPageUpRow = function(eItem) {
+		var eFirst = this.getFirstRowOnPage(eItem);
+		if (this.port.getRowOffset(eFirst) >= this.port.getRowOffset(eItem))
+			eFirst = this.getPreviousPageRow(eItem);
+		return eFirst;
+	}
+
+	/**
+	 * Returns the last visible row, or the row one page below it if that is the row passed.
+	 * @param eItem
+	 * @return
+	 */
+	btl.grid.Navigation.prototype.getPageDownRow = function(eItem) {
+		var eLast = this.getLastRowOnPage(eItem);
+		if (this.port.getRowOffset(eLast) <= this.port.getRowOffset(eItem))
+			eLast = this.getNextPageRow(eItem);
+		return eLast;
+	}
+
+	//calls a command and calls a callBack function on the command result
+	//if a required page is not loaded it loads the page and then retries
+	//
+	// cmd - command to be perfomed
+	// param - initial element to count from
+	// callBack - function to be called back
+	// bLoadAll - load all intermediate pages also
+	btl.grid.Navigation.prototype.call = function(cmd, param, callBack, bLoadAll) {
+		//check if param is valid - it can be destoryed
+		if(param && !param.offsetParent)//just ignore the command
+			return;
+		if (!this.bLivescrolling) {
+			oRes = this[cmd](param);
+			if (callBack) {
+				callBack(oRes);
+			}
+			return;
+		}
+		//-livescrolling code
+		//check necessary page presence
+		var aPages = this.grid.pageHolders.pages;
+		var iPage = 0;	  //page to load, default 0 - no need to load any page
+		var oRes = null;  // result
+		switch(cmd){
+			case "getFirstRow":
+				if (!aPages[1].loaded)
+					iPage = 1;
+				break;
+			case "getLastRow":
+				var i = aPages.length - 1;
+				if (!aPages[i].loaded)
+					iPage = i;
+				break;
+			case "getPreviousRow":
+				var oRow = param;
+				if (oRow.rowIndex > 1) break; //no need to check a page
+
+				//check if a required page is loaded
+				var i = this.grid.pageHolders.getPage( oRow) - 1;
+				if (i >= 1 && !aPages[i].loaded)
+					iPage = i;
+				break;
+			case "getNextRow":
+				var oRow = param;
+				if (oRow.rowIndex + 1 < oRow.parentNode.rows.length) break; //no need to check a page
+				//check if a required page is loaded
+				var i = this.grid.pageHolders.getPage( oRow) + 1;
+				if (i < aPages.length && !aPages[i].loaded)
+					iPage = i;
+				break;
+			case "getPageUpRow"://screen page
+				var oFirst = this.getFirstRowOnPage(param);
+				if (this.port.getRowOffset(oFirst) >= this.port.getRowOffset(param)) {
+					//check if the page on top of screen page is loaded
+					var iOffs = this.port.getPosition() - this.port.viewNode.offsetHeight;
+					if (iOffs < 0) iOffs = 0;
+					var i = this.grid.pageHolders.getPageAtOffset(iOffs);
+					if (aPages[i] && !aPages[i].loaded)
+						iPage = i;
+				} else 
+					oRes = oFirst;
+				break;
+			case "getPageDownRow"://screen page
+				var oLast = this.getLastRowOnPage(param);
+				if (this.port.getRowOffset(oLast) <= this.port.getRowOffset(param)){
+					//check if the page on bottom of screen page is loaded
+					var iOffs = this.port.getPosition() + this.port.viewNode.offsetHeight * 2;//the current page and the next
+					var i = this.grid.pageHolders.getPageAtOffset(iOffs);
+					if (aPages[i] && !aPages[i].loaded)
+						iPage = i;
+				} else 
+					oRes = oLast;
+				break;
+			default:
+			/*
+			case "getPreviousPageRow":	//screen page
+			case "getNextPageRow":		//screen page				
+			case "getRowAtOffset":
+			case "getFirstRowOnPage":
+			case "getLastRowOnPage":
+			*/
+				break;
+		}
+		
+		if (!this.grid.requested.length) { //wait untill page loading is finished
+			if (iPage) { //load required page
+				var me = this;
+				this.grid.controller.addEventListener('pageRefreshed', 
+					function(event){
+						if (me.grid.pageHolders.pages[iPage].loaded){
+							//drop this event handler
+							me.grid.controller.removeEventListener('pageRefreshed', arguments.callee, false);
+							//recall
+							me.call(cmd, param, callBack);
+							me.grid.controller.focus();
+						}
+					}, false);
+				if (bLoadAll) {//load all pages from the current to requested
+					var curPage = this.grid.controller.getProperty('page');
+					var iStart = 0, iEnd = 0;
+					if ( curPage > iPage) {
+						for(var i = curPage - 1; i >= iPage; i--)
+							if (!aPages[i].loaded) {
+								if (!iEnd) iEnd = i;
+								iStart = i;
+							} else if (iEnd) {
+								this.grid.loadPages(iStart, iEnd);
+								iEnd = 0;
+							}					
+					} else {
+						for(var i = curPage + 1; i <= iPage; i++)
+							if (!aPages[i].loaded) {
+								if (!iStart) iStart = i;
+								iEnd = i;
+							} else if (iStart) {
+								this.grid.loadPages(iStart, iEnd);
+								iStart = 0;
+							}
+					}
+					if (iStart * iEnd)//load the last range
+						this.grid.loadPages(iStart, iEnd);
+				} else 
+					this.grid.loadPages(iPage, iPage);
+			} else {
+				if (!oRes)
+					oRes = this[cmd](param);
+				if (callBack) {
+					callBack(oRes);
+				}
+			}//if(iPage)
+		} else {
+			//ignore
+		}
+		
+	}
+	
+	/**
+	 * Reserves a space for pages to be loaded later
+	 * @param grid Reference to Grid object
+	 */
+	btl.grid.PageHolders = function(oGrid, sDefaultPageHeight) {
+		if (!oGrid) {
+			bb.command.trace(oGrid, "It is not a grid object", 3);
+			return;
+		}
+		this.grid = oGrid;
+		this.iTag = 0;
+		this.iLoaded = 0;
+		this.visiblePages = {}; //contains pages visible at this moment
+		this.pages = [];
+		this.iPageScrollTo = -1;//page number to scroll to
+		this.pageHeight = sDefaultPageHeight;
+		this.tableHolder = oGrid.dataContainer.body.tables[0].parentNode;
+		oGrid.addPollListener(this);
+	}
+	btl.grid.PageHolders.prototype = {};
+
+	/**
+	 * Creates a page holder - an empty element holding a place for a page to be loaded later
+	 * @param iPage - page number
+	 * @param oInsertPoint - the element a page to be inserted before(optional)
+	 */
+	btl.grid.PageHolders.prototype.addPage = function btl_grid_pageHolders_addPage(iPage, oInsertPoint) {
+		if( !oInsertPoint)
+			oInsertPoint = null;
+			
+		var	sHeight = this.pageHeight;
+		var sFontSize = Math.min(300, Math.min(Math.ceil(this.grid.dataContainer.body.viewNode.offsetHeight * 0.8), Math.ceil(this.grid.dataContainer.body.viewNode.offsetWidth * 0.8))) + 'px';
+		var oPage = new btl.grid.PageHolder(iPage, sHeight, sFontSize);
+		oPage.parent = this;
+		
+		if (this.tableHolder)
+			this.tableHolder.insertBefore(oPage.viewNode, oInsertPoint);
+		
+		this.pages[iPage] = oPage;
+		return oPage;
+	}
+	/**
+	 * Updates page holders according to the current number of pages
+	 */
+	btl.grid.PageHolders.prototype.update = function btl_grid_pageHolders_update() {
+			var iNPages = this.grid.controller.getProperty('totalPages');
+			var iPages = this.pages.length; //number of page holders
+			var iN = iPages > 0 ? iPages - 1 : 0;
+			for(var i = 0; i < iNPages - iN; i++){//add new
+				this.addPage(i + iN + 1);
+			}
+
+			for(var i = iN; i > iNPages; i--){//delete extra
+				var oPage = this.pages.pop();
+				oPage.unload( true);
+				if( oPage.viewNode.parentNode)
+					oPage.viewNode.parentNode.removeChild(oPage.viewNode);
+			}
+			if (iPages != this.pages.length){
+				this.grid.scrollers.scrollBar.updateScrollHeight();
+			}
+	}
+	/**
+	 * Unloads unnecessary pages, leaves only iMaxPages pages, ignores pages visible at the moment
+	 * 0 - unload all including visible
+	 * any number less than number of visible pages leaves them and unload the rest
+	 */
+	btl.grid.PageHolders.prototype.unload = function btl_grid_pageHolders_unload(iMaxPages) {
+		if (iMaxPages) {
+			var aUnload = [];
+			for(var i = 0, iMax = this.pages.length; iMax > i; i++) {
+				var oPage = this.pages[i];
+				if (oPage && oPage.loaded) {
+					if (this.visiblePages[oPage.pageNumber])
+						iMaxPages--;
+					else
+						aUnload.push(oPage);
+				}
+			}
+			if (aUnload.length) {
+				aUnload.sort( function(a, b){return a.iTag - b.iTag});
+				for(var i = aUnload.length - 1, j=0, jMax=aUnload.length; i >= iMaxPages && j < jMax; i--){
+					aUnload[j++].unload();
+				}
+				this.grid.dataContainer.body.refreshTables();
+			}//if
+		} else { //unload all
+			for(var i = 1, iMax = this.pages.length; iMax > i; i++) {
+				var oPage = this.pages[i];
+				if (oPage && oPage.loaded) 
+					oPage.unload();
+			}
+			this.grid.dataContainer.body.refreshTables();
+		}//if iMaxPages
+	}
+
+	/**
+	 * Clears all pages and stop polling
+	 */
+	btl.grid.PageHolders.prototype.clear = function(){
+		this.grid.removePollListener(this);
+		for (var i = 0; i < this.pages.length; i++) {
+			var oPage = this.pages[i];
+			if (oPage) {
+				var oParent = oPage.viewNode.parentNode;
+				if (oParent)
+					oParent.removeChild(oPage.viewNode);
+				if (oPage.loaded) {
+					for(var j = 0, jMax = oPage.tables.length; jMax > j; j++)
+						if (oParent = oPage.tables[j].parentNode)
+							oParent.removeChild(oPage.tables[j]);
+				}//if loaded
+			}//if oPage
+		}//for i
+	}	
+	/**
+	 * Returns list of loaded and visible pages
+	 */
+	btl.grid.PageHolders.prototype.getVisiblePages = function( bLoadedOnly){
+		var aPages = [];
+		for (var i = 1; i < this.pages.length; i++) {
+			var oPage = this.pages[i];
+			if (oPage && (!bLoadedOnly || oPage.loaded) && this.visiblePages[oPage.pageNumber])
+				aPages.push(i);
+		}//for i
+		return aPages;
+	}
+	/**
+	 * Returns a page for cell, row or table
+	 */
+	btl.grid.PageHolders.prototype.getPage = function(oElm){
+		var oTableIndex = this.grid.getTableIndex(oElm);
+		var oTable = oTableIndex.port.tables[ oTableIndex.table];
+		for (var i = 1; i < this.pages.length; i++) {
+			var oPage = this.pages[i];
+			if (oPage && oPage.loaded)
+				for(var j = 0; j < oPage.tables.length; j++)
+					if (oPage.tables[j] == oTable)
+						return oPage.pageNumber;
+		}//for i
+		return null;
+	}	
+	/**
+	 * Returns a page for the requested offet
+	 */
+	btl.grid.PageHolders.prototype.getPageAtOffset = function(iOffset){
+		if (this.pages.length <= 1 || (this.pages.length > 1 && this.pages[1].getTop() > iOffset))
+			return null;
+		
+		for (var i = 1; i < this.pages.length; i++) {
+			var oPage = this.pages[i];
+			if (oPage && oPage.getTop() > iOffset)
+				return i - 1;
+		}//for i
+		return this.pages.length - 1;
+	}	
+	//TODO: debug only: validate loaded pages
+	btl.grid.PageHolders.prototype.validate = function(){
+		var arr = [];
+		for (var i = 1; i < this.pages.length; i++) {
+			var oPage = this.pages[i];
+			if (oPage && oPage.loaded)
+				for (var j = 0; j < oPage.tables.length; j++) 
+					if (!oPage.tables[j].parentNode || (oPage.tables[j].parentNode.nodeType != 1)){
+						arr.push(i);
+						break;
+					}
+		}
+		return arr.length ? arr : null;
+	}
+	/**
+	 * Scrolls to a specified page offset
+	 * iPage - page number
+	 * iOffset - offset from the page top
+	 */
+	btl.grid.PageHolders.prototype.scrollTo = function( iPage, iOffset){
+		if (this.pages[iPage].loaded) {
+			this.grid.dataContainer.body.setPosition( this.pages[iPage].getTop() + (iOffset ? iOffset : 0));
+			this.iPageScrollTo = -1;
+		} else //postponed scrolling
+			this.iPageScrollTo = iPage;
+	}
+	/**
+	 * Polls position to detect a moment to load data
+	 */
+	btl.grid.PageHolders.prototype.poll = function(){
+		if( this.iPageScrollTo >= 0)
+			this.scrollTo(this.iPageScrollTo);
+			
+		var curPos = this.grid.dataContainer.body.getPosition();
+		if (this.curPos != curPos){
+			this.curPos = curPos;
+		} else if (this.curPos != this.loadedPos){
+			this.loadedPos = this.curPos;
+			this.updateVisiblePages();
+		}//if 
+	}
+	/**
+	 * Updates list of visible pages, loads them if necessary, sets the current page
+	 */
+	btl.grid.PageHolders.prototype.updateVisiblePages = function(){
+		var curPos = this.grid.dataContainer.body.getPosition();
+		var iCurPage = -1;
+		//find the page(s)
+		var iDataHeight = this.grid.dataContainer.body.viewNode.offsetHeight;
+		this.visiblePages = {};
+		var aPagesToLoad = [];
+		for (var i = 1, iMax = this.pages.length; iMax > i; i++) {
+			//page is not loaded yet 
+			var oPage = this.pages[i];
+			if (oPage) {
+				//page top || page bottom || page middle is visible
+				var iPageTop = oPage.getTop();//viewNode.offsetTop;
+				var iPageBottom = oPage.getBottom();//btl.gridBase.getScrollHeight( this[i].viewNode);
+				if ((iPageTop >= curPos && (curPos + iDataHeight) > iPageTop) ||
+					(iPageBottom > curPos && (curPos + iDataHeight) >= iPageBottom) ||
+					(iPageTop <= curPos && iPageBottom >= (curPos + iDataHeight))){//visible
+
+					this.visiblePages[i] = true;
+					if (!oPage.loaded)
+						aPagesToLoad.push(i);
+					if (iCurPage < 0)
+						iCurPage = i;
+				} else if (iCurPage >= 0) { //we already after visible pages
+					break;
+				}//if visible
+			} //if
+		}//for
+		// send load requests
+		while (aPagesToLoad.length) {
+			var iPageStart = aPagesToLoad.shift();
+			var iPageEnd = iPageStart;
+			while (iPageEnd + 1 == aPagesToLoad[0])
+				iPageEnd = aPagesToLoad.shift();
+			this.grid.loadPages(iPageStart, iPageEnd);
+		}
+		this.grid.controller.setAttribute('page', iCurPage);
+	}
+		
+	/**
+	 * @param iPage Page number
+	 * @param sHeight Page height
+	 * @param sFontSize Font size (optional)
+	 */
+	btl.grid.PageHolder = function(iPage, sHeight, sFontSize) {
+		this.pageNumber = iPage;
+		btl.gridBase.Component.call(this);
+		this.fontSize = sFontSize ? sFontSize : Math.ceil(0.8 * bb.html.convertToPixels( sHeight, this.viewNode)) + 'px';
+		this.setHeight(sHeight, sFontSize);
+		this.loaded = false;
+		this.tables = [];
+		this.iTag = 0;//keeps page loading order
+		this.parent = {iTag : 0};//dumb parent
+	}
+	btl.grid.PageHolder.prototype = new btl.gridBase.Component();
+	
+	btl.grid.PageHolder.prototype.getTemplate = function() {
+		var oDiv = document.createElement('div');
+		oDiv.className = 'btl-grid-page-holder';
+		oDiv.appendChild(document.createTextNode(this.pageNumber));
+		return oDiv;
+	}
+	
+	btl.grid.PageHolder.prototype.setHeight = function( sHeight) {
+		this.viewNode.style.fontSize = this.fontSize;
+		this.viewNode.style.height = sHeight;
+	}
+	/**
+	 * returns top of the page
+	 */
+	btl.grid.PageHolder.prototype.getTop = function() {
+		return (this.loaded ? this.tables[0] : this.viewNode).offsetTop;
+	}
+	/**
+	 * returns height of the page
+	 */
+	btl.grid.PageHolder.prototype.getBottom = function() {
+		if (this.loaded) {
+			var oLastTable = this.tables[this.tables.length - 1];
+			return oLastTable.offsetTop + oLastTable.offsetHeight;
+		}
+		return this.viewNode.offsetTop + this.viewNode.offsetHeight;
+	}
+	
+	/**
+	 *  saves references to page tables
+	 *  aTables - array of page tables otherwise 
+	 */
+	btl.grid.PageHolder.prototype.ready = function( aTables) {
+		if (aTables) //outside provided tables
+			for (var i = 0, iMax = aTables.length; iMax > i; i++)
+				this.tables.push( aTables[i]);
+		else { //tables are inside the page		
+			for (var i = 0, iMax = this.viewNode.childNodes.length; iMax > i; i++)
+				this.tables.push( this.viewNode.childNodes[i]);
+
+			//move tables out of the page
+			this.setHeight( 'auto');
+			for (var i = 0, iMax = this.tables.length; iMax > i; i++)
+				this.parent.tableHolder.insertBefore( this.tables[i], this.viewNode);
+		}
+		if (this.viewNode.parentNode)
+			this.viewNode.parentNode.removeChild(this.viewNode);
+		this.loaded = true;
+		this.iTag = this.parent.iTag++;
+	}
+
+	btl.grid.PageHolder.prototype.hasParentNode = function() {
+		return this.viewNode.parentNode && this.viewNode.parentNode.nodeType == 1 ? true : false;
+	}
+	/**
+	 *  prepares a page holder to loading
+	 */
+	btl.grid.PageHolder.prototype.reset = function() {
+		if (!this.hasParentNode()) { //clear old content
+			this.unload();
+		}
+		this.viewNode.style.fontSize = '100%';
+		this.viewNode.innerHTML = '';
+	}
+	/**
+	 *  unloads the page
+	 *  bDontRestore - dont move the viewNode back
+	 */
+	btl.grid.PageHolder.prototype.unload = function( bDontRestore) {
+		var bNeed = this.tables.length;
+		if (bNeed) {
+		   var oParent = this.tables[0].parentNode;
+		   this.setHeight( (this.getBottom() - this.getTop()) + 'px');
+		   if (!bDontRestore)
+		   		oParent.insertBefore(this.viewNode, this.tables[0]);
+		   		
+		   this.viewNode.display = 'none';
+		   for (var i = 0, iMax = this.tables.length; iMax > i; i++)
+				oParent.removeChild(this.tables[i]);
+		   this.viewNode.innerHTML = this.pageNumber;
+		   this.tables = [];
+		   this.viewNode.display = 'block';
+		}
+		this.loaded = false;
+		return bNeed;
+	}
+}]]></d:resource>
+
+			<d:attribute name="sortable" default="true">
+				
+			</d:attribute>
+
+			<d:property name="sortable">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					return btl.isTrueValue(name, this.getAttribute(name));
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					this.setAttribute(name, value ? 'true' : 'false');
+				]]></d:setter>
+			</d:property>
+
+			<d:attribute name="readonly" default="false">
+				
+			</d:attribute>
+
+			<d:property name="readonly">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					return btl.isTrueValue('readonly', this.getAttribute('readonly'));
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					this.setAttribute(name, value ? 'true' : 'false');
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="viewRecords">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					if (!this._._viewRecords)
+						this._._viewRecords = this.getProperty('gate').dataContainer.body.getRows();
+					return this._._viewRecords;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="columns">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					if (!this._._columns) //find 'dataGridColBase' elements - children of the grid and 'dataGridColGroupBase' elements
+						this._._columns = btl.grid.getChildrenByType(this, ['dataGridColGroupBase', 'dataGridColBase']);
+					return this._._columns;
+				]]></d:getter>
+			</d:property>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				var oGate = this.getProperty('gate');
+
+				//create empty table to host columns
+				var oTable = document.createElement('table');
+				oTable.className = 'btl-grid-view-host';
+				var oRow = document.createElement('tr');
+				oTable.appendChild(document.createElement('tbody')).appendChild(oRow);
+				this.viewNode.appendChild(oTable);
+
+				//create empty row to host editors
+				oGate.editorsHost = oTable.appendChild(document.createElement('tr'));
+
+				this.viewGate = this.viewNode.appendChild(document.createElement('div'));
+				this.viewGate.style.display = 'none';
+
+				//add default behavior(s)
+/*
+				//row selecting/focusing
+				if (!bb.instanceOf(this, btl.namespaceURI, 'iDataGridSelectAndFocus'))
+					bb.addBehavior(this, btl.namespaceURI, 'dataGridRowFocusAndSelect');
+
+				//editing
+				if (!bb.instanceOf(this, btl.namespaceURI, 'iDataGridEditItem'))
+					bb.addBehavior(this, btl.namespaceURI, 'dataGridEditCell');
+
+				//column freezing
+				bb.addBehavior(this, btl.namespaceURI, 'dataGridFreezingUI');
+
+				//sorting
+				bb.addBehavior(this, btl.namespaceURI, 'dataGridSortOneColumn');
+*/
+				oGate.disableUserSelect();
+				this.callSuper();
+
+				//force loading fieldEditor API
+				bb.command.destroy( bb.document.createElementNS(btl.namespaceURI, 'fieldEditor'));
+				this.viewNode.tabIndex = 0;
+			]]></d:constructor>
+
+			<d:destructor type="text/javascript"><![CDATA[
+				this._destructed = true;
+				var ds = this.getProperty( 'dataSource');
+				if( ds) if(ds._) ds.removeObserver( this);
+				//this.getProperty('gate').deleteData();
+			]]></d:destructor>
+
+
+			<d:method name="createGrid">
+				<d:argument name="renderMode"/>
+				<d:body type="text/javascript"><![CDATA[
+					return new btl.grid.Grid(this, renderMode);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getRecordId">
+				
+				<d:argument name="item" required="true"/>
+				<d:body type="text/javascript"><![CDATA[
+					var oRow = (item.localName || item.tagName).toLowerCase() == 'tr' ? item : item.parentNode;
+					return oRow.getAttribute(this.getProperty('gate').idAttrName);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getColumn">
+				
+				<d:argument name="elm" required="true"/>
+				<d:body type="text/javascript"><![CDATA[
+					var oGate = this.getProperty('gate');
+
+					if (!elm)
+						return null;
+
+					if ( bb.html.hasClass(elm, oGate.hClassNames.header))
+						return elm.column;
+
+					var cell =  bb.selector.queryAncestor( elm, oGate.hSelectors.header);//find a header cell
+					if (cell)
+						return cell.column;
+
+					cell =  bb.selector.queryAncestor( elm, oGate.hSelectors.data);//find a cell
+					if (cell)
+						return this.getProperty('columns')[cell.cellIndex];
+
+					return null;
+				]]></d:body>
+			</d:method>
+
+			<d:attribute name="livescrolling" default="false">
+				
+				<d:changer type="application/javascript"><![CDATA[
+					this.getProperty('gate').setLivescrolling( btl.isTrueValue( name, value));
+					this.refresh();
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="maxPages" default="0">
+				
+			</d:attribute>
+
+			<d:property name="livescrolling">
+				
+				<d:getter type="application/javascript"><![CDATA[
+					return btl.isTrueValue( name, this.getAttribute(name));
+				]]></d:getter>
+				<d:setter type="application/javascript"><![CDATA[
+					this.setAttribute(name, value ? 'true' : 'false');
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="page">
+				<d:setter type="text/javascript"><![CDATA[
+					if (this.getProperty('page') != value){
+						this.setAttribute('page', value);
+						var oGate = this.getProperty('gate');
+						var bLiveScrolling = this.getProperty('livescrolling');
+						var bGo = !bLiveScrolling || !oGate.pageHolders || !oGate.pageHolders.pages[value] || !oGate.pageHolders.pages[value].loaded;
+						if( bGo) {
+							if (!this.getProperty('busy'))
+								this.setProperty('busy', true);
+								
+							oGate.requested.push(value);
+							btl.dataBinding.refreshObserver(this, !bLiveScrolling);
+						} else {
+							//update pager
+							var oEvent = bb.document.createEvent('Events');
+							oEvent.initEvent('pageRefreshed', false, false);
+							oEvent.action = 'read';
+							this.dispatchEvent(oEvent);
+						}
+						if (bLiveScrolling)//jump
+							oGate.pageHolders.scrollTo(value);
+					}
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					if (this.getProperty("totalPages") > 0) {
+						return parseInt(this.getAttribute('page'), 10);
+					}
+					else {
+						return 0;
+					}
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="mode">
+				
+				<d:setter type="application/javascript"><![CDATA[
+					if (this._._mode != value) {
+						this._._mode = value;
+						bb.command.fireEvent(this, 'modeChanged', false, false);
+					}
+				]]></d:setter>
+			</d:property>
+
+			<d:method name="dataUpdate">
+				<d:argument name="action"/>
+				<d:argument name="records"/>
+				<d:argument name="actionObj"/>
+				<d:body type="text/javascript"><![CDATA[
+					if (this._destructed)
+						return; //destroyed
+
+					var oGate = this.getProperty('gate');
+					var oSource = this.getProperty('dataSource');
+					var bLivescrolling = this.getProperty('livescrolling');
+
+					switch (action) {
+						case "update": //update values
+							for (var i=0; i < records.length; i++)
+								if (this._.oIndexes[records[i]]){ //updated existing records
+									oGate.updateRecord(records[i]);
+								}
+							//drop sorted state
+							this.setProperty('sorted', false);
+							break;
+						case "sort":
+						case "read":
+							this.setProperty('mode', 'view');
+							var iPage = this.getProperty('page');
+							if (bLivescrolling) {
+								if (oGate.requested.length) {
+									var hPageRange = oGate.requested.shift();
+									oGate.renderGridPages(records, hPageRange.start, hPageRange.end);
+									this.setProperty('busy', false);
+								} else {
+									oGate.renderGridPage(records, iPage);
+								}
+								oGate.pageHolders.update();
+							} else {
+								//regular paging
+								if (oGate.requested.length) {//clean up requested
+									oGate.requested = [];
+									this.setProperty('busy', false);
+								}
+								//avoid size jumping after destroying
+								var bAutoHeight = this.getProperty('height') == 'auto';
+								if (bAutoHeight)
+									this.viewNode.style.height = this.viewNode.offsetHeight + 'px';
+								oGate.renderGrid(records);
+								if (bAutoHeight)
+									this.viewNode.style.height = 'auto';
+							}
+							//unsorted grid - empty 'sortField' and no index column or changed record field which was used for sorting
+							//TODO: local sort on index
+							//this.setProperty('sorted', this.getProperty('sortable') || oGate.oRenderOptions.bHasIndex);
+							this.setProperty('sorted', this.getProperty('sortable') && this.getProperty('sortField') != '');
+							this._._selectedItems = null; //reset property to refill on request
+							break;
+						case "delete":
+							for (var i=0; i < records.length; i++)
+								oGate.deleteRecord(records[i]);
+							if (!oGate.dataContainer.body.hasRows()) {
+								var iPage = this.getProperty('page');
+								if (iPage < this.getProperty('totalPages'))
+									this.refresh();
+								else if (iPage > 0) //the last page
+									this.setProperty('page', iPage - 1);
+								else { // do nothing - it was a single page
+								}
+							} else {
+								oGate.doLayout();
+							}
+							if (bLivescrolling)
+								oGate.pageHolders.update();
+							break;
+					}
+					//set sorted state
+					var bSorted = this.getProperty('sorted');
+					var aCols = this.getProperty('columns');
+					var sField = this.getProperty('sortField');
+					for (var i = 0, iMax = aCols.length; iMax > i; i++)
+						aCols[i].setProperty('sorted', bSorted && aCols[i].getAttribute('dataField') == sField);
+
+					this.callSuper('dataUpdate', [action, records, actionObj]);
+					var oEvent = bb.document.createEvent('Events');
+					oEvent.initEvent('pageRefreshed', false, false);
+					oEvent.records = records;
+					oEvent.action = action;
+					this.dispatchEvent(oEvent);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="sort">
+				<d:argument name="sortField"/>
+				<d:argument name="sortDirection"/>
+				<d:body type="text/javascript"><![CDATA[
+					this.setProperty("mode", "view");
+					if ( this.getProperty('livescrolling')) {
+						//discard all pages and reload visible
+						this.setProperty('sorted', false);
+
+						if (arguments.length && sortField != this.getAttribute('sortField')) //desorts if sortField is empty string or null
+							this.setProperty('sortField', sortField ? sortField : '');
+
+						if (sortDirection && (sortDirection != this.getAttribute('sortDirection')))
+							this.setProperty('sortDirection', sortDirection == 'descending' ? 'descending' : 'ascending');
+						this.refresh( true);
+					} else {
+						this.callSuper("sort", [sortField, sortDirection]);
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="refresh">
+				<d:argument name="updateOnly"/>
+				<d:body type="text/javascript"><![CDATA[
+					var oGate = this.getProperty('gate');
+					if (oGate.pageHolders){ //initialized(!) livescrolling
+						var arr = oGate.pageHolders.getVisiblePages();
+						oGate.pageHolders.unload(1);	//unload all except visible, they will be unloaded on data response
+						//TODO: change it after loadPages is changed
+						if (arr.length) {
+							oGate.loadPages(arr[0], arr[arr.length - 1], updateOnly);
+						}
+					} else {
+						this.callSuper("refresh", [updateOnly]);
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="setColumnSize">
+				
+				<d:argument name="columnId" required="true"/>
+				<d:argument name="size" required="true"/>
+				<d:body type="text/javascript"><![CDATA[
+					this.getProperty('gate').columns.getColumn(columnId).setWidth(size);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="deleteRecords">
+				
+				<d:argument name="records">
+					
+				</d:argument>
+				<d:argument name="noVisual">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					var oSource = this.getProperty('dataSource');
+					if (oSource && records.length && !this.getProperty('readonly')) {
+						if (!noVisual) {
+							var oGate = this.getProperty('gate');
+							for (var i = 0; i < records.length; i++){
+								var oRow = oGate.getRow(records[i]);
+								if ( oRow) {
+									bb.html.addClass(oRow, oGate.hClassNames.deleted);
+									oGate.oEdit.hDeleted[records[i]] = oRow;
+								}
+							}
+						}//if !noVisual
+
+						//request deleting
+						btl.dataSource.actionRequest(this, 'delete', {'attributes':this.getProperty('state'), 'records':records});
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="initialized" type="text/javascript"><![CDATA[
+				var oGate = this.getProperty('gate');
+
+				oGate.hClassNames.data = oGate.hClassNames.cell;
+				oGate.hSelectors.data = oGate.hSelectors.cell;
+
+				oGate.hClassNames.changed = 'btl-grid-changed';
+				oGate.hSelectors.changed = 'td.btl-grid-changed';
+
+				oGate.hClassNames.deleted = 'btl-grid-deleted';
+				oGate.hSelectors.deleted = 'tr.btl-grid-deleted';
+
+				oGate.hClassNames.sortedAscending = 'btl-grid-header-sorted-ascending';
+				oGate.hClassNames.sortedDescending = 'btl-grid-header-sorted-descending';
+
+				oGate.ready();
+				this.setProperty("mode", "view");
+			]]></d:handler>
+
+			<d:handler event="columnsReordered" type="text/javascript"><![CDATA[
+				//needs to update columns property to the new order
+				this.setProperty('columns', this.getProperty('gate').getColumns());
+			]]></d:handler>
+
+			<d:handler event="sort" type="text/javascript"><![CDATA[
+				this.setProperty('busy', false);
+			]]></d:handler>
+
+			<d:method name="sortColumn">
+				
+				<d:argument name="column">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					if (column && bb.instanceOf(column, btl.namespaceURI, 'dataGridColBase')) {
+						var sField = column.getAttribute('dataField');
+						if (sField.length) { //TODO: local sort on index column || oCol.getAttribute('render') == 'index'
+							this.setProperty('busy', true);
+							var iSortAscending = this.getProperty('sortDirection') == 'ascending' ? 1 : 0;
+							var iSortReverse = column.getProperty('sorted') ? 1 : 0;
+							this.sort(sField, iSortReverse ^ iSortAscending ? 'ascending' : 'descending');
+						}
+					}
+				]]></d:body>
+			</d:method>
+
+		</d:element>
+
+		<!-- dataGridColGroupBase - group of grid columns -->
+		<d:element name="dataGridColGroupBase">
+			
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-grid-header-group btl-label" style="display:none">
+					<d:content/>
+				</div>
+			</d:template>
+
+			<d:attribute name="label">
+				
+			</d:attribute>
+
+			<d:attribute name="rowspan">
+				
+			</d:attribute>
+
+			<d:attribute name="title">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					if (this.viewNode.parentNode) //cell?
+						this.viewNode.parentNode.title = value;
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="name">
+				
+			</d:attribute>
+
+			<d:attribute name="class">
+				
+			</d:attribute>
+
+			<d:attribute name="display">
+				
+				<!-- Initialization of this attribute is handled inside the DOMNodeInsertedIntoDocument event handler -->
+				<d:mapper type="text/javascript"><![CDATA[/* override default mapper */]]></d:mapper>
+				<d:changer type="text/javascript"><![CDATA[
+					if (btl.isTrueValue(name, value) || value == '' || value === undefined) {
+						this.show();
+					} else if (value == 'false' || value == 'none') {
+						this.hide();
+					} else {
+						this.show();
+					}
+				]]></d:changer>
+			</d:attribute>
+
+			<d:property name="columns">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					return btl.grid.getChildrenByType(this, 'dataGridColBase');
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="grid">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					return this._._info ? this._._info.grid : null;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="hidden">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					if (this.getProperty('grid'))
+						if (this.viewNode.parentNode)
+							if (this.viewNode.parentNode.offsetWidth == 0)
+								return true;
+
+					var sDisplay = this.getAttribute('display');
+					if (sDisplay == 'false' || sDisplay == 'none')
+						return true;
+
+					return false;
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					if (this.getProperty('grid'))
+						if (this.viewNode.parentNode) {
+							if (value)
+								this.hide();
+							else
+								this.show();
+						}
+				]]></d:setter>
+			</d:property>
+
+			<d:method name="hide">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var oGrid = this.getProperty('grid');
+					if (oGrid) {
+						var oGate = oGrid.getProperty('gate');
+						var aColumns = oGate.columns.getColumnsFromCell(this.viewNode.parentNode);
+						for (var i = 0; i < aColumns.length; i++)
+							aColumns[i].hide();
+						oGate.doLayout();
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="show">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var oGrid = this.getProperty('grid');
+					if (oGrid) {
+						var oGate = oGrid.getProperty('gate');
+						var aColumns = oGate.columns.getColumnsFromCell(this.viewNode.parentNode);
+						for (var i = 0; i < aColumns.length; i++)
+							aColumns[i].show();
+						oGate.doLayout();
+					}
+				]]></d:body>
+			</d:method>
+		</d:element>
+
+		<d:element name="dataGridColBase">
+			
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-grid-header-content btl-label" style="display:none;">
+					<d:content/><div class="btl-grid-header-sort-indicator"/>
+				</div>
+			</d:template>
+
+			<d:attribute name="align">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					//invalidate render options
+					this.setProperty('renderOptions', null);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="title">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					if (this.viewNode.parentNode) //cell?
+						this.viewNode.parentNode.title = value;
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="valign">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					//invalidate render options
+					this.setProperty('renderOptions', null);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="label">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					//invalidate render options
+					this.setProperty('renderOptions', null);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="readonly" default="false">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					//invalidate render options
+					this.setProperty('renderOptions', null);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="resizable" default="true">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					var bResizable = bb.isTrueValue(name, value);
+					var oGrid = this.getProperty('grid');
+					if (oGrid) {
+						var oGate = oGrid.getProperty('gate');
+						var oSizerCell = oGate.columns.getColumn(i).getSizer();
+						if (oSizerCell){
+							if (bResizable)
+								bb.html.removeClass(oSizerCell, oGate.hClassNames.no_resize);
+							else
+								bb.html.addClass(oSizerCell, oGate.hClassNames.no_resize);
+						}
+					}
+					if (bResizable)
+						bb.html.removeClass(this.viewNode, oGate.hClassNames.no_resize);
+					else
+						bb.html.addClass(this.viewNode, oGate.hClassNames.no_resize);
+
+					//invalidate render options
+					this.setProperty('renderOptions', null);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="render" default="value">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					//invalidate render options
+					this.setProperty('renderOptions', null);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="class">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					//invalidate render options
+					this.setProperty('renderOptions', null);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="dataClass">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					//invalidate render options
+					this.setProperty('renderOptions', null);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="name">
+				
+			</d:attribute>
+
+			<d:attribute name="dataField">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					//invalidate render options
+					this.setProperty('renderOptions', null);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="width">
+				<d:changer type="text/javascript"><![CDATA[
+					//invalidate render options
+					this.setProperty('renderOptions', null);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="format">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					//invalidate render options
+					this.setProperty('renderOptions', null);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="editFormat">
+				
+			</d:attribute>
+
+			<d:attribute name="dataType" default="html">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					//invalidate render options
+					this.setProperty('renderOptions', null);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="display">
+				
+				<!-- Initialization of this attribute is handled inside the DOMNodeInsertedIntoDocument event handler -->
+				<d:mapper type="text/javascript"><![CDATA[/* override default mapper */]]></d:mapper>
+				<d:changer type="text/javascript"><![CDATA[
+					if (btl.isTrueValue(name, value) || value == '' || value === undefined) {
+						this.show();
+					} else if (value == 'false' || value == 'none') {
+						this.hide();
+					} else {
+						this.show();
+					}
+				]]></d:changer>
+			</d:attribute>
+
+			<d:property name="dataType">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					var sDataType = this.getAttribute('dataType');
+					return sDataType ? sDataType : 'html';
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					this.setAttribute('dataType', value);
+					return value;
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="index">
+				
+				<d:getter type="application/javascript"><![CDATA[
+					var oGrid = this.getProperty('grid');
+					if (oGrid) {
+						return oGrid.getProperty('gate').dataContainer.header.getRange(this.viewNode.parentNode).first;
+					}
+					return null;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="sorted">
+				
+				<d:setter type="application/javascript"><![CDATA[
+					var oGrid = this.getProperty('grid');
+					var oGate = oGrid.getProperty('gate');
+					if (this._._sorted)
+						bb.html.removeClass( this.viewNode, [oGate.hClassNames.sortedAscending, oGate.hClassNames.sortedDescending]);
+					if (value) {
+						bb.html.addClass( this.viewNode,
+							oGrid.getAttribute('sortDirection') == 'ascending' ? oGate.hClassNames.sortedAscending : oGate.hClassNames.sortedDescending);
+					} else {
+//						bb.html.removeClass( this.viewNode, [oGate.hClassNames.sortedAscending, oGate.hClassNames.sortedDescending]);
+					}
+					this._._sorted = value;
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="readonly">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					var grid = this.getProperty('grid');
+					if (grid && grid.getProperty(name))
+						return true;
+					return btl.isTrueValue(name, this.getAttribute(name)) || this.getAttribute('dataField') == '';
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					this.setAttribute(name, value ? 'true' : 'false');
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="grid">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					return this._._info ? this._._info.grid : null;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="renderOptions">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					if (!this._._renderOptions) {
+						var sRender = (this.getAttribute('render') || '').toLowerCase();
+						var iRender = btl.grid.VALUE;
+						if (sRender == 'none')
+							iRender = btl.grid.NONE;
+						else if (sRender == 'index')
+							iRender = btl.grid.INDEX;
+
+						var sQuery = this.getAttribute('dataField');
+
+						var oGrid = this.getProperty('grid');
+						var sDataType = this.getProperty('dataType');
+
+						var vFormat, sWidth = this.getAttribute('width');
+						if (oGrid) {
+							vFormat = btl.dataSource.getFormat(oGrid.getProperty('dataSource'), sQuery, this.getAttribute('format'));
+							// add html escape formatter if datatype is not html
+							if(sDataType != 'html')
+								vFormat.unshift('htmlescape');
+							if (this.viewNode.parentNode)
+								sWidth = oGrid.getProperty( 'gate').columns.getColumn( this.getProperty('index')).getWidth();
+						} else {
+							vFormat = (sDataType != 'html' ? 'htmlescape ' : '') + this.getAttribute('format');
+						}
+						this._._renderOptions =	{
+								'iRender'    : iRender,
+								'bReadOnly'  : this.getProperty('readonly'),
+								'bHidden'    : this.getProperty('hidden'),
+								'sQuery'     : sQuery,
+								'sClass'     : this.getAttribute('class'),
+								'sDataClass' : this.getAttribute('dataClass'),
+								'sLabel'	 : this.getAttribute('label'),
+								'sAlign'     : this.getAttribute('align'),
+								'sVAlign'    : this.getAttribute('valign'),
+								'bResizable' : btl.isTrueValue( 'resizable', this.getAttribute('resizable')),
+								'sDataType'	 : sDataType,
+								'vFormat'    : vFormat,
+								'sWidth'     : sWidth
+							};
+					}
+					return this._._renderOptions;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="editor">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					if (btl.isTrueValue("readonly", this.getAttribute("readonly"))) {
+						return null;
+					}
+					if (this._._editor) {
+						return this._._editor;
+					}
+					var oGrid = this.getProperty("grid");
+					if (oGrid) {//initialize
+						oGrid.getProperty('gate').attachFieldEditor(this);
+					}
+					return this._._editor;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="hidden">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					var oGrid = this.getProperty('grid');
+					if (oGrid)
+						if (this.viewNode.parentNode) {
+							var bRet = oGrid.getProperty('gate').columns.getColumnFromCell(this.viewNode.parentNode).isHidden();
+							return bRet;
+							return oGrid.getProperty('gate').columns.getColumnFromCell(this.viewNode.parentNode).isHidden();
+						}
+
+					var sDisplay = this.getAttribute('display');
+					if (sDisplay == 'false' || sDisplay == 'none')
+						return true;
+
+					return false;
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					if (this.getProperty('grid'))
+						if (this.viewNode.parentNode) {
+							if (value)
+								this.hide();
+							else
+								this.show();
+							this.setProperty('renderOptions', null);
+						}
+				]]></d:setter>
+			</d:property>
+
+			<d:method name="hide">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var oGrid = this.getProperty('grid');
+					if (oGrid) {
+						var oGate = oGrid.getProperty('gate');
+						oGate.columns.getColumnFromCell(this.viewNode.parentNode).hide();
+						this.setProperty('renderOptions', null);
+						oGate.doLayout();
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="show">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var oGrid = this.getProperty('grid');
+					if (oGrid) {
+						var oGate = oGrid.getProperty('gate');
+						oGrid.getProperty('gate').columns.getColumnFromCell(this.viewNode.parentNode).show();
+						this.setProperty('renderOptions', null);
+						oGate.doLayout();
+					}
+				]]></d:body>
+			</d:method>
+		</d:element>
+
+		<d:behavior name="dataGridRowFocusAndSelect" implements="b:iDataGridSelectAndFocus">
+			
+
+			
+
+			<d:resource type="text/css"><![CDATA[
+				.btl-grid-focusedItem-normal .btl-grid-data {
+					border-top: 1px dotted black;
+					padding-top: 0;
+					border-bottom: 1px dotted black;
+				}
+
+				.btl-grid-selectedRow-normal {
+					background-color: gray;
+				}
+			]]></d:resource>
+
+			<d:resource type="text/javascript"><![CDATA[
+				btl.dataGridRowFocusAndSelect = {};
+
+				btl.dataGridRowFocusAndSelect.UI = function() {
+					this.classNames = this.getClassNames();
+					this.selectors = this.getSelectors();
+				};
+
+				btl.dataGridRowFocusAndSelect.UI.prototype = new btl.gridBase.Component();
+
+				btl.dataGridRowFocusAndSelect.UI.prototype.getClassNames = function() {
+					return {
+						'focusedItem' : ['btl-grid-focusedItem', 'btl-grid-focusedItem-normal'],
+						'selectedRow' : ['btl-grid-selectedRow', 'btl-grid-selectedRow-normal']
+					};
+				};
+
+				btl.dataGridRowFocusAndSelect.UI.prototype.getSelectors = function() {
+					return {
+						'focusedItem' : '.btl-grid-focusedItem',
+						'selectedRow' : 'tr.btl-grid-selectedRow'
+					};
+				};
+			]]></d:resource>
+
+			<d:attribute name="selectType" default="multiple">
+				
+			</d:attribute>
+
+			<d:attribute name="selectedIndexes">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					// making selection
+					var aItemIds = btl.gridBase.split(value);
+					if (aItemIds.length) {
+						var oGate = this.getProperty('gate');
+						if (this.getAttribute("selectType") == "single")
+							aItemIds = [aItemIds[0]];
+
+						var aItems = [];
+						for (var i = 0; aItemIds.length > i; i++) {
+							var oItem = oGate.getRow(aItemIds[i]);
+							if (oItem)
+								aItems.push(oItem);
+						}
+						this.setProperty('selectedItems', aItems);
+					}
+				]]></d:changer>
+			</d:attribute>
+
+			<d:property name="focusedItem">
+				<d:setter type="text/javascript"><![CDATA[
+					var oGate = this.getProperty('gate');
+					if (this._._focusedItem != value) {
+						if (this._._focusedItem)
+							bb.html.removeClass(this._._focusedItem, oGate.focusAndSelectUI.classNames.focusedItem);
+
+						this._._focusedItem = value;
+						if (value) {
+							bb.html.addClass(value, oGate.focusAndSelectUI.classNames.focusedItem);
+							oGate.oEdit.oDeletedFocus = null; //reset item virtually focused instead of deleted
+						}
+						bb.command.fireEvent(this, 'focusItem', false, false);
+					}
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="selectedItems">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					if (!this._._selectedItems) {
+						var oGate = this.getProperty('gate');
+						this._._selectedItems = oGate.dataContainer.body.getElements(oGate.focusAndSelectUI.selectors.selectedRow);
+					}
+					return this._._selectedItems;
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					var oGate = this.getProperty('gate');
+					if (!this._._selectedItems) {
+						this._._selectedItems = oGate.dataContainer.body.getElements(oGate.focusAndSelectUI.selectors.selectedRow);
+					}
+					oGate.setSelected(this._._selectedItems, false);
+					if (value)
+						oGate.setSelected(value, true);
+					return value;
+				]]></d:setter>
+			</d:property>
+
+			<d:method name="deleteSelected">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var oSource = this.getProperty('dataSource');
+					var aRows = this.getProperty('selectedItems');
+					if (oSource && aRows.length) {
+						var aIndexes = [];
+						var oGate = this.getProperty('gate');
+						var oFocused = this.getProperty('focusedItem');
+						var oDeletedFocus = null;
+						for (var i = 0; aRows.length > i; i++) {
+							var sId = this.getRecordId(aRows[i]);
+							if (sId !== null) {
+								aIndexes.push(sId);
+								oGate.oEdit.hDeleted[sId] = aRows[i];
+								bb.html.addClass(aRows[i], oGate.hClassNames.deleted);
+							}
+							if (oFocused == aRows[i]) {
+								oDeletedFocus = oFocused;
+								this.setProperty('focusedItem', null);
+							}
+						}//for
+						if (oDeletedFocus) {
+							//find not deleted item to be virtually focused instead of deleted focus
+							//the following key pressing to move focus starts from deleted focus place
+							var oVirtFocus = null;
+							var oIndex = oGate.getTableIndex(oDeletedFocus);
+							if (oIndex) {
+								while (!oVirtFocus && oIndex.nextRow()) {
+									var oRow = oIndex.getElement();
+									if (!bb.html.hasClass(oRow, oGate.hClassNames.deleted))
+										oVirtFocus = {'row' : oRow, 'iOffset' : 1};
+								}
+								var oIndex = oGate.getTableIndex(oDeletedFocus);
+								while (!oVirtFocus && oIndex.previousRow()) {
+									var oRow = oIndex.getElement();
+									if (!bb.html.hasClass(oRow, oGate.hClassNames.deleted))
+										oVirtFocus = {'row' : oRow, 'iOffset' : -1};
+								}
+							}
+							oGate.oEdit.oDeletedFocus = oVirtFocus;
+						}
+
+						if (aIndexes.length) {
+							//drop selection
+							this.setProperty('selectedItems', null);
+							this.deleteRecords(aIndexes, true);
+						}
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="rowFocusAndSelectUICommand">
+				
+				<d:argument name="commands"/>
+				<d:body type="text/javascript"><![CDATA[
+					var sMode = this.getProperty('mode');
+					var oGate = this.getProperty('gate');
+					var aCommands = typeof commands == 'string' ? [commands] : commands;
+
+					var oItem = arguments[1];
+					this.setProperty('busy', true);
+					//aCommands can be modified during command processing
+					var bChange = false;
+					for (var i = 0; i < aCommands.length; i++) {
+						switch (aCommands[i]) {
+							case "select_switch": //sets range start, switch selection of the item
+								bChange = oGate.setSelected(oItem, !oGate.isSelected(oItem)) || bChange;
+								aCommands.push("select_range_start");
+								break;
+
+							case "select_on": //sets range start, turns item selection on
+								bChange = oGate.setSelected(oItem, true) || bChange;
+								if (this._._selectedItems) //optimization
+									this._._selectedItems.push(oItem);
+								else
+									this._._selectedItems = [oItem];//optimization
+
+								aCommands.push("select_range_start");
+								break;
+
+							case "select_off": //sets range start, turns item selection off
+								bChange = oGate.setSelected(oItem, false) || bChange;
+								aCommands.push("select_range_start");
+								break;
+
+							case "select_range_end": //deselects all selected items, selects from the range start to the item
+								var aOldSelected = this.getProperty("selectedItems");
+
+								if (!this._._selectionStart)
+									this._._selectionStart = oGate.navigation.getFirstRowOnPage();
+
+								var aItems = oGate.getItemsRange(this._._selectionStart, oItem);
+
+								//optimization - deselect only necessary items
+								var oJustSelected = {};
+								for (var j = 0, jMax = aItems.length; j < jMax; j++) {
+									oJustSelected[ this.getRecordId(aItems[j])] = true;
+								}
+
+								var a2Deselect = [];
+								for (var j = 0, jMax = aOldSelected.length; j < jMax; j++) {
+									if (!oJustSelected[ this.getRecordId(aOldSelected[j])])
+										a2Deselect.push(aOldSelected[j]);
+								}
+								bChange = oGate.setSelected(aItems, true) || bChange;
+								bChange = oGate.setSelected(a2Deselect, false) || bChange;
+
+								this._._selectedItems = aItems;//optimization
+								break;
+
+							case "select_range_start"://sets range start, does not change selection
+								this._._selectionStart = oItem;
+								break;
+
+							case "deselect_all": //deselects all selected items
+								bChange = oGate.setSelected(this.getProperty("selectedItems"), false) || bChange;
+								this._._selectedItems = [];//optimization
+								break;
+
+							case "focus": //sets focus, does not change selection
+								this.setProperty("focusedItem", oItem);
+
+							var oElement = oItem.cells.length > oGate.iEditColumnIndex ? oItem.cells[oGate.iEditColumnIndex] : oItem;
+							if (arguments[2])
+								oGate.dataContainer.body.scrollIntoView(oElement, true);
+							break;
+						}
+					}//for
+					if (bChange) {
+						bb.command.fireEvent(this, 'selectionChanged', false, false);
+					}
+					this.setProperty('busy', false);
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="initialized" type="application/javascript"><![CDATA[
+				var oGate = this.getProperty('gate');
+
+				oGate.focusAndSelectUI = new btl.dataGridRowFocusAndSelect.UI();
+
+				// making initial selection
+				var aItemIds = this.getAttribute("selectedIndexes");
+				aItemIds = btl.gridBase.split(aItemIds);
+				if (aItemIds.length) {
+					if (this.getAttribute("selectType") == "single")
+						aItemIds = [aItemIds[0]];
+
+					var aItems = [];
+					for (var i = 0; aItemIds.length > i; i++) {
+						var oItem = oGate.getRow(aItemIds[i]);
+						if (oItem)
+							aItems.push(oItem);
+					}
+					oGate.setSelected(aItems, true);
+				}
+				if (this.getProperty('livescrolling'))
+					if( parseInt(this.getAttribute('maxPages')))
+						bb.command.trace( this, "dataGridRowFocusAndSelect behavior and livescrolling can't be used with 'maxPages' attribute defined.", 2);
+			]]></d:handler>
+
+			<d:handler event="mousedown" type="text/javascript"><![CDATA[
+				var sMode = this.getProperty('mode');			//grid current mode - view or edit
+				var oGate = this.getProperty('gate');
+				var eTarget = bb.html.hasClass(event.viewTarget, oGate.hClassNames.row) ? event.viewTarget : bb.selector.queryAncestor( event.viewTarget, oGate.hSelectors.row);
+				if (!eTarget) return;
+
+				if (sMode == "view" || this.getProperty('focusedItem') != eTarget) {
+					var bCtrlKey = event.ctrlKey || event.metaKey;
+					var sType = this.getAttribute('selectType');//single, multiple
+					var bMultiple = sType == 'multiple';
+					var aCommands = [];
+
+					if (bMultiple) {
+						if (event.shiftKey) {
+							aCommands.push("select_range_end");
+						} else if (bCtrlKey) {
+							aCommands.push("select_switch");
+						}
+					}
+					if (!aCommands.length) {
+						if (bCtrlKey && this.getProperty("selectedItems")[0] == eTarget) { //select single + Ctrl
+							aCommands.push("select_switch");
+						} else if (!this._._selectedItems || this._._selectedItems[0] != eTarget) { //optimization
+							aCommands.push("deselect_all");
+							aCommands.push("select_on");
+						}
+					}
+					if (this._._focusedItem != eTarget) {
+						aCommands.push("focus");
+					}
+					// executing commands
+					if (aCommands.length)
+						this.rowFocusAndSelectUICommand(aCommands, eTarget, false); //no need to scroll into view for mouse operations
+				}//if (sMode
+			]]></d:handler>
+
+			<d:handler event="keydown" type="text/javascript"><![CDATA[
+				/*
+					In view mode:
+						- Enter initiates edit mode on already focused row only or sets a focus if there is no one
+						- any key - sets a focus if there is no focused row
+						- F2 initiates edit mode on anyhow focused row
+						- Navigation keys(Up, Down, PageUp, PageDown, Home, End) move the focus and change selection
+						- Ctrl+Space - switch selection of the focused row
+						- Ctrl+Navigation keys - move the focus without changing selection
+						- Shift+Navigation keys - move the focus, select records range
+
+					In edit mode:
+						- Escape discards last change and leaves edit mode
+						- Enter saves changes, initiates next item editing
+						- Tab and Shift + Tab navigates the edit controls (in row editing mode if it's implemented)
+				*/
+				var oGate = this.getProperty('gate');			//JS API gate
+				var sMode = this.getProperty('mode');			//grid current mode - view or edit
+				var sKey = event.keyIdentifier;					//pressed key
+				var bCtrlKey = event.ctrlKey || event.metaKey;	//Ctrl/Meta key is pressed
+				var sType = this.getAttribute('selectType');	//single, multiple
+				var bMultiple = sType == 'multiple';			//multiple selection is allowed
+				var eFocused = this.getProperty('focusedItem');	//currently focused item
+				var eTarget = null; 							//item to be focused
+				var aCommands = []; 							//UI command set to run
+
+				if (sMode == "view") {
+					var oNavCommand = null;					//Navigator command - we have either eTarget or oNavCommand
+					switch (sKey) {
+						case 'U+002E': //Del - delete selected rows
+							if (this.getAttribute('readonly') == 'false') {
+								if (!bb.command.fireEvent(this, 'deleteSelection', false, true).defaultPrevented)
+									this.deleteSelected();
+									event.preventDefault();
+							}
+							break;
+						case 'U+0020': //Space
+							if (bCtrlKey) {
+								if (!bMultiple && this.getProperty("selectedItems")[0] != eFocused) {
+									aCommands.push("deselect_all");
+								}
+								aCommands.push("select_switch");
+								eTarget = eFocused;
+							} else if (!event.shiftKey) {
+								if (this.getProperty("selectedItems")[0] != eFocused) {
+									aCommands.push("deselect_all");
+									aCommands.push("select_switch");
+									eTarget = eFocused;
+							}
+							}
+							break;
+						case "Up":
+							if (eFocused)
+								oNavCommand = {cmd : 'getPreviousRow', param : eFocused};
+
+							else if (oGate.oEdit.oDeletedFocus) {
+								if (oGate.oEdit.oDeletedFocus.iOffset < 0)
+									eTarget = oGate.oEdit.oDeletedFocus.row;
+								else
+									oNavCommand = {cmd : 'getPreviousRow', param : oGate.oEdit.oDeletedFocus.row};
+							}
+							break;
+						case "Down":
+							if (eFocused)
+								oNavCommand = {cmd : 'getNextRow', param : eFocused};
+
+							else if (oGate.oEdit.oDeletedFocus) {
+								if (oGate.oEdit.oDeletedFocus.iOffset > 0)
+									eTarget = oGate.oEdit.oDeletedFocus.row;
+								else
+									oNavCommand = {cmd : 'getNextRow', param : oGate.oEdit.oDeletedFocus.row};
+							}
+							break;
+						case "PageUp":
+							if (eFocused)
+								oNavCommand = {cmd : 'getPageUpRow', param : eFocused};
+							else if (oGate.oEdit.oDeletedFocus)
+								oNavCommand = {cmd : 'getPageUpRow', param : oGate.oEdit.oDeletedFocus.row};
+							break;
+						case "PageDown":
+							if (eFocused)
+								oNavCommand = {cmd : 'getPageDownRow', param : eFocused};
+							else if (oGate.oEdit.oDeletedFocus)
+								oNavCommand = {cmd : 'getPageDownRow', param : oGate.oEdit.oDeletedFocus.row};
+							break;
+						case "Home":
+							oNavCommand = {cmd : 'getFirstRow'};
+							break;
+						case "End":
+							oNavCommand = {cmd : 'getLastRow'};
+							break;
+						default:
+							if (!eFocused && !oGate.oEdit.oDeletedFocus) {
+								eTarget = this.getProperty('selectedItems')[0]; //focus the first selected
+								if (!eTarget)
+									eTarget = oGate.navigation.getFirstRowOnPage();
+							}
+					}//switch
+
+					if (eTarget || oNavCommand) {
+						if (bMultiple && eFocused) {
+							if (event.shiftKey) {
+								aCommands.push("select_range_end");
+							} else if (bCtrlKey) { //only change focus
+							}
+						}
+						if (!aCommands.length) {
+							if (bCtrlKey) { //only change focus
+							} else {
+								aCommands.push("deselect_all");
+								aCommands.push("select_on");
+							}
+						}
+						aCommands.push("focus");
+						if (eTarget)
+							this.rowFocusAndSelectUICommand(aCommands, eTarget, true);
+						else {
+							var grid = this;
+							var fCallBack = function( row){
+								if (row !== null)
+									grid.rowFocusAndSelectUICommand(aCommands, row, true);
+								else if( oNavCommand.param)
+									grid.rowFocusAndSelectUICommand(aCommands, oNavCommand.param, true);
+							};
+							oGate.navigation.call(oNavCommand.cmd, oNavCommand.param, fCallBack, event.shiftKey); //cmd, current row, action, load all in between
+						}
+						event.preventDefault();
+					}
+				}
+			]]></d:handler>
+		</d:behavior>
+
+		<!-- Editing -->
+		<d:behavior name="dataGridEditCell" implements="b:iDataGridEditItem">
+			
+
+			<d:resource type="text/css"><![CDATA[
+				.btl-grid-editItem-normal {
+					background-color: #AAAAAA;
+				}
+
+				/* workaround(?) to avoid the same color in case the dataGridRowFocusAndSelect behavior is used */
+				.btl-grid-focusAndSelect-editItem-normal {
+					background-color: #DDDDDD;
+				}
+			]]></d:resource>
+
+			<d:resource type="text/javascript"><![CDATA[
+				btl.dataGridEditCell = {};
+
+				btl.dataGridEditCell.UI = function(oDataGrid) {
+					this.dataGrid = oDataGrid;
+					this.classNames = this.getClassNames();
+					this.selectors = this.getSelectors();
+				};
+
+				btl.dataGridEditCell.UI.prototype = new btl.gridBase.Component();
+
+				btl.dataGridEditCell.UI.prototype.getClassNames = function() {
+					var hClassNames = {
+						'editItem' : ['btl-grid-editItem', 'btl-grid-editItem-normal']
+					};
+
+					/* workaround(?) to avoid the same color in case the dataGridRowFocusAndSelect behavior is used */
+					if (this.dataGrid.instanceOf('http://www.backbase.com/2006/btl', 'dataGridRowFocusAndSelect')) {
+						hClassNames.editItem = ['btl-grid-editItem', 'btl-grid-focusAndSelect-editItem-normal'];
+					}
+
+					return hClassNames;
+				};
+
+				btl.dataGridEditCell.UI.prototype.getSelectors = function() {
+					return {
+						'editItem' : '.btl-grid-editItem'
+					};
+				};
+			]]></d:resource>
+
+			<d:property name="editedItem">
+				
+			</d:property>
+
+			<d:property name="editedRecord">
+				
+			</d:property>
+
+			<d:method name="editStart">
+				
+				<d:argument name="cell">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					if (!cell)
+						cell = this.getProperty('gate').oEdit.highlightCell;
+					if (cell)
+						this.editCellUICommand('edit_on', cell);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="editFinish">
+				
+				<d:argument name="save">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					this.editCellUICommand('edit_off', null, save);
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="pageRefreshed" type="text/javascript"><![CDATA[
+					//invalidate focus
+					var oGate = this.getProperty('gate');
+					var eFocus = oGate.oEdit.focus;
+					if( eFocus && eFocus.parentNode && !eFocus.parentNode.offsetParent)
+						oGate.oEdit.focus = null;
+			]]></d:handler>
+
+			<d:method name="editCellUICommand">
+				
+				<d:argument name="commands"/>
+				<d:body type="text/javascript"><![CDATA[
+					var sMode = this.getProperty('mode');
+					var oGate = this.getProperty('gate');
+					var aCommands = typeof commands == 'string' ? [commands] : commands;
+					var oItem = arguments[1];
+					var iDelta = arguments[1];//for edit_focus...
+					var vArg2 = arguments.length > 2 ? arguments[2] : null;
+					var me = this;
+					var oEdit = oGate.oEdit;
+					var eFocused = null;
+					if (bb.instanceOf(this, btl.namespaceURI, 'iDataGridSelectAndFocus'))
+						eFocused = this.getProperty('focusedItem');
+					else if (oEdit.focus)
+						eFocused = oEdit.focus;
+					else if (typeof oItem == 'object')
+						eFocused = oItem;
+
+					function stopTheCurrent(bSave) {
+
+						if (oEdit.bFinishing) return;
+						oEdit.bFinishing = true;
+						var oEditor = oEdit.column.getProperty('editor');
+						if (oEditor && oEditor.editFinish()) {//not prevented
+
+							if (oEdit.item && oEdit.editorCell) {
+								//need to get value before editor restore because IE drops some properties
+								//i.e. 'checked' property on a checkbox
+								var vNewValue = oEditor.getProperty('value');
+								//restore cell
+								if (oEdit.editorCell.parentNode)//can be deleted
+									oEdit.editorCell.parentNode.replaceChild(oEdit.item, oEdit.editorCell);
+								//restore editor
+								oGate.editorsHost.appendChild(oEdit.editorCell);
+
+								if (bSave) {
+									if (oEdit.vOldValue != vNewValue) {
+										var sField = oEdit.column.getAttribute("dataField");
+										var sRecId = me.getProperty('editedRecord');
+										btl.dataSource.setValue(me.getProperty('dataSource'), sRecId, sField, vNewValue);
+
+										if (sField == me.getAttribute('sortField')) { //sort field was changed, so order is broken
+											me.setProperty('sorted', false);
+										}
+
+										bb.html.addClass(oEdit.item, oGate.hClassNames.changed);
+										oEdit.hChanged[sRecId] = oEdit.item.parentNode; //save changed row in a cache
+										//show a value from databinding
+										oGate.updateCell(oEdit.item);
+										oEdit.recordId = sRecId;
+										oEdit.postponedSaves = true;
+									}
+								}
+							}
+							delete oEdit.item;
+							delete oEdit.editorCell;
+							delete oEdit.initialValue;
+							me.setProperty('editedItem', null);
+							me.setProperty('editedRecord', null);
+						}
+					oEdit.bFinishing = false;
+					}
+
+					for (var i = 0; i < aCommands.length; i++) {
+						switch (aCommands[i]) {
+							case "edit_on": //initiate editing
+								var oCol = this.getProperty('columns')[oItem.cellIndex];
+								var bStarted = false;
+								if (oCol && !oCol.getProperty('readonly')) {
+									var sRecId = this.getRecordId(oItem);
+									//0. get the editor
+									var oEditor = oCol.getProperty('editor');
+									if (oEditor && oEditor.viewNode.parentNode &&  //editor is already in place
+												sRecId !== null && !(sRecId in oEdit.hDeleted) && //not deleted
+												(oEdit.postponedSaves || !(sRecId in oEdit.hChanged)) //postponed or don't wait for confirmation
+												) {
+										//enable editing in the fridge if it needs
+										var oEditCell = oItem;
+										if (oGate.fridge.isFrozen(oItem.cellIndex)) {
+											var oIndex = oGate.getTableIndex(oItem);
+											if (oIndex)
+												oEditCell = oGate.getFridgeElement(oIndex);
+										}
+
+										//init internals
+										var oSource = this.getProperty('dataSource');
+										var sQuery = oCol.getAttribute("dataField");
+
+										var editFormat = oCol.modelNode.getAttribute('editFormat');
+										if( editFormat && editFormat.length){ //there is attribute
+											editFormat = btl.dataSource.getFormat( oSource, sQuery, editFormat);
+											if( editFormat.length == 0 ) // formatter is not found
+												editFormat = false;
+										}
+										else
+											editFormat = false;
+
+										var vValue = btl.dataSource.getValue(oSource, sRecId, sQuery, editFormat);
+
+										//set editor value
+										//oEdit.initialValue - when editing is started with typing then it contains first characters
+										var bTyping = 'initialValue' in oEdit;
+										var vEditValue = bTyping ? oEdit.initialValue : vValue;
+
+										//save item to be edited
+										oEdit.editorCell = oEditor.viewNode.parentNode;	//cell with editor
+										oEdit.editorCell.className = oItem.className;		//copy decoration
+
+										oEdit.item = oEditCell; 					//cell with old value
+										oEdit.column = oCol;						//reference to the column
+										oEdit.vOldValue = vValue;					//old value
+										oEdit.recordId = sRecId;					//record id
+
+										this.setProperty('editedItem', oEdit.editorCell);	//cell in the grid to be edited
+										this.setProperty('editedRecord', sRecId);	//edited record id
+
+										//replace cell with editor
+										var oRow = oEditCell.parentNode;
+										oRow.replaceChild(oEdit.editorCell, oEditCell);
+										if (bb.browser.ie) //in IE radio buttons/checkboxes lost values
+											oEditor.setProperty('value', vValue);//set old value
+
+										if (oEditor.editStart(vEditValue, true, bTyping)) {//set value, focus and (select the value or put editor's caret to the end)
+											this.setProperty('mode', 'edit');
+											oGate.enableUserSelect();
+											bStarted = true;
+
+										} else { //prevented - reset
+											//restore cell with editor
+											oRow.replaceChild(oEditCell, oEdit.editorCell);
+
+											oEdit.item = oEdit.editorCell = null;
+											delete oEdit.initialValue;
+											this.setProperty('editedItem', null);
+											this.setProperty('editedRecord', null);
+										}//if not prevented
+									}//if editor exists
+								}//if not readonly
+
+								if (!bStarted && sMode == 'edit') {//can't start editing
+									vArg2 = false;
+									aCommands.push("edit_off");
+								}
+								break;
+
+							case "edit_off":
+								var bSave = vArg2 ? true : false; //save or discard the current change
+								stopTheCurrent(bSave);
+								if (oEdit.postponedSaves) {
+									//save postponed changes
+									aCommands.push("edit_save");
+								}
+								this.setProperty('mode', 'view');
+								oGate.disableUserSelect();
+
+								var me = this;//set focus back to the grid after editing
+								setTimeout(function(){me.focus()}, 10);
+								break;
+
+							case "edit_next": //save the current and immediatly start editing oItem
+								//save the current change
+								stopTheCurrent(true);
+								//set next cell to edit
+								aCommands.push("edit_on");
+								break;
+
+							case "edit_save": // save all postponed changes
+								//update request
+								oEdit.postponedSaves = false;
+								btl.dataSource.actionRequest(this, 'update', [oEdit.recordId]);
+								break;
+
+							case "edit_focus_cell": // highlight a cell to be edited
+								if (!this.getProperty('readonly')) {
+									if (isNaN(oItem)) {
+										if (oItem)
+											oGate.iEditColumnIndex = oItem.cellIndex;
+									} else
+										break;
+								} //continue in edit_focus
+							case "edit_focus": // highlight a cell to be edited
+								if (!this.getProperty('readonly')) {
+									if (!isNaN(iDelta)) {
+										//if the column is hidden - find new offset
+										var iOffset = iDelta;
+										var aColumns = oGate.columns;
+										var iCol = oGate.iEditColumnIndex + iOffset;
+										var iSign = iOffset < 0 ? -1 : 1;//direction to find not hidden column
+
+										for (var oCol = aColumns.getColumn(iCol);; iCol += iSign, oCol = aColumns.getColumn(iCol)) {
+											if( !oCol) {// switch direction
+												if ( iSign * iOffset < 0) { //already switched once, so column is not found
+													iOffset = null; //the only case - all columns are hidden
+													break;
+												}
+												iSign *= -1;
+												continue;
+											}
+											if (!oCol.isHidden()) {
+												iOffset = iCol - oGate.iEditColumnIndex;
+												break;
+											}
+										}//for
+										if (iOffset === null)//no visible column found
+											break;
+										else
+											oGate.iEditColumnIndex += iOffset;
+									}
+									var bScroll = vArg2; //scroll into view required for keyboard operations
+									var oCell = null;
+
+									if ( !bb.instanceOf(this, btl.namespaceURI, 'iDataGridSelectAndFocus')) {//no focusing is attached
+										if (typeof oItem == 'object')
+											oCell = oItem;
+										else if (eFocused && oGate.iEditColumnIndex >= 0 && oGate.iEditColumnIndex < eFocused.parentNode.cells.length)
+											oCell = eFocused.parentNode.cells[oGate.iEditColumnIndex];
+
+									} else if (eFocused && (eFocused.localName || eFocused.tagName).toLowerCase() == 'tr' && oGate.iEditColumnIndex < eFocused.cells.length) {
+										oCell = eFocused.cells[oGate.iEditColumnIndex];
+
+									} else if (eFocused && (eFocused.localName || eFocused.tagName).toLowerCase() == 'td') {
+										oCell = eFocused;
+
+									}
+
+									if (oGate.oEdit.highlightCell != oCell) {
+									 	if (oGate.oEdit.highlightCell)//switch off
+									 		oGate.dehighlight(oGate.oEdit.aHighlighted);
+
+										if (oCell) {
+									 		oGate.oEdit.aHighlighted = oGate.highlight(oCell);
+
+											if (bScroll) {//if a cell behind the fridge then manually scroll
+												var iDelta = oGate.fridge.viewNode.offsetWidth - oCell.offsetLeft + oGate.dataContainer.body.container.viewNode.scrollLeft;
+												var bFrozen = oGate.fridge.isFrozen( oGate.iEditColumnIndex); //means it's already in a horizontal view
+
+												if ( !oGate.fridge.isEmpty() && !bFrozen && iDelta > 0)
+													oGate.dataContainer.body.container.viewNode.scrollLeft -= iDelta;
+												else
+													oGate.dataContainer.body.scrollIntoView(oCell);
+											}
+										}
+										oGate.oEdit.highlightCell = oCell;
+										oEdit.focus = oCell;
+									}
+								}//if ! readonly
+								break;
+						}//switch
+					}//for
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="click" type="text/javascript"><![CDATA[
+				//accept click on grid elements only
+				var bGrid = (event.target == this) ||
+							bb.instanceOf(event.target, btl.namespaceURI, 'dataGridColBase') ||
+							bb.instanceOf(event.target, btl.namespaceURI, 'dataGridColGroupBase');
+				if (!bGrid) return;
+
+				var sMode = this.getProperty('mode');
+				var oEdit = this.getProperty('gate').oEdit;
+				var oGate = this.getProperty('gate');
+				var oItem = bb.html.hasClass(event.viewTarget, oGate.hClassNames.data) ? event.viewTarget : bb.selector.queryAncestor( event.viewTarget, oGate.hSelectors.data);
+
+				if (!oItem) {
+					if (sMode == "edit")
+						this.editCellUICommand("edit_off", null, true);
+					return;
+				}
+
+				var bHasFocus = bb.instanceOf(this, btl.namespaceURI, 'iDataGridSelectAndFocus');
+				if (bHasFocus && 2 > event.detail)//needs dblclick if grid has focusing behavior
+					return;
+
+				if (bHasFocus) {
+					var eFocused = this.getProperty('focusedItem');
+					var bInFocus = (eFocused == oItem.parentNode || eFocused == oItem);
+					if (bInFocus) {
+						if (oEdit.iEditWait) {
+							window.clearTimeout(oEdit.iEditWait);
+							oEdit.iEditWait = null;
+						}
+						if (sMode == "view") {
+							this.editCellUICommand(["edit_focus_cell", "edit_on"], oItem, false);//set focus and no scrollIntoView
+
+						} else if (sMode == "edit") {
+							//save the current and initiate new one
+							this.editCellUICommand(["edit_focus_cell", "edit_next"], oItem, false);//set focus, edit next item
+						}
+					} else if (sMode == "edit") {
+							//save changes
+							this.editCellUICommand("edit_off", null, true);
+					}
+				} else {//internal edit focus only
+					if (oEdit.iEditWait) {
+						window.clearTimeout(oEdit.iEditWait);
+						oEdit.iEditWait = null;
+					}
+					if (sMode == "edit") {
+						//save changes
+						if (oEdit.editorCell == oItem || !oItem.parentNode) { //the cell in edit mode or an island
+							this.editCellUICommand("edit_off", null, true);
+						} else
+							this.editCellUICommand(["edit_focus_cell", "edit_next"], oItem, false);//set focus, edit next item
+					} else {
+						this.editCellUICommand(["edit_focus_cell", "edit_on"], oItem, false);//set focus and no scrollIntoView
+					}
+				}
+			]]></d:handler>
+
+			<!-- switch off content scrolling with mouse wheel -->
+			<d:handler event="mousedown" type="text/javascript"><![CDATA[
+				var sMode = this.getProperty('mode');
+				var oGate = this.getProperty('gate');
+				if (event.target != this) return;
+
+				var oItem = bb.html.hasClass(event.viewTarget, oGate.hClassNames.data) ? event.viewTarget : bb.selector.queryAncestor( event.viewTarget, oGate.hSelectors.data);
+				if (!oItem) return;
+
+				var oEdit = oGate.oEdit;
+
+				var bCanWait = false; //TO-DO:the attribute this.getAttribute('postponedUpdate');
+				if (sMode == 'view') {
+						this.editCellUICommand("edit_focus_cell", oItem, false);//set focus and no scrollIntoView
+
+				} else {
+					var bCanWait = false;
+					if ( bb.instanceOf(this, btl.namespaceURI, 'iDataGridSelectAndFocus')) {//the same focus
+						var eFocused = this.getProperty('focusedItem');
+						bCanWait = (eFocused == oItem.parentNode || eFocused == oItem);
+
+					} else { //the same record
+						bCanWait = (this.getRecordId(oItem.parentNode) == oEdit.recordId);
+					}
+					if (sMode == 'edit' && !oEdit.iEditWait) {
+						if (bCanWait) { //bInFocus wait dblclick to start editing next cell
+							var oMe = this;
+							oEdit.iEditWait =
+								window.setTimeout(function() {
+									oMe.editCellUICommand("edit_off", oItem, true);
+									oMe.editCellUICommand("edit_focus_cell", oItem, false);
+									oEdit.iEditWait = null;
+									//oMe.editCellUICommand(["edit_off", "edit_focus_cell"], oItem, true);
+								}, 500);
+						} else {
+							this.editCellUICommand("edit_off", oItem, true);
+							this.editCellUICommand("edit_focus_cell", oItem, false);
+						}//can wait
+					}//no waiting
+				}
+			]]></d:handler>
+
+			<!-- switch off column dragging -->
+			<d:handler event="dragStart" type="application/javascript"><![CDATA[
+				if (this.getProperty('mode') == 'edit')
+					event.preventDefault();
+			]]></d:handler>
+
+			<!-- switch off content scrolling with mouse wheel -->
+			<d:handler event="mousewheel" type="application/javascript"><![CDATA[
+				if (event.target == this)
+					if (this.getProperty('mode') == 'edit')
+						event.preventDefault();
+			]]></d:handler>
+
+			<d:handler event="focusItem" type="text/javascript"><![CDATA[
+				this.editCellUICommand("edit_focus", 0, false); //set new cell to edit
+			]]></d:handler>
+
+			<!-- handler to start editing on start typing -->
+			<d:handler event="textInput" type="text/javascript"><![CDATA[
+				var sMode = this.getProperty('mode');
+				var oEdit = this.getProperty('gate').oEdit;
+				if (sMode == 'view') if(oEdit.highlightCell) if (event.data != ' ') {
+					oEdit.initialValue = event.data; //fill this value immediatly instead of original data
+					this.editCellUICommand("edit_on", oEdit.highlightCell);
+				}
+			]]></d:handler>
+
+			<d:handler event="keydown" type="text/javascript"><![CDATA[
+				/*
+					In view mode:
+						- F2, Enter and Shift+Enter initiates edit mode on focused item
+						- left - selects the previous cell to edit
+						- right selects the next cell to edit
+						- ctrl+left - selects the first cell to edit
+						- ctrl+right selects the last cell to edit
+
+					In edit mode:
+						- Escape discards the current editing change, saves postponed changes and switches edit mode off
+						- Enter saves all changes and switches edit mode off
+						- Shift+Enter postpones saving changes, initiates next cell editing
+				*/
+				var oGate = this.getProperty('gate');			//JS API gate
+				var sMode = this.getProperty('mode');			//grid current mode - view or edit
+				var sKey = event.keyIdentifier;					//pressed key
+				var bCtrlKey = event.ctrlKey || event.metaKey;	//Ctrl/Meta key is pressed
+
+				if (sMode == "view") {
+					if (this.getAttribute('readonly') == 'false') {
+						var oEdit = oGate.oEdit;
+						var oRow = null;   //row to set edit focus
+						var iOffset = null; //offset from the current edit cell
+						var bDone = false;
+
+						if (!bb.instanceOf(this, btl.namespaceURI, 'iDataGridSelectAndFocus')) {
+							//process focusing specific keys without attached focused behavior
+
+							// livescrolling needs more complicated navigation
+							// because a page can be missed and loading it takes time
+							var oNavCommand = null; //navigation command = { cmd : cmdName, param : obj}
+							var grid = this;
+							//default callback
+							var fCallBack = function(row) {
+								if (row !== null && oGate.iEditColumnIndex >= 0 && oGate.iEditColumnIndex < row.cells.length)
+									grid.editCellUICommand("edit_focus_cell", row.cells[oGate.iEditColumnIndex], true);
+							}
+
+							if (!oEdit.focus)
+								oNavCommand = {cmd : 'getFirstRowOnPage'};
+							else {
+								switch (sKey) {
+									case "PageUp":
+										oNavCommand = {cmd : 'getPageUpRow', param : oEdit.focus.parentNode};
+										break;
+									case "PageDown":
+										oNavCommand = {cmd : 'getPageDownRow', param : oEdit.focus.parentNode};
+										break;
+									case 'Up': //arrow
+										if (!bCtrlKey) {//ctrl+Up works like Home
+											oNavCommand = {cmd : 'getPreviousRow', param : oEdit.focus.parentNode};
+											break;
+										}
+									case 'Down': //arrow
+										if (!bCtrlKey) {//ctrl+Down works like End
+											oNavCommand = {cmd : 'getNextRow', param : oEdit.focus.parentNode};
+											break;
+										}
+									case "Home":
+										oNavCommand = {cmd : 'getFirstRow'};
+										var fOldCallBack = fCallBack;
+										fCallBack = function( row){
+											if (row == oEdit.focus.parentNode) //already on top, so move to the start
+												grid.editCellUICommand("edit_focus", -oGate.iEditColumnIndex, true);
+											 else
+												fOldCallBack(row);
+										}
+										break;
+									case "End":
+										oNavCommand = {cmd : 'getLastRow'};
+										var fOldCallBack = fCallBack;
+										fCallBack = function( row){
+											if (row == oEdit.focus.parentNode) //already on top, so move to the start
+												grid.editCellUICommand("edit_focus", oGate.columns.getLength() - oGate.iEditColumnIndex - 1, true);
+											else
+												fOldCallBack(row);
+										}
+										break;
+								}//switch
+							}
+							if (oNavCommand) {
+								oGate.navigation.call(oNavCommand.cmd, oNavCommand.param, fCallBack);
+								event.preventDefault();
+								bDone = true;
+							}
+						}
+						if ( !bDone) {
+							switch (sKey) {
+								case 'Left': //left arrow
+									if (oGate.iEditColumnIndex > 0) {
+										if (bCtrlKey)
+											iOffset = -oGate.iEditColumnIndex;
+										else
+											iOffset = -1;
+									}
+									break;
+
+								case 'Right': //right arrow
+									if (oGate.iEditColumnIndex < oGate.columns.getLength() - 1) {//one before the last
+										if (bCtrlKey)
+											iOffset = oGate.columns.getLength() - oGate.iEditColumnIndex - 1;
+										else
+											iOffset = 1;
+									}
+									break;
+								case 'F2': //edit
+									if (event.shiftKey)
+										break;
+
+								case 'Enter':
+									if (bCtrlKey)
+										break;
+									if (oGate.oEdit.highlightCell) {
+										this.editCellUICommand("edit_on", oGate.oEdit.highlightCell);
+										event.preventDefault();
+									}
+									break;
+							}//switch
+						}//if (bDone
+						if (iOffset !== null) {
+							this.editCellUICommand("edit_focus", iOffset, true);//set focus and scrollIntoView
+							event.preventDefault();
+						}
+					}
+				} else if (sMode == "edit") {
+					switch (sKey) {
+						case 'U+001B': //Escape
+							this.editCellUICommand("edit_off", null, false);
+							event.preventDefault();
+							break;
+
+						case 'Enter': //start edit
+							if (!bCtrlKey) {
+								var oItem = oGate.oEdit.editorCell; //the edited cell
+								if (event.shiftKey && oItem && oItem.nextSibling) { //initiate next cell editing
+									//find the next editable
+									var aColumns = this.getProperty('columns');
+									for (var oNext = oItem.nextSibling; oNext && aColumns[oNext.cellIndex].getProperty('readonly'); oNext = oNext.nextSibling);
+
+									if (oNext)
+										this.editCellUICommand(["edit_focus_cell", "edit_next"], oNext, true);
+									else
+										this.editCellUICommand("edit_off", null, true);
+								} else
+									this.editCellUICommand("edit_off", null, true);
+								event.preventDefault();
+							}
+							break;
+					}//switch
+				}//if sMode
+			]]></d:handler>
+
+			<!-- handler to stop editing on page refreshed -->
+			<d:handler event="modeChanged" type="text/javascript"><![CDATA[
+				if (this.getProperty('mode') == 'view')
+					if (this.getProperty('gate').oEdit.item)
+						this.editFinish();
+			]]></d:handler>
+
+			<d:handler event="initialized" type="application/javascript"><![CDATA[
+				var oGate = this.getProperty('gate');
+
+				/* XXX: Refactor, cause focusAndSelect should not be involved, yet it is required */
+				if (!oGate.focusAndSelectUI) {
+					oGate.focusAndSelectUI = new btl.dataGridRowFocusAndSelect.UI();
+				}
+
+				oGate.dataGridEditCellUI = new btl.dataGridEditCell.UI(this);
+
+				oGate.iEditColumnIndex = 0;
+			]]></d:handler>
+		</d:behavior>
+
+		<!-- sort column on click -->
+		<d:behavior name="dataGridSortOneColumn">
+			
+
+			<d:handler event="click" type="text/javascript"><![CDATA[
+				if (event.isDefaultPrevented || this.getProperty('busy') || event.ctrlKey || event.metaKey || event.shiftKey || event.button || this.sortClick != event.viewTarget || !this.getProperty('sortable') || this.getProperty('busy'))
+					return;
+
+				var oGate = this.getProperty('gate');
+				var oTarget = bb.html.hasClass(event.viewTarget, oGate.hClassNames.header) ? event.viewTarget : bb.selector.queryAncestor( event.viewTarget, oGate.hSelectors.header);
+				if (!oTarget) return;
+
+				this.sortColumn(this.getColumn(oTarget));
+			]]></d:handler>
+
+			<d:handler event="mousedown" type="application/javascript"><![CDATA[
+				this.sortClick = event.viewTarget;
+			]]></d:handler>
+		</d:behavior>
+
+		<!--  Freezing columns -->
+		<d:behavior name="dataGridFreezingUI">
+			
+
+			<d:resource type="text/css"><![CDATA[
+				.btl-grid-fridgeSplitter,
+				.btl-grid-fridgeSplitterClone {
+					position: absolute;
+					top: 0;
+					left: 0;
+					width: 4px;
+					background-color: #000000;
+				}
+			]]></d:resource>
+
+			<d:resource type="text/javascript"><![CDATA[
+				btl.dataGridFreezingUI = {};
+
+				btl.dataGridFreezingUI.FridgeSplitter = function(oFridge) {
+					btl.gridBase.Component.call(this);
+					this.fridge = oFridge;
+				};
+
+				btl.dataGridFreezingUI.FridgeSplitter.prototype = new btl.gridBase.Component();
+
+				btl.dataGridFreezingUI.FridgeSplitter.prototype.classNames = {
+					'normal' : ['btl-grid-fridgeSplitter', 'btl-grid-fridgeSplitter-normal'],
+					'hover' : 'btl-grid-fridgeSplitter-hover',
+					'press' : 'btl-grid-fridgeSplitter-press'
+				};
+
+				btl.dataGridFreezingUI.FridgeSplitter.prototype.selectors = {
+					'splitter' : 'div.btl-grid-fridgeSplitter'
+				};
+
+				btl.dataGridFreezingUI.FridgeSplitter.prototype.getTemplate = function() {
+					var oDiv = document.createElement('div');
+					bb.html.addClass(oDiv, this.classNames.normal);
+					return oDiv;
+				};
+
+				btl.dataGridFreezingUI.FridgeSplitter.prototype.repaint = function() {
+					if (this.fridge.isEmpty()) {
+						this.viewNode.style.left = '0px';
+						this.viewNode.style.height = this.fridge.grid.dataContainer.viewNode.clientHeight + 'px';
+					} else {
+						this.viewNode.style.left = (this.fridge.viewNode.offsetLeft + this.fridge.viewNode.offsetWidth - 3) + 'px';
+						this.viewNode.style.height = this.fridge.viewNode.clientHeight + 'px';
+					}
+				};
+
+				btl.dataGridFreezingUI.FridgeSplitter.prototype.widthChanged = function() {
+				};
+
+				btl.dataGridFreezingUI.FridgeSplitter.prototype.heightChanged = function() {
+					this.repaint();
+				};
+
+				btl.dataGridFreezingUI.FridgeSplitterClone = function( oFridge) {
+					btl.dataGridFreezingUI.FridgeSplitter.call(this, oFridge);
+				};
+
+				btl.dataGridFreezingUI.FridgeSplitterClone.prototype = new btl.dataGridFreezingUI.FridgeSplitter();
+
+				btl.dataGridFreezingUI.FridgeSplitterClone.prototype.getTemplate = function() {
+					var oDiv = document.createElement('div');
+					bb.html.addClass(oDiv, 'btl-grid-fridgeSplitterClone');
+					bb.html.addClass(oDiv, this.classNames.normal);
+					bb.html.setStyle(oDiv, 'opacity', '0.6');
+					return oDiv;
+				};
+			]]></d:resource>
+
+			<d:attribute name="frozenColumns" default="0">
+				<d:changer type="text/javascript"><![CDATA[
+					this._._gate.fridge.freeze(parseInt(value));
+					this.getProperty('gate').freezeUI.splitter.repaint();
+				]]></d:changer>
+			</d:attribute>
+
+			<d:handler event="initialized" type="text/javascript"><![CDATA[
+				var oGate = this.getProperty('gate');
+				oGate.freezeUI = {
+					'splitter' : new btl.dataGridFreezingUI.FridgeSplitter(oGate.fridge)
+				};
+				this.viewNode.appendChild(oGate.freezeUI.splitter.viewNode);
+				oGate.fridge.addSizeListener(oGate.freezeUI.splitter);
+			]]></d:handler>
+
+			<d:handler event="layoutUpdated" type="text/javascript"><![CDATA[
+				this.getProperty('gate').freezeUI.splitter.repaint();
+			]]></d:handler>
+
+			<d:handler event="mouseenter" match=".btl-grid-fridgeSplitter" type="text/javascript"><![CDATA[
+				var oGate = this.getProperty('gate');
+				if (!oGate.freezeUI.started) { /* only apply the hover effect when not dragging */
+					bb.html.removeClass(oGate.freezeUI.splitter.viewNode, oGate.freezeUI.splitter.classNames.normal);
+					bb.html.addClass(oGate.freezeUI.splitter.viewNode, oGate.freezeUI.splitter.classNames.hover);
+				}
+			]]></d:handler>
+
+			<d:handler event="mouseleave" match=".btl-grid-fridgeSplitter" type="text/javascript"><![CDATA[
+				var oGate = this.getProperty('gate');
+				bb.html.removeClass(oGate.freezeUI.splitter.viewNode, oGate.freezeUI.splitter.classNames.hover);
+				bb.html.addClass(oGate.freezeUI.splitter.viewNode, oGate.freezeUI.splitter.classNames.normal);
+			]]></d:handler>
+
+			<d:handler event="mousedown" match=".btl-grid-fridgeSplitter" type="text/javascript"><![CDATA[
+				if (event.shiftKey || event.ctrlKey || event.metaKey || event.button)
+					return;
+
+				var oGate = this.getProperty('gate');
+
+				bb.html.removeClass(oGate.freezeUI.splitter.viewNode, oGate.freezeUI.splitter.classNames.normal);
+				bb.html.removeClass(oGate.freezeUI.splitter.viewNode, oGate.freezeUI.splitter.classNames.hover);
+				bb.html.addClass(oGate.freezeUI.splitter.viewNode, oGate.freezeUI.splitter.classNames.press);
+
+				// handling freezing
+				var oDummy = oGate.resizeDummy.viewNode;
+				var oBox = oGate.dataContainer.viewNode;
+
+				//position and size element to be actually resized
+				oDummy.style.left = '0';
+				oDummy.style.top = '0';
+				oDummy.style.display = 'block';
+				oDummy.style.width = '0';
+
+				this.setProperty('busy', true);
+
+				btl.resize.startResize(this, oDummy, btl.resize.RIGHT, event.pageX, event.pageY, null, 0, 0);
+
+				var oClone = new btl.dataGridFreezingUI.FridgeSplitterClone( oGate.fridge);
+				oGate.freezeUI.splitterClone = oClone;
+
+				// insert clone before splitter so the splitter will hover over the clone
+				this.viewNode.insertBefore(oGate.freezeUI.splitterClone.viewNode, oGate.freezeUI.splitter.viewNode);
+				oGate.freezeUI.splitterClone.repaint();
+
+				oBox.scrollLeft = 0;	//rewind
+
+				oGate.freezeUI.box = bb.html.getBoxObject(this.viewNode); //zero point
+				var aLimits = [];
+				var iWLimit = oBox.offsetWidth;
+				for (var i = 0, iLength = oGate.columns.getLength(); i < iLength; i++) {
+					var oCell = oGate.columns.getColumn(i).getSizer();
+					var oLimits = { left: oCell.offsetLeft, middle: oCell.offsetLeft + oCell.offsetWidth / 2 };
+					if (oLimits.left >= iWLimit)
+						break;
+					aLimits[i] = oLimits;
+				}
+				if (aLimits.length)
+					aLimits[aLimits.length-1].middle = Infinity;
+				oGate.freezeUI.aLimits = aLimits;
+				oGate.freezeUI.started = true;
+				oGate.freezeUI.changed = false;
+
+				event.preventDefault();
+			]]></d:handler>
+
+			<d:handler event="resize" type="text/javascript"><![CDATA[
+				var oGate = this.getProperty('gate');
+				if (oGate.freezeUI.started) {
+					oGate.freezeUI.changed = true;
+					var iX = event.pageX - oGate.freezeUI.box.left;
+
+ 					if (iX > this.viewNode.clientWidth - oGate.freezeUI.splitter.viewNode.clientWidth) {
+ 						iX = 0;
+ 					}
+
+					if (iX >= 0) {
+						var iCenterOffset = Math.round(bb.html.getBoxObject(oGate.freezeUI.splitter.viewNode, 'border').width / 2);
+						oGate.freezeUI.splitter.viewNode.style.left = Math.max(iX - iCenterOffset, 0) + 'px';
+					}
+
+					var iBorder = 0,
+						iColumn = 0;
+
+					for (var i = 0; oGate.freezeUI.aLimits.length > i; i++) {
+						if (oGate.freezeUI.aLimits[i].middle >= iX) {
+							iBorder = oGate.freezeUI.aLimits[i].left;
+							iColumn = i;
+							break;
+						}
+					}
+
+					if (iColumn != oGate.freezeUI.iColumn) {
+						if (0 >= iX) {
+							oGate.freezeUI.splitterClone.viewNode.style.left = '0';
+						} else if (oGate.freezeUI.box.width >= iBorder) {
+							oGate.freezeUI.splitterClone.viewNode.style.left = iBorder - 1 + 'px';
+						}
+						oGate.freezeUI.iColumn = iColumn;
+					}
+					event.preventDefault();
+				}
+			]]></d:handler>
+
+			<d:handler event="resizeEnd" type="text/javascript"><![CDATA[
+				var oGate = this.getProperty('gate');
+				if (oGate.freezeUI.started) {
+					oGate.freezeUI.started = false;
+					event.preventDefault();
+
+					if (oGate.freezeUI.changed) {
+						this.freeze(oGate.freezeUI.iColumn);
+						// set the splitter to the position it should get when the column is frozen
+						oGate.freezeUI.splitter.viewNode.style.left = oGate.freezeUI.splitterClone.viewNode.style.left;
+					}
+
+					/* XXX: Good enough cleanup? The goal is to remove the splitter clone completely. */
+					this.viewNode.removeChild(oGate.freezeUI.splitterClone.viewNode);
+					oGate.freezeUI.splitterClone = null;
+
+					bb.html.removeClass(oGate.freezeUI.splitter.viewNode, oGate.freezeUI.splitter.classNames.press);
+					bb.html.addClass(oGate.freezeUI.splitter.viewNode, oGate.freezeUI.splitter.classNames.normal);
+
+					this.setProperty('busy', false);
+				}
+			]]></d:handler>
+		</d:behavior>
+	</d:namespace>
+</d:tdl>

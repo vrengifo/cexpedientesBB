@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"   xmlns:d="http://www.backbase.com/2006/tdl" >
+	<d:namespace name="http://www.backbase.com/2006/btl">
+		<!--
+			Ideally, these resources would have been inline.
+			But to avoid code duplication that would be necessary to still be backwards compatible
+			(these resources were in the BTL 'element' binding) they have been placed in separate
+			files.
+		-->
+		<d:resource type="text/css"><![CDATA[/*
+	This file contains CSS that is used by/for BTL. It is a resource in resources.xml,
+	which is supposed to be included when using BTL (automatically done by the config files).
+
+	To not break backwards compatibility in the case when the config files are not used,
+	this file is also included by the 'element' binding.
+ */
+.btl-repaint {
+	zoom: 1;
+	background-color: transparent;
+	-moz-outline: none;
+}]]></d:resource>
+		<d:resource type="text/javascript"><![CDATA[/* This file contains JavaScript that is used by/for BTL. It is a resource in btl.xml,
+	which is supposed to be included when using BTL (automatically done by the config files).
+
+	To not break backwards compatibility in the case when the config files are not used,
+	this file is also included by the 'element' binding. */
+if (!window.btl) {
+	/**
+	 * <p>The btl API object.</p>
+	 * <p>On this object, you will find btl (widget) API functions.</p>
+	 * @publish
+	 */
+	var btl = {};
+};
+
+btl.namespaceURI = "http://www.backbase.com/2006/btl";
+
+btl.funcReturnFalse = function btl_funcReturnFalse(){ return false; };
+
+btl.funcReturnTrue = function btl_funcReturnTrue(){ return true; };
+
+btl.isInsideHead = function btl_isInsideHead(oElm, oOrigNode, oTarget){
+	if(oTarget && oTarget != oOrigNode){
+		return false;
+	}
+	while(oElm && oElm.nodeType == 1){
+		// check for the btl-head class
+		if(bb.html.hasClass(oElm, 'btl-head')){
+			return true;
+		}
+		// if the viewRoot of the element has been reached, don't go further up
+		if (oElm.controller == oOrigNode){
+			break;
+		}
+		oElm = oElm.parentNode;
+	}
+	return false;
+};
+
+//forces a repaint view element on browser
+btl.repaint = function btl_repaint(oElm) {
+	bb.html.addClass(oElm, 'btl-repaint');
+	setTimeout(function(){
+		if(oElm) bb.html.removeClass(oElm, 'btl-repaint');
+		oElm = null;
+	}, 1);
+};
+
+btl.isTrueValue = function btl_isTrueValue(sName, sValue) {
+	return sValue == 'true' || sValue == sName;
+};
+
+btl.isFalseValue = function btl_isFalseValue(sName, sValue) {
+	return sValue != 'true' && sValue != sName;
+};
+
+btl.containsElement = function btl_containsElement(oElm1, oElm2){
+	while(oElm2){
+		if(oElm1 == oElm2) return true;
+		oElm2 = oElm2.parentNode;
+	}
+	return false;
+};
+
+btl.getScrollLeft = function btl_getScrollLeft(oElm){
+	var iScrollLeft = 0;
+	while(oElm){
+		if(oElm.scrollLeft) iScrollLeft += oElm.scrollLeft;
+		oElm = oElm.parentNode;
+	}
+	return iScrollLeft;
+};
+
+btl.getScrollTop = function btl_getScrollTop(oElm){
+	var iScrollTop = 0;
+	while(oElm){
+		if(oElm.scrollTop) iScrollTop += oElm.scrollTop;
+		oElm = oElm.parentNode;
+	}
+	return iScrollTop;
+};
+
+btl.setPrivateProperty = function btl_setPrivateProperty(oController, sProperty, value){
+	oController._['_btl_' + sProperty] = value;
+};
+
+btl.getPrivateProperty = function btl_getPrivateProperty(oController, sProperty){
+	return oController._['_btl_' + sProperty];
+};
+
+btl.html = {};
+
+btl.html.stretch = function btl_html_stretch(oElm){
+	var oParent = oElm.parentNode;
+	//Reset the height
+	oElm.style.height = '1px';
+
+	/* total height of elements before the stretch element is top of stretch minus top of first element */
+	var iHeightBefore;
+	var iStretchTop;
+	var iFirstTop;
+
+	/* total height of elements after the stretch element is top of last element
+		plus height of last element minus top of element after stretch */
+	var iHeightAfter;
+	var iLastTop;
+	var iLastHeight;
+	var iAfterStretchTop;
+
+	/* available height is height of parent minus border-top/bottom-width minus padding-top/bottom */
+	var iAvailableHeight = bb.html.getBoxObject(oParent, 'content').height;
+
+	/* available height minus height of elements before stretch minus height of elements after stretch */
+	var iStretchHeight;
+
+	var oChild = oParent.firstChild;
+
+	var oStretch;
+
+	while(oChild){
+		/* A child is valid when it is not positioned absolutely or if it is not an element node.
+			Certain cases of possible invalidity are not taken into account. What to do for negative margins
+			for example? */
+		var bValidChild = oChild.nodeType === 1 && bb.html.getStyle(oChild, 'position') !== 'absolute' && bb.html.getStyle(oChild, 'display') !== 'none';
+		var oNextSibling = oChild.nextSibling;
+
+		if(bValidChild){
+			var oBoxObject = bb.html.getBoxObject(oChild);
+
+			if (iFirstTop === undefined){
+				// first element
+				iFirstTop = oBoxObject.top;
+			}
+
+			if(iStretchTop === undefined && oChild === oElm){
+				oStretch = oChild;
+				iStretchTop = oBoxObject.top;
+
+				// heightBefore can be calculated when stretch is found
+				iHeightBefore = iStretchTop - iFirstTop;
+				// if stretch happens to be the last element, the remaining heights should be 0
+				iHeightAfter = 0;
+			} else if(iStretchTop !== undefined && iAfterStretchTop === undefined){
+				// after stretch element
+				iAfterStretchTop = oBoxObject.top;
+				// if element after stretch happens to be the last element, the remaining heights should be height of the element
+				iHeightAfter = oBoxObject.height;
+			} else {
+				// last element
+				iLastTop = oBoxObject.top;
+				iLastHeight = oBoxObject.height;
+				iHeightAfter = iLastTop + iLastHeight - iAfterStretchTop;
+			}
+		}
+		oChild = oNextSibling;
+	}
+
+	iStretchHeight = iAvailableHeight - iHeightBefore - iHeightAfter;
+
+	if(oElm && iStretchHeight){
+		btl.html.setHeight(oElm, iStretchHeight);
+	}
+};
+
+/* set height of an element (in px) as would be done in border-box */
+btl.html.setHeight = function btl_html_setHeight(oElm, iHeight){
+	//if box-model for oElm is content-box
+		// get height
+		// get height of content
+		// border+padding = height - content height
+		// iHeight = iHeight - border+padding
+	iHeight -= bb.html.getStyle(oElm, 'box-sizing') == 'content-box' ?  bb.html.getBoxObject(oElm, 'border').height - bb.html.getBoxObject(oElm, 'content').height : 0;
+	bb.html.setStyle(oElm, 'height', iHeight + 'px');
+};
+btl.html.setWidth = function btl_html_setWidth(oElm, iWidth){
+	//if box-model for oElm is content-box
+		// get height
+		// get height of content
+		// border+padding = height - content height
+		// iHeight = iHeight - border+padding
+	iWidth -= bb.html.getStyle(oElm, 'box-sizing') == 'content-box' ?  bb.html.getBoxObject(oElm, 'border').width - bb.html.getBoxObject(oElm, 'content').width : 0;
+	bb.html.setStyle(oElm, 'width', iWidth + 'px');
+};
+
+btl.controller = {};
+
+/* returns true when oAncestor contains oDescendant (not when oAncestor === oDescendant) */
+btl.controller.containsElement = function btl_controller_containsElement(oAncestor, oDescendant){
+	while(oDescendant){
+		oDescendant = oDescendant.getProperty('parentNode');
+		if(oAncestor === oDescendant){
+			return true;
+		}
+	}
+	return false;
+};]]></d:resource>
+	</d:namespace>
+</d:tdl>

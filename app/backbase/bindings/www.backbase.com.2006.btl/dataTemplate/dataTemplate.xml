@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="dataObserver" src="../dataBinding/dataBinding.xml"/>
+
+		<d:element name="dataTemplate" extends="b:dataObserver" abstract="true">
+			
+
+			<d:property name="instance">
+				<!-- abstract property, must be overridden -->
+				
+				<d:getter type="text/javascript"><![CDATA[
+					// Also possible: return modelNode to build instance in document tree
+					// return this.modelNode;
+					if (!this._._instance)
+						this._._instance = bb.xml.parse('<?xml version="1.0" encoding="UTF-8"?><root/>').documentElement;
+					return this._._instance;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="xsltProcessor">
+				<!-- return a prepared XSLTProcessor object -->
+				
+				<d:getter type="text/javascript"><![CDATA[
+					if (!this._._xsltProcessor) {
+						this._._xsltProcessor = new XSLTProcessor();
+						this._._xsltProcessor.importStylesheet(bb.getResource(this, 'data-template'));
+					}
+					return this._._xsltProcessor;
+				]]></d:getter>
+			</d:property>
+
+			<d:method name="dataUpdate">
+				<d:argument name="action"/>
+				<d:argument name="records"/>
+				<d:argument name="actionObj"/>
+				<d:body type="text/javascript"><![CDATA[
+					var oIndexes = this.getProperty('indexes');
+					var bRootUpdate = !oIndexes || oIndexes.length == 0;
+
+					// update indexes property
+					this.callSuper('dataUpdate', [action, records, actionObj]);
+
+					switch (action) {
+						case 'read':
+							if (bRootUpdate) {
+								this.buildInstance(records);
+								this.repaint();
+							} else {
+								this.updateInstance(records);
+								this.repaint(records);	// TODO: selective repaint (no duplicate painting)
+							}
+							break;
+						case 'update':
+						//case 'create':
+							btl.dataSource.actionRequest(this, 'read', records);
+							break;
+						case 'delete':
+							this.removeFromInstance(records);
+							this.repaint();	// TODO: selective repaint (only parent nodes)
+							break;
+					}
+					
+					this.setProperty('indexes', this.getInstanceIndexes());
+				]]></d:body>
+			</d:method>
+
+			<d:method name="repaint">
+				
+				<d:argument name="records">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					var oXProc = this.getProperty('xsltProcessor');
+					var oInstance = this.getProperty('instance');
+					var oFragment = oXProc.transformToFragment(oInstance, document);
+					this.viewGate.innerHTML = ""; //clear
+					this.viewGate.appendChild(oFragment);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getIdFromView">
+				
+				<d:argument name="node">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					var sId;
+					while (node.nodeType == 1 && node != this.viewNode) {
+						if (sId = node.getAttribute('btl_data-id'))
+							return sId;
+						node = node.parentNode;
+					}
+					return null;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="buildInstance">
+				
+				<d:argument name="records">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					var oInstance = this.getProperty('instance');
+					// clear children, if any
+					while (oChild = oInstance.firstChild)
+						oChild.parentNode.removeChild(oChild);
+					var oDataSource = this.getProperty('dataSource');
+					for (var i=0, len = records.length; i < len; i++) {
+						var oItem = this.buildInstanceItem(oInstance.ownerDocument, oDataSource, records[i]);
+						oInstance.appendChild(oItem);
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="updateInstance">
+				
+				<d:argument name="records">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					var oDataSource = this.getProperty('dataSource');
+					for (var i=0, len=records.length; i < len; i++) {
+						var oOldItem = this.getInstanceNode(records[i]);
+						if (oOldItem) {
+							var oNewItem = this.buildInstanceItem(oOldItem.ownerDocument, oDataSource, records[i]);
+							oOldItem.parentNode.replaceChild(oNewItem, oOldItem);
+						}
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="removeFromInstance">
+				
+				<d:argument name="records">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					var oDataSource = this.getProperty('dataSource');
+					for (var i=0, len=records.length; i < len; i++) {
+						var oItem = this.getInstanceNode(records[i]);
+						if (oItem) {
+							oItem.parentNode.removeChild(oItem);
+						}
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getInstanceNode">
+				
+				<d:argument name="identifier">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					var oInstance = this.getProperty('instance');
+					var sQuery = './/*[@id="' + identifier.replace(/"/g, '""') + '"]';
+					return bb.xml.selectSingleNode(oInstance, sQuery, null);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getInstanceNodes">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var oInstance = this.getProperty('instance');
+					return bb.xml.selectNodes(oInstance, './/*[@id]', null);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getInstanceIndexes">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var aNodes = this.getInstanceNodes();
+					var aIndexes = [];
+					for (var i = 0, len = aNodes.length; i < len; i++)
+						aIndexes.push(aNodes[i].getAttribute('id'));
+					return aIndexes;
+				]]></d:body>
+			</d:method>
+			
+			<d:method name="buildInstanceItem">
+				
+				<d:argument name="document">
+					
+				</d:argument>
+				<d:argument name="dataSource">
+					<!-- XXX: sure we want to pass this? It can be retrieved from this... -->
+					
+				</d:argument>
+				<d:argument name="recordID">
+					
+				</d:argument>
+				<d:body/>
+			</d:method>
+		</d:element>
+	</d:namespace>
+</d:tdl>

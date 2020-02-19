@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="element" src="../element/element.xml"/>
+
+		<d:element name="dropDown" extends="b:element" abstract="true">
+			
+
+			<d:resource type="text/css"><![CDATA[
+				.btl-dropDown {
+					/*  setting position to avoid "unexplainable" scrollbars (when using display and
+						visibility and to still allow measuring the width of the dropdown */
+					top: -10000px;
+					left: -10000px;
+					position: absolute;
+					z-index: 999;
+				}
+			]]></d:resource>
+
+			<d:resource type="text/javascript"><![CDATA[
+				//closes the current dropdown for browsers which do not set focus to a body
+				btl.dropDown = {
+					currentObject: null
+				};
+
+				//By default dopDown is not supposed to be focusable so the only way to close it is
+				//document mousedown event, which is not triggered if I'm clicking dropDown itself.
+				btl.dropDown.documentMouseDown = function(event){
+					var obj = btl.dropDown.currentObject;
+					if (obj && obj._) {
+						if (!obj._._cancelMouseDown) {
+							obj.close();
+						}
+						obj._._cancelMouseDown = false;
+					}
+				}
+
+				bb.document.addEventListener('mousedown', btl.dropDown.documentMouseDown, false);
+			]]></d:resource>
+
+			<d:property name="open">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					var oDropDown = null, oCurrent = btl.dropDown.currentObject;
+					if (this._['_open'] != value){
+						oDropDown = this.getProperty('dropDownElement');
+						if(oDropDown){
+							if(value === true){
+								this._['_open'] = true;
+								bb.html.position(oDropDown, this.viewNode, 'after-start');
+								// also checking if oCurrent has a viewNode to check that it really still exists
+								if (oCurrent && oCurrent.viewNode) {
+									oCurrent.close();
+								}
+								btl.dropDown.currentObject = this;
+							} else {
+								this._['_open'] = false;
+								// reset position so class will be used
+								oDropDown.style.top = '';
+								oDropDown.style.left = '';
+								btl.dropDown.currentObject = null;
+							}
+						}
+					}
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="dropDownElement">
+				
+			</d:property>
+
+			<d:method name="open">
+				
+				<d:body type="text/javascript"><![CDATA[
+					this.setProperty('open', true);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="close">
+				
+				<d:body type="text/javascript"><![CDATA[
+					this.setProperty('open', false)
+				]]></d:body>
+			</d:method>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				var oDropDown = this.getProperty('dropDownElement');
+
+				if(oDropDown){
+					bb.html.addClass(oDropDown, 'btl-dropDown');
+					oDropDown.controller = this;
+					document.body.appendChild(oDropDown);
+				}
+			]]></d:constructor>
+
+			<d:destructor type="text/javascript"><![CDATA[
+				var oDropDown = this.getProperty('dropDownElement');
+				if(oDropDown){
+					if(oDropDown.parentNode)
+						oDropDown.parentNode.removeChild(oDropDown);
+				}
+			]]></d:destructor>
+
+			<d:handler event="mousedown" type="text/javascript"><![CDATA[
+				if (this.getProperty("open")) {
+					this._["_cancelMouseDown"] = true;
+				}
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

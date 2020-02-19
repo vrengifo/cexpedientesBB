@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="windowBase" src="../windowBase.xml"/>
+
+		<d:element name="window" extends="b:windowBase">
+			
+
+			<d:resource type="text/css"><![CDATA[.btl-window {
+	position: absolute;
+	overflow: hidden;
+	/* this index was chosen to overelap all none floating elements, cause they can still use
+	   z-index to solve some browser issues, and to be under all other floating elements, that
+	   can possibly be on the same level with window */
+	z-index: 100;
+}
+.btl-window-inline {
+	position: relative;
+}
+.btl-window-inner,
+.btl-window-inner2 {
+	overflow: hidden;
+	height: 100%;
+}
+.btl-window-inner2 {
+	padding: 1px;
+	border: 1px solid InactiveBorder;
+	background-color: ThreeDFace;
+}
+.btl-window-head {
+	cursor: move;
+	color: InactiveCaptionText;
+	background-color: InactiveCaption;
+}
+.btl-window-label {
+	cursor: move;
+	font-weight: bold;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	color: InactiveCaptionText;
+}
+.btl-window-head .btl-label {
+	padding-top: 3px;
+	padding-bottom: 3px;
+}
+.btl-window-button {
+	display: none;
+	margin-top: 3px;
+	margin-right: 2px;
+	cursor: pointer;
+	float: right;
+	background-color: ButtonFace;
+	border-color: ThreeDHighlight ThreeDDarkShadow ThreeDDarkShadow ThreeDHighlight;
+}
+.btl-window-button,
+.btl-window-button-inner {
+	border-width: 1px;
+	border-style: solid;
+}
+.btl-window-button-inner {
+	border-color: ThreeDFace ThreeDShadow ThreeDShadow ThreeDFace;
+	padding: 0 1px 1px 0;
+}
+.btl-window-button-icon {
+	position: relative;
+	width: 10px;
+	height: 9px;
+}
+.btl-window-button-minimize,
+.btl-window-button-maximize,
+.btl-window-button-restore1,
+.btl-window-button-restore2 {
+	font-size: 1px;
+	line-height: 1px;
+}
+.btl-window-button-minimize {
+	width: 6px;
+	height: 2px;
+	position: absolute;
+	bottom: 0;
+	left: 1px;
+	background-color: ButtonText;
+}
+.btl-window-button-maximize {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	top: 0;
+	background-color: ButtonFace;
+	border-style: solid;
+	border-color: ButtonText;
+	border-width: 2px 1px 1px 1px;
+}
+.btl-window-button-restore1,
+.btl-window-button-restore2 {
+	position: absolute;
+	width: 7px;
+	height: 6px;
+	background-color: ButtonFace;
+	border-style: solid;
+	border-color: ButtonText;
+	border-width: 2px 1px 1px 1px;
+	display: none;
+}
+.btl-window-button-restore1 {
+	top: 0;
+	right: 0;
+}
+.btl-window-button-restore2 {
+	left: 0;
+	bottom: 0;
+}
+.btl-window-minimized .btl-window-minimizeRestoreButton .btl-window-button-minimize,
+.btl-window-maximized .btl-window-maximizeRestoreButton .btl-window-button-maximize {
+	display: none;
+}
+.btl-window-minimized .btl-window-minimizeRestoreButton .btl-window-button-restore1,
+.btl-window-minimized .btl-window-minimizeRestoreButton .btl-window-button-restore2,
+.btl-window-maximized .btl-window-maximizeRestoreButton .btl-window-button-restore1,
+.btl-window-maximized .btl-window-maximizeRestoreButton .btl-window-button-restore2 {
+	display: block;
+}
+.btl-window-closeButton .btl-window-button-icon div {
+	height: 1px;
+	background-color: ButtonText;
+	position: absolute;
+	overflow: hidden;
+}
+.btl-window-closeButton-x1l,
+.btl-window-closeButton-x1r {
+	bottom: 1px;
+}
+.btl-window-closeButton-x2l,
+.btl-window-closeButton-x2r {
+	bottom: 2px;
+}
+.btl-window-closeButton-x3 {
+	bottom: 3px;
+}
+.btl-window-closeButton-x4 {
+	bottom: 4px;
+}
+.btl-window-closeButton-x5 {
+	bottom: 5px;
+}
+.btl-window-closeButton-x6l,
+.btl-window-closeButton-x6r {
+	bottom: 6px;
+}
+.btl-window-closeButton-x7l,
+.btl-window-closeButton-x7r {
+	bottom: 7px;
+}
+.btl-window-closeButton-x1l,
+.btl-window-closeButton-x1r,
+.btl-window-closeButton-x2l,
+.btl-window-closeButton-x2r,
+.btl-window-closeButton-x6l,
+.btl-window-closeButton-x6r,
+.btl-window-closeButton-x7l,
+.btl-window-closeButton-x7r {
+	width: 2px;
+}
+.btl-window-closeButton-x3,
+.btl-window-closeButton-x5 {
+	width: 4px;
+}
+.btl-window-closeButton-x4 {
+	width: 2px;
+}
+.btl-window-closeButton-x1l,
+.btl-window-closeButton-x7l {
+	left: 1px;
+}
+.btl-window-closeButton-x1r,
+.btl-window-closeButton-x7r {
+	right: 1px;
+}
+.btl-window-closeButton-x2l,
+.btl-window-closeButton-x6l {
+	left: 2px;
+}
+.btl-window-closeButton-x2r,
+.btl-window-closeButton-x6r {
+	right: 2px;
+}
+.btl-window-closeButton-x3,
+.btl-window-closeButton-x5 {
+	left: 3px;
+}
+.btl-window-closeButton-x4 {
+	left: 4px;
+}
+.btl-window-content {
+	position: relative;
+	overflow: auto;
+	border-top: 1px solid ButtonFace;
+	background-color: Window;
+	color: WindowText;
+}
+/* active */
+.btl-window-active .btl-window-inner2 {
+	border-color: ActiveBorder;
+}
+.btl-window-active .btl-window-head {
+	color: CaptionText;
+	background-color: ActiveCaption;
+}
+/* button states */
+.btl-window-button-press {
+	border-color: ThreeDDarkShadow ThreeDHighlight ThreeDHighlight ThreeDDarkShadow;
+}
+.btl-window-button-press .btl-window-button-inner {
+	border-color: ThreeDShadow ThreeDFace ThreeDFace ThreeDShadow;
+	padding: 1px 0 0 1px;
+}
+/* fixes */
+.btl-window,
+.btl-window * {
+	box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	-khtml-box-sizing: border-box;
+}
+.opera .btl-window-button-maximize {
+	height: 100%;
+}
+.opera .btl-window-button-restore1,
+.opera .btl-window-button-restore2 {
+	height: 80%;
+}
+
+.ie .btl-window-content {
+	width: 100%;
+}
+]]></d:resource>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-window btl-window-active btl-ridge">
+					<div class="btl-window-inner btl-ridge-inner">
+						<div class="btl-window-inner2">
+							<div class="btl-window-head btl-head btl-dragMove">
+								<div class="btl-window-buttons">
+									<div class="btl-window-button btl-window-closeButton">
+										<div class="btl-window-button-inner">
+											<div class="btl-window-button-icon">
+												<div class="btl-window-closeButton-x1l"/>
+												<div class="btl-window-closeButton-x1r"/>
+												<div class="btl-window-closeButton-x2l"/>
+												<div class="btl-window-closeButton-x2r"/>
+												<div class="btl-window-closeButton-x3"/>
+												<div class="btl-window-closeButton-x4"/>
+												<div class="btl-window-closeButton-x5"/>
+												<div class="btl-window-closeButton-x6l"/>
+												<div class="btl-window-closeButton-x6r"/>
+												<div class="btl-window-closeButton-x7l"/>
+												<div class="btl-window-closeButton-x7r"/>
+											</div>
+										</div>
+									</div>
+									<div class="btl-window-button btl-window-maximizeRestoreButton">
+										<div class="btl-window-button-inner">
+											<div class="btl-window-button-icon">
+												<div class="btl-window-button-maximize"/>
+												<div class="btl-window-button-restore1"/>
+												<div class="btl-window-button-restore2"/>
+											</div>
+										</div>
+									</div>
+									<div class="btl-window-button btl-window-minimizeRestoreButton">
+										<div class="btl-window-button-inner">
+											<div class="btl-window-button-icon">
+												<div class="btl-window-button-minimize"/>
+												<div class="btl-window-button-restore1"/>
+												<div class="btl-window-button-restore2"/>
+											</div>
+										</div>
+									</div>
+								</div>
+								<div class="btl-window-label btl-label"> </div>
+							</div>
+							<div class="btl-window-content">
+								<d:content/>
+							</div>
+						</div>
+					</div>
+				</div>
+			</d:template>
+
+			<d:attribute name="width" default="350px"/>
+
+			<d:attribute name="height" default="250px"/>
+
+			<d:attribute name="resizeMinWidth" default="150px"/>
+
+			<d:attribute name="resizeMinHeight" default="32px"/>
+
+			<d:attribute name="useDragClass" default="true">
+				
+			</d:attribute>
+
+			<d:attribute name="buttons">
+				<d:mapper type="text/javascript"><![CDATA[
+					if ( value != 'none' ) {
+						var sButtons = this.getAttribute('buttons');
+						var aValues = sButtons.split(' ');
+
+						for ( var i = aValues.length-1; i >= 0; i = i-1 ){
+							var oButton = null;
+
+							switch ( aValues[i] ) {
+								case 'close':
+									oButton = bb.selector.query(this.viewNode, '.btl-window-closeButton');
+									break;
+								case 'maximize':
+									oButton = bb.selector.query(this.viewNode, '.btl-window-maximizeRestoreButton');
+									break;
+								case 'minimize':
+									oButton = bb.selector.query(this.viewNode, '.btl-window-minimizeRestoreButton');
+									break;
+							}
+
+							if(oButton){
+								// display button
+								oButton.style.display = 'block';
+							}
+						}
+					}
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="mode">
+				<d:mapper type="text/javascript"><![CDATA[
+					value == 'inline' ? bb.html.addClass(this.viewNode, 'btl-window-inline') : bb.html.removeClass(this.viewNode, 'btl-window-inline');
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:property name="height">
+				<d:setter type="text/javascript"><![CDATA[
+					this.viewNode.style.height = value;
+					this._._height = value;
+					bb.ui.reflow(this, true, true);
+				]]></d:setter>
+			</d:property>
+
+			<d:method name="maximize">
+				<d:body type="text/javascript"><![CDATA[
+					bb.html.removeClass(this.viewNode, 'btl-window-minimized');
+					this.callSuper('maximize');
+					bb.html.addClass(this.viewNode, 'btl-window-maximized');
+				]]></d:body>
+			</d:method>
+
+			<d:method name="minimize">
+				<d:body type="text/javascript"><![CDATA[
+					bb.html.removeClass(this.viewNode, 'btl-window-maximized');
+					this.callSuper('minimize');
+					bb.html.addClass(this.viewNode, 'btl-window-minimized');
+				]]></d:body>
+			</d:method>
+
+			<d:method name="restore">
+				<d:body type="text/javascript"><![CDATA[
+					bb.html.removeClass(this.viewNode, 'btl-window-minimized');
+					this.callSuper('restore');
+					if (this._['_maximized']) {
+						bb.html.addClass(this.viewNode, 'btl-window-maximized');
+					} else {
+						bb.html.removeClass(this.viewNode, 'btl-window-maximized');
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				// disable user select on window head
+				var oHead = bb.selector.query(this.viewNode, '.btl-window-head');
+				bb.html.disableUserSelect(oHead);
+
+				// internal property to allow taskBar open window context menu
+				// it's temporary solution until window/windowArea/windowManager menu support is developed
+				this.__windowHead = this.viewNode.firstChild.firstChild.firstChild;
+			]]></d:constructor>
+
+			<d:handler event="mousedown" match=".btl-window-button" type="text/javascript"><![CDATA[
+				bb.html.addClass(event.currentView, 'btl-window-button-press');
+			]]></d:handler>
+
+			<d:handler event="mouseup" match=".btl-window-button" type="text/javascript"><![CDATA[
+				bb.html.removeClass(event.currentView, 'btl-window-button-press');
+			]]></d:handler>
+
+			<d:handler event="mouseleave" match=".btl-window-button" type="text/javascript"><![CDATA[
+				bb.html.removeClass(event.currentView, 'btl-window-button-press');
+			]]></d:handler>
+
+			<d:handler event="click" match=".btl-window-closeButton" type="text/javascript"><![CDATA[
+				this.close();
+			]]></d:handler>
+
+			<d:handler event="click" match=".btl-window-maximizeRestoreButton" type="text/javascript"><![CDATA[
+				this.setProperty('maximized', !this.getProperty('maximized'));
+			]]></d:handler>
+
+			<d:handler event="click" match=".btl-window-minimizeRestoreButton" type="text/javascript"><![CDATA[
+				this.setProperty('minimized', !this.getProperty('minimized'));
+			]]></d:handler>
+
+			<d:handler event="reflow" type="text/javascript"><![CDATA[
+				var oElm = bb.selector.query(this.viewNode, '.btl-window-content');
+				if (this.hasAttribute('height') && this.getAttribute('height') !== 'auto') {
+					btl.html.stretch(oElm);
+				} else {
+					oElm.style.height = '';
+				}
+			]]></d:handler>
+			
+			<d:handler event="dragStart" type="text/javascript"><![CDATA[
+				var oButtonContainer = bb.selector.query(this.viewNode, '.btl-window-buttons');
+				if (btl.containsElement(oButtonContainer, event.viewTarget)){
+					event.preventDefault();
+				}
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

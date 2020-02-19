@@ -1,0 +1,156 @@
+<d:namespace
+	xmlns:t="http://www.backbase.com/2007/debugger"
+	xmlns:e="http://www.backbase.com/2006/xel"
+	xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:d="http://www.backbase.com/2006/tdl"
+	name="http://www.backbase.com/2007/debugger">
+
+	<d:element name="computedStyle" extends="t:baseDebuggerInspector" implements="t:iViewCategory t:iViewSubCategory">
+		<d:template type="application/xhtml+xml">
+			<div><d:content /></div>
+		</d:template>
+		<d:method name="update">
+			<d:argument name="oElm" />
+			<d:body type="text/javascript"><![CDATA[
+				var aResult = [];
+				if(oElm && oElm.style){
+
+					var oStyle = bb.browser.ie ? oElm.currentStyle : bb.tooling.window.document.defaultView.getComputedStyle(oElm, null);
+
+					aResult[aResult.length] = '<table class="bb-debugger-table" width="100%" cellpadding="0" border="0" cellspacing="0">';
+
+					var aName = [], aValue = [];
+					for(var i in oStyle){
+						if(typeof(oStyle[i]) == 'string'){
+							aName[aName.length]  = i;
+							aValue[i] = oStyle[i];
+						}
+					}
+					//Special case for Safari, it doesnt report correctly
+					if(bb.browser.webkit && oStyle['cssText']){
+						var aSplit = oStyle['cssText'].split(';');
+						aName = [], aValue = [];
+						for(var i = 0; i < aSplit.length; i++){
+							var aSplit2 = aSplit[i].split(':');
+							var sName = bb.string.trim(aSplit2.shift());
+							if(sName){
+								aName[aName.length] = sName;
+								aValue[ sName ] = aSplit2.join(':');
+							}
+						}
+					}
+					aName.sort();
+
+					var aText = [ 'font-family', 'font-size', 'font-weight', 'font-variant', 'font-size-adjust', 'font-style', 'color', 'text-transform', 'text-decoration', 'text-indent', 'letter-spacing', 'word-spacing', 'line-height', 'text-align', 'vertical-align', 'direction', 'column-count', 'column-gap', 'column-width', 'text-align-last', 'text-autospace', 'text-justify', 'text-kashida', 'text-kashida-space', 'text-overflow', 'text-underline-position', 'word-break', 'writing-mode'];
+					aResult.push('<thead><tr><th colspan="2">Text</th></tr></thead>');
+					aResult.push('<tbody>');
+					for(var i = 0; i < aName.length; i++){
+						if(bb.array.indexOf(aText, bb.string.fromCamelCase(aName[i])) != -1 ){
+							if( aValue[aName[i]] )
+								aResult.push('<tr><td class="bb-debugger-first">'+bb.string.fromCamelCase(aName[i])+'&#160;</td><td>'+aValue[aName[i]]+'&#160;</td></tr>');
+							aName.splice(i, 1);
+							i--;
+						}
+					}
+					aResult.push('</tbody>');
+
+
+					var aBackground = [ 'background-color', 'background-image', 'background-repeat', 'background-position', 'background-attachment', 'opacity' ];
+					aResult.push('<thead><tr><th colspan="2">Background</th></tr></thead>');
+					aResult.push('<tbody>');
+					for(var i = 0; i < aName.length; i++){
+						if(bb.array.indexOf(aBackground, bb.string.fromCamelCase(aName[i])) != -1 ){
+							if( aValue[aName[i]] )
+								aResult.push('<tr><td class="bb-debugger-first">'+bb.string.fromCamelCase(aName[i])+'&#160;</td><td>'+aValue[aName[i]]+'&#160;</td></tr>');
+							aName.splice(i, 1);
+							i--;
+						}
+					}
+					aResult.push('</tbody>');
+
+					var aBox = [ 'width', 'height', 'top', 'right', 'bottom', 'left', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color', 'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style', 'outline-top-width', 'outline-right-width', 'outline-bottom-width', 'outline-left-width', 'outline-top-color', 'outline-right-color', 'outline-bottom-color', 'outline-left-color', 'outline-top-style', 'outline-right-style', 'outline-bottom-style', 'outline-left-style' ];
+					aResult.push('<thead><tr><th colspan="2">Box Model</th></tr></thead>');
+					aResult.push('<tbody>');
+					for(var i = 0; i < aName.length; i++){
+						if(bb.array.indexOf(aBox, bb.string.fromCamelCase(aName[i])) != -1 ){
+							if( aValue[aName[i]] )
+								aResult.push('<tr><td class="bb-debugger-first">'+bb.string.fromCamelCase(aName[i])+'&#160;</td><td>'+aValue[aName[i]]+'&#160;</td></tr>');
+							aName.splice(i, 1);
+							i--;
+						}
+					}
+					aResult.push('</tbody>');
+
+					var aLayout = ['position', 'display', 'visibility', 'z-index', 'overflow', 'white-space', 'clip', 'style-float', 'css-float', 'clear', 'box-sizing', 'overflow-x', 'overflow-y' ];
+					aResult.push('<thead><tr><th colspan="2">Layout</th></tr></thead>');
+					aResult.push('<tbody>');
+					for(var i = 0; i < aName.length; i++){
+						if(bb.array.indexOf(aLayout, bb.string.fromCamelCase(aName[i])) != -1 ){
+							if( aValue[aName[i]] ){
+								if(aName[i] == 'cssFloat' || aName[i] == 'styleFloat'){
+									aValue['float'] = aValue[aName[i]];
+									aName[i] = 'float';
+								}
+								aResult.push('<tr><td class="bb-debugger-first">'+bb.string.fromCamelCase(aName[i])+'&#160;</td><td>'+aValue[aName[i]]+'&#160;</td></tr>');
+							}
+							aName.splice(i, 1);
+							i--;
+						}
+					}
+					aResult.push('</tbody>');
+
+
+
+					aResult.push('<thead><tr><th colspan="2">Other</th></tr></thead>');
+					aResult.push('<tbody>');
+					for(var i = 0; i < aName.length; i++){
+						if( aValue[aName[i]] )
+							aResult.push('<tr><td class="bb-debugger-first">'+bb.string.fromCamelCase(aName[i])+'&#160;</td><td>'+aValue[aName[i]]+'&#160;</td></tr>');
+					}
+					aResult.push('</tbody>');
+
+					aResult.push('</table>');
+
+				}
+
+				this.viewNode.innerHTML = aResult.join('');
+
+			]]></d:body>
+		</d:method>
+
+		<d:property name="disabled">
+			<d:setter type="text/javascript">
+				if(this._['_'+name] != value){
+					if(value == false){
+						var selected = bb.getProperty(bb.tooling.currentTree, 'selectedNode');
+						if(selected){
+							if (bb.tooling.currentTree.getProperty('viewCategory') == 'view') {
+								this.update(selected);
+							} else {
+								this.update(bb.tooling.window.bb.getControllerFromModel(selected).viewNode);
+							}
+						}
+					}
+				}
+				this._['_'+name] = value;
+			</d:setter>
+		</d:property>
+
+		<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript">
+			var oThis = this;
+			bb.tooling.root.addEventListener('tree-select',
+				function(eEvent){
+					if(!bb.getProperty(oThis, 'disabled') ){
+						if (eEvent.treeModelTarget){
+							oThis.update(eEvent.treeTarget.viewNode);
+						} else {
+							oThis.update(eEvent.treeViewTarget);
+						}
+					}
+				}, false);
+		</d:handler>
+
+		<d:property name="viewCategory" onget="return bb.evaluateSmart('string(ancestor::b:tab/@category)', this, bb.tooling.nsResolver);" />
+		<d:property name="viewSubCategory" onget="return 'style';" />
+	</d:element>
+</d:namespace>

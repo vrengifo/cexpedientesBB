@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="infoBoxBase" src="../infoBoxBase.xml"/>
+
+		<d:element name="infoBox" extends="b:infoBoxBase">
+			
+
+			<d:resource type="text/css"><![CDATA[
+				.btl-infoBox {
+					position: absolute;
+					top: -10000px;
+					left: -10000px;
+					background-image: url(media/gradient.png);
+					background-repeat: repeat-x;
+					background-color: #F0F0F0;
+					overflow: hidden;
+					z-index: 850;
+				}
+				.btl-infoBox-content {
+					height: 100%;
+					width: 100%;
+					overflow: auto;
+					border: 2px solid white;
+				}
+				/* fixes */
+				.btl-infoBox,
+				.btl-infoBox-content {
+					box-sizing: border-box;
+					-moz-box-sizing: border-box;
+					-khtml-box-sizing: border-box;
+				}
+			]]></d:resource>
+
+			<d:resource type="image/png" src="media/gradient.png"/>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-infoBox btl-border">
+					<div class="btl-infoBox-content"><d:content/></div>
+				</div>
+			</d:template>
+
+			<d:method name="open">
+				<d:argument name="destination"/>
+				<d:body type="text/javascript"><![CDATA[
+					if (!destination)
+						destination = this.getProperty('listeners')[0];
+
+					if (destination){
+						if ( this.callSuper('open', [destination]) ){
+							// position the infoBox if super function is okay!
+							bb.html.position(this.viewNode, destination.viewNode, 'after-start');
+
+							// Workaround for bug 11002 to ensure correct width in IE.
+							// When the infoBox has a width of "auto", the width of the content area
+							// is calculated and set explicitly (unless the infoBox height is also auto
+							// in which case both the width and height of the content area is set to auto).
+							if(bb.browser.ie) {
+								var oContentNode = this.viewNode.getElementsByTagName('div')[0];
+								if(!this.getProperty('width') || this.getProperty('width') == 'auto') {
+									oContentNode.style.height = oContentNode.style.width = "auto";
+									if(this.getProperty('height') && this.getProperty('height') != 'auto') {
+										oContentNode.style.width = this.viewNode.clientWidth + "px";
+										oContentNode.style.height = "100%";
+									}
+								} else {
+									oContentNode.style.width = "100%";
+									oContentNode.style.height = "100%";
+								}
+							}
+						}
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="close">
+				<d:body type="text/javascript"><![CDATA[
+					this.callSuper('close');
+					this.viewNode.style.left = '-10000px';
+					this.viewNode.style.top = '-10000px';
+				]]></d:body>
+			</d:method>
+
+			<d:destructor type="text/javascript"><![CDATA[
+				if(this.viewNode && this.viewNode.parentNode)
+					this.viewNode.parentNode.removeChild(this.viewNode);
+				this.callSuper('__destructor');
+			]]></d:destructor>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				// Append the viewNode to the body to ensure independent rendering.
+				document.body.appendChild(this.viewNode);
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

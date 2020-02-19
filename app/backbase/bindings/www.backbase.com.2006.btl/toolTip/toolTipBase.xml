@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="dimensionElement containerElement" src="../visualElement/visualElement.xml"/>
+
+		<d:element name="toolTipBase" extends="b:dimensionElement b:containerElement" abstract="true">
+			
+
+			
+
+			<d:resource type="text/javascript"><![CDATA[
+				btl.toolTipBase = {};
+
+				btl.toolTipBase.show = function(eEvent){
+
+					var oChild = btl.toolTipBase.getToolTip(this);
+
+					if(oChild.viewNode.parentNode != document.body){
+
+						if(btl.toolTipBase.currentToolTip){
+							btl.toolTipBase.hide.call(btl.toolTipBase.currentToolTip, {'target':	btl.toolTipBase.currentToolTip});
+						}
+						btl.toolTipBase.currentToolTip = this;
+
+						btl.toolTipBase.addHideTriggering(this);
+
+						document.body.appendChild(oChild.viewNode);
+
+						bb.html.position(oChild.viewNode, this.viewNode, 'tooltip', bb.viewport.scrollLeft + eEvent.clientX, bb.viewport.scrollTop + eEvent.clientY);
+
+						bb.command.fireEvent(oChild, 'show', false, false);
+					}
+				};
+
+				btl.toolTipBase.currentToolTip = null;
+
+				btl.toolTipBase.getToolTip = function(oController){
+					var aChildren = oController.getProperty('childNodes'),
+						i = 0,
+						oChild;
+					while (oChild = aChildren[i++]){
+						if (oChild.instanceOf(btl.namespaceURI, 'toolTipBase')){
+							return oChild;
+						}
+					}
+				};
+
+				btl.toolTipBase.hide = function(eEvent){
+					btl.toolTipBase.removeHideTriggering(this);
+
+					var oChild = btl.toolTipBase.getToolTip(this);
+
+					document.body.removeChild(oChild.viewNode);
+					oChild.viewNode.style.left = '';
+					oChild.viewNode.style.top = '';
+
+					bb.command.fireEvent(oChild, 'hide', false, false);
+
+					btl.toolTipBase.currentToolTip = null;
+
+				};
+
+				/**
+				 * Adds handlers responsible for showing tooltip to trigger element.
+				 * @param {object} oTriggerNode - node that should trigger the events.
+				 */
+				btl.toolTipBase.addShowTriggering = function(oTriggerNode) {
+					oTriggerNode.addEventListener('mouseenter', btl.toolTipBase.show, false);
+					oTriggerNode.addEventListener('focus', btl.toolTipBase.show, false);
+				};
+
+				/**
+				 * Removes all handlers responsible for showing tooltip from trigger element.
+				 * @param {object} oTriggerNode - node that triggers the events.
+				 */
+				btl.toolTipBase.removeShowTriggering = function(oTriggerNode) {
+					oTriggerNode.removeEventListener('mouseenter', btl.toolTipBase.show, false);
+					oTriggerNode.removeEventListener('focus', btl.toolTipBase.show, false);
+				};
+
+				/**
+				 * Adds handlers responsible for hiding tooltip to trigger element.
+				 * @param {object} oTriggerNode - node that should trigger the events.
+				 */
+				btl.toolTipBase.addHideTriggering = function(oTriggerNode) {
+					oTriggerNode.addEventListener('mouseleave', btl.toolTipBase.hide, false);
+					oTriggerNode.addEventListener('mousedown', btl.toolTipBase.hide, false);
+					oTriggerNode.addEventListener('blur', btl.toolTipBase.hide, false);
+				};
+
+				/**
+				 * Removes all handlers responsible for hiding tooltip from trigger element.
+				 * @param {object} oTriggerNode - node that triggers the events.
+				 */
+				btl.toolTipBase.removeHideTriggering = function(oTriggerNode) {
+					oTriggerNode.removeEventListener('mouseleave', btl.toolTipBase.hide, false);
+					oTriggerNode.removeEventListener('mousedown', btl.toolTipBase.hide, false);
+					oTriggerNode.removeEventListener('blur', btl.toolTipBase.hide, false);
+				};
+			]]></d:resource>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				var oParent = this.getProperty('parentNode');
+				if (oParent) {
+					if (this.viewNode.parentNode) {
+						this.viewNode.parentNode.removeChild(this.viewNode);
+					}
+					btl.toolTipBase.addShowTriggering(oParent);
+				}
+			]]></d:handler>
+
+			<d:handler event="DOMNodeRemovedFromDocument" type="text/javascript"><![CDATA[
+				var oParent = this.getProperty('parentNode');
+				if (oParent) {
+					btl.toolTipBase.removeHideTriggering(oParent);
+
+					if (this.viewNode && this.viewNode.parentNode) {
+						this.viewNode.parentNode.removeChild(this.viewNode);
+					}
+					if (btl.toolTipBase.currentToolTip == oParent) {
+						btl.toolTipBase.currentToolTip = null;
+					}
+					btl.toolTipBase.removeShowTriggering(oParent);
+				}
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

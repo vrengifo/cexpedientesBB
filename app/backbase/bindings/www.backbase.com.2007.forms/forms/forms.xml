@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml"  xmlns:d="http://www.backbase.com/2006/tdl"  xmlns:bf="http://www.backbase.com/2007/forms">
+
+	<d:namespace name="http://www.backbase.com/2007/forms">
+
+		<!--
+			Form submission interfaces
+		-->
+		<d:interface name="iForm">
+			
+			<d:property name="action">
+				
+			</d:property>
+			<d:property name="elements">
+				
+			</d:property>
+			<d:property name="enctype">
+				
+			</d:property>
+			<d:property name="dataSet">
+				
+			</d:property>
+			<d:property name="encodedData">
+				
+			</d:property>
+			<d:property name="method">
+				
+			</d:property>
+			<d:method name="submit">
+				
+			</d:method>
+
+			
+
+			
+		</d:interface>
+
+		<d:interface name="iInput">
+			
+			<d:property name="form">
+				
+			</d:property>
+			<d:property name="name">
+				
+			</d:property>
+			<d:property name="value">
+				
+			</d:property>
+			<d:property name="disabled">
+				
+			</d:property>
+			<d:property name="successful">
+				
+			</d:property>
+		</d:interface>
+
+		<d:interface name="iInputList" extends="bf:iInput">
+			
+			<d:property name="options">
+				
+			</d:property>
+		</d:interface>
+
+		<d:interface name="iInputMultiple" extends="bf:iInputList">
+			
+			<d:property name="multiple">
+				
+			</d:property>
+		</d:interface>
+
+		<d:interface name="iInputRange" extends="bf:iInput">
+			
+
+			<d:property name="min">
+				
+			</d:property>
+
+			<d:property name="max">
+				
+			</d:property>
+		</d:interface>
+
+		<d:interface name="iOption">
+			
+			<d:property name="disabled">
+				
+			</d:property>
+			<d:property name="successful">
+				
+			</d:property>
+			<d:property name="value">
+				
+			</d:property>
+			<d:property name="selected">
+				
+			</d:property>
+		</d:interface>
+
+		<d:interface name="iFileInput" extends="bf:iInput">
+			
+			<d:property name="action">
+				
+			</d:property>
+			<d:property name="parameters">
+				
+			</d:property>
+			<d:property name="responseXML">
+				
+			</d:property>
+			<d:property name="responseHTML">
+				
+			</d:property>
+			<d:method name="submit">
+				
+			</d:method>
+		</d:interface>
+
+		<d:interface name="iFileInputParameter">
+			
+			<d:property name="name">
+				
+			</d:property>
+			<d:property name="value">
+				
+			</d:property>
+		</d:interface>
+
+		<!--
+			Validation common interfaces
+		 -->
+		<d:interface name="iValidation">
+			
+			<d:property name="validity">
+				
+			</d:property>
+			<d:method name="validate">
+				
+			</d:method>
+
+			
+
+			
+		</d:interface>
+
+		<d:interface name="iValidationSchema" extends="bf:iValidation">
+			
+			<d:property name="schemaType">
+				
+			</d:property>
+			<d:property name="value">
+				
+			</d:property>
+		</d:interface>
+
+		<d:interface name="iValidationRequired" extends="bf:iValidation">
+			
+			<d:property name="value">
+				
+			</d:property>
+			<d:property name="required">
+				
+			</d:property>
+		</d:interface>
+
+		<!--
+			Forms validation interfaces
+		 -->
+		<d:interface name="iValidationForm" extends="bf:iValidation bf:iForm">
+			
+			<d:method name="validateAndSubmit">
+				
+			</d:method>
+		</d:interface>
+
+		<!--
+			Validation messages interfaces
+		-->
+		<d:interface name="iMessenger">
+			
+			<d:property name="messages">
+				
+			</d:property>
+		</d:interface>
+
+		<d:interface name="iMessages">
+			
+			<d:property name="messages">
+				
+			</d:property>
+			<d:method name="handleValidityChanged">
+				
+				<d:argument name="event" type="object">
+					
+				</d:argument>
+			</d:method>
+		</d:interface>
+
+		<d:interface name="iMessage">
+			
+			<d:property name="event">
+				
+			</d:property>
+			<d:property name="facet">
+				
+			</d:property>
+			<d:method name="show">
+				
+			</d:method>
+			<d:method name="hide">
+				
+			</d:method>
+		</d:interface>
+	</d:namespace>
+</d:tdl>

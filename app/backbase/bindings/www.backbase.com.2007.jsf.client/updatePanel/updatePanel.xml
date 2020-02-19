@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?><d:namespace xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:c="http://www.backbase.com/2006/command" xmlns:d="http://www.backbase.com/2006/tdl" xmlns:e="http://www.backbase.com/2006/xel" xmlns:xi="http://www.w3.org/2001/XInclude"   name="http://www.backbase.com/2007/jsf/client">
+
+	<d:element name="updatePanelFragment">
+	   	   
+           <d:resource type="text/javascript"><![CDATA[
+               function findElement(sParent, sId) {
+	        	   var oElm = document.getElementById(sId);
+               	   if (!oElm) {
+	               	   var oParent = document.getElementById(sParent);
+		               var oElements = oParent.getElementsByTagName('*'), i = 0;
+		               while(oElm = oElements[i++]) {
+		               	   if (sId == oElm.getAttribute('name')) {
+		               	       return oElm;
+		               	   }
+			           }
+		           }
+		           return oElm;
+               }
+           ]]></d:resource>
+           <d:template type="text/javascript">
+           		var oElement = findElement(this.getAttribute('updatePanelId'), this.getAttribute('elementId'));
+				var oParent = oElement.parentNode;
+	            var sText = this.getProperty('textContent');
+                oParent.innerHTML = sText;
+           		var oElm = findElement(this.getAttribute('updatePanelId'), this.getAttribute('elementId'));
+
+				var func = htmlChangeHandler;
+				if (this.getAttribute('observe') == 'true' &amp;&amp; this.getAttribute('ignore') != 'true') {
+					func = htmlChangeHandlerWithSubmit;
+				}
+				var type = oElm.getAttribute('type');
+				// Standard JSF will use button to trigger form submission via Javascript function.
+				// We detect that and add Backbase click listener instead.
+      			if (type &amp;&amp; (type == 'submit' || type == 'button')) {
+					if (String(oElm.onclick).indexOf('clearFormHiddenParams') != -1) {
+						oElm.setAttribute('onclick', '');
+						  bb.html.addEventListener(oElement, 'click', htmlSubmit);
+					}
+				} else if (type &amp;&amp; (type == 'checkbox' || type == 'radio')) {
+					bb.html.addEventListener(oElm, 'click', func);
+				} else {
+					bb.html.addEventListener(oElm, 'change', func);
+				}
+				return [oParent, oParent];
+           </d:template>
+           <d:attribute name="elementId"/>
+           <d:attribute name="updatePanelId"/>
+           <d:attribute name="observe"/>
+           <d:attribute name="ignore"/>
+           <d:method name="__children">
+               <d:body type="text/javascript"/>
+           </d:method>
+	   </d:element>
+
+		<d:element name="updatePanel">
+       		
+           <d:resource type="text/javascript"><![CDATA[
+               function htmlChangeHandlerWithSubmit(eEvent){
+					if(!eEvent) eEvent = event;
+					var oTarget = eEvent.target || eEvent.srcElement;
+
+					var value = oTarget.value;
+					var type = oTarget.getAttribute('type');
+					if (type && type == 'checkbox') {
+						value = oTarget.checked;
+					}
+					if ((type && type == 'select-multiple') || oTarget.getAttribute('multiple') == 'multiple') {
+						var options = oTarget.options, option, i = 0;
+						var optionValues = [];
+						while(option = options[i++]) {
+							if (option.selected) {
+								optionValues.push([oTarget.name, option.value]);
+							}
+						}
+						bb.bjsf.registerHtmlValueChange(oTarget.name, optionValues);
+					} else {
+						bb.bjsf.registerHtmlValueChange(oTarget.name, [[oTarget.name, value]]);
+					}
+
+					bb.bjsf.sync(bb.getControllerFromView(oTarget), 'submit');
+			   }
+
+				// this is for button!
+			   function htmlSubmit(eEvent) {
+					if(!eEvent) eEvent = event;
+					var oTarget = eEvent.target || eEvent.srcElement;
+					var id = oTarget.id;
+					if (!id) {
+						id = oTarget.name;
+					}
+					// detect if jsf submit
+					var formName = id.substring(0, id.lastIndexOf(':'));
+					feedFormToDelta(document.getElementById(formName));
+					// Standard JSF framework expects certain parameters to recognize the form submission
+					bb.bjsf.registerHtmlValueChange(formName + '_SUBMIT', [[formName + '_SUBMIT', '1']]);
+					bb.bjsf.registerHtmlValueChange(formName + ':_idcl', [[formName + ':_idcl', id]]);
+					bb.bjsf.registerHtmlValueChange(id, [[id, '1']]);
+					bb.bjsf.sync(bb.getControllerFromView(oTarget), 'submit');
+
+					if (bb.browser.ie) {
+						return false;
+					} else {
+						eEvent.preventDefault();
+					}
+			   }
+
+			   function submitHtmlForm(eEvent) {
+			   		feedFormToDelta(this);
+ 		            bb.bjsf.sync(bb.getControllerFromView(this), 'submit');
+			   }
+
+			   function feedFormToDelta(oForm) {
+	               var oInputs = oForm.getElementsByTagName('input'), oElm, i = 0;
+	               while(oElm = oInputs[i++]) {
+						addToDelta(oElm, oForm.name);
+		           }
+	               var oInputs = oForm.getElementsByTagName('select'), oElm, i = 0;
+	               while(oElm = oInputs[i++]) {
+						addToDelta(oElm, oForm.name);
+		           }
+	               var oInputs = oForm.getElementsByTagName('textarea'), oElm, i = 0;
+	               while(oElm = oInputs[i++]) {
+						addToDelta(oElm, oForm.name);
+		           }
+
+		           // Support for Tomahawk InputHtml editor
+		           var oIFrames = oForm.getElementsByTagName('iframe'), oElm, i = 0;
+		           while(oElm = oIFrames[i++]) {
+		           		var frameId = oElm.id.substring(0, oElm.id.lastIndexOf('_iframe'));
+		           		if (bb.browser.ie) {
+		           			value = oElm.contentWindow.document.documentElement.innerHTML;
+		           	  	} else {
+		           	  		value = oElm.contentDocument.documentElement.innerHTML;
+		           	  	}
+		           	  	value = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml">' + value + '</html>';
+						if (frameId && frameId.length > 0) {
+							bb.bjsf.registerHtmlValueChange(frameId, [[frameId, value]]);
+						}
+		           }
+			   }
+
+			   function addToDelta(oElm, sFormName) {
+			   		if (oElm.name && oElm.name.indexOf(sFormName) == 0) {
+		       			var type = oElm.getAttribute('type');
+						var value = oElm.value;
+		       			if (type && (type == 'submit' || type == 'button')) {
+							return;
+						}
+						if (type && type == 'checkbox') {
+							value = oElm.checked;
+						}
+						if ((type && type == 'select-multiple') || oElm.getAttribute('multiple') == 'multiple') {
+							var options = oElm.options, option, i = 0;
+							var optionValues = [];
+							while(option = options[i++]) {
+								if (option.selected) {
+									optionValues.push([oElm.name, option.value]);
+								}
+							}
+							bb.bjsf.registerHtmlValueChange(oElm.name, optionValues);
+						} else {
+							bb.bjsf.registerHtmlValueChange(oElm.name, [[oElm.name, value]]);
+						}
+	              	 }
+			   }
+
+               function htmlChangeHandler(eEvent){
+					if(!eEvent) eEvent = event;
+					var oTarget = eEvent.target || eEvent.srcElement;
+
+					var value = oTarget.value;
+					var type = oTarget.getAttribute('type');
+					if (type && type == 'checkbox') {
+						value = oTarget.checked;
+					}
+					if ((type && type == 'select-multiple') || oTarget.getAttribute('multiple') == 'multiple') {
+						var options = oTarget.options, option, i = 0;
+						var optionValues = [];
+						while(option = options[i++]) {
+							if (option.selected) {
+								optionValues.push([oTarget.name, option.value]);
+							}
+						}
+						bb.bjsf.registerHtmlValueChange(oTarget.name, optionValues);
+					} else {
+						bb.bjsf.registerHtmlValueChange(oTarget.name, [[oTarget.name, value]]);
+					}
+			   }
+
+			   function addHtmlChangeHandler(oElement, mObserveIds, mIgnoreIds, bInput) {
+               	   var id = oElement.getAttribute('id');
+               	   var name = oElement.getAttribute('name');
+               	   var func = htmlChangeHandler;
+               	   if ((mObserveIds[id] || mObserveIds[name]) && !mIgnoreIds[id] && !mIgnoreIds[name]) {
+               	   		func = htmlChangeHandlerWithSubmit;
+		           }
+
+       			   if (bInput) {
+		       			var type = oElement.getAttribute('type');
+		       			if (type && (type == 'submit' || type == 'button')) {
+	 						if (String(oElement.onclick).indexOf('clearFormHiddenParams') != -1) {
+	 						oElement.setAttribute('onclick', '');
+							  bb.html.addEventListener(oElement, 'click', htmlSubmit);
+							}
+						} else if (type && (type == 'checkbox' || type == 'radio')) {
+						   bb.html.addEventListener(oElement, 'click', func);
+						} else {
+			               bb.html.addEventListener(oElement, 'change', func);
+			            }
+					} else {
+		               bb.html.addEventListener(oElement, 'change', func);
+		            }
+			   }
+
+               function activatePanel(oDiv, sText, sIgnoreIds, sObserveIds) {
+               	   var aIgnoreIds = sIgnoreIds.split(',');
+               	   var mIgnoreIds = {};
+               	   for(var i in aIgnoreIds) {
+					   mIgnoreIds[aIgnoreIds[i]] = aIgnoreIds[i];
+				   }
+
+               	   var aObserveIds = sObserveIds.split(',');
+               	   var mObserveIds = {};
+               	   for(var i in aObserveIds) {
+					   mObserveIds[aObserveIds[i]] = aObserveIds[i];
+				   }
+
+//					oDiv.innerHTML = sText;
+
+
+
+					// Simple Clear onload handlers.
+					if (window.execScript) // IE
+						document.body.onload =  null;
+					else
+						window.onload =  null;
+
+
+					var oDiv2 = document.createElement('div')
+					oDiv2.innerHTML = sText;
+					oDiv.innerHTML = '';
+					oDiv.appendChild(oDiv2);
+
+					// Experimental script execution code... (not tested on all browsers)
+					if (window.execScript) { // for IE
+						var oScripts = oDiv.getElementsByTagName('script');
+						for(var i=0;i < oScripts.length;++i) {
+							var s = oScripts[i].innerHTML;
+							s = s.replace(/^\s*<!--/, '').replace(/-->\s*$/, '');
+	                        window.execScript(s);
+						}
+					}
+
+					// Simple Call onload handlers.
+					if (window.execScript) { // IE
+						if (document.body.onload) {
+							var fnFunc = document.body.onload;
+							document.body.onload = null;
+							setTimeout(function(){fnFunc(),10});
+						}
+					}
+					else {
+						if (window.onload) {
+							var fnFunc = window.onload;
+							window.onload = null;
+							setTimeout(function(){fnFunc(),10});
+						}
+					}
+
+	               var oElm;
+	               var oInputs = oDiv.getElementsByTagName('input'), oElm, i = 0;
+	               while(oElm = oInputs[i++]) {
+	               	   addHtmlChangeHandler(oElm, mObserveIds, mIgnoreIds, true);
+		           }
+	               var oInputs = oDiv.getElementsByTagName('select'), oElm, i = 0;
+	               while(oElm = oInputs[i++]) {
+	               	   addHtmlChangeHandler(oElm, mObserveIds, mIgnoreIds, false);
+		           }
+	               var oInputs = oDiv.getElementsByTagName('textarea'), oElm, i = 0;
+	               while(oElm = oInputs[i++]) {
+	               	   addHtmlChangeHandler(oElm, mObserveIds, mIgnoreIds, false);
+		           }
+
+				   // Standard JSF will use the link that triggers oamSubmitForm Javascript function to submit the form.
+				   // We recognize the commandLink and add click listener instead.
+	               var oLinks = oDiv.getElementsByTagName('a'), oElm, i = 0;
+	               while(oElm = oLinks[i++]) {
+	               	   if (oElm.href.indexOf('#') != -1) {
+					   	 if (String(oElm.onclick).indexOf('oamSubmitForm') != -1) {
+	               	   	    //oElm.setAttribute('onclick', '');
+	               	   	    bb.html.addEventListener(oElm, 'click', htmlSubmit);
+	               	   	 }
+	               	   }
+		           }
+
+	               var oForms = oDiv.getElementsByTagName('form'), oElm, i = 0;
+	               while(oElm = oForms[i++]) {
+	               	   oElm.submit = submitHtmlForm;
+		           }
+
+				}
+
+           ]]></d:resource>
+           <d:template type="text/javascript">
+               var oDiv = document.createElement('div');
+               oDiv.setAttribute('id', this.getAttribute('id'));
+               return [oDiv, oDiv];
+
+           </d:template>
+           <d:attribute name="ignoreIds">
+           		
+           </d:attribute>
+
+           <d:attribute name="observeIds">
+           		
+           </d:attribute>
+
+           <d:method name="__children">
+           	   
+               <d:body type="text/javascript"/>
+           </d:method>
+           <d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+              var sText = this.getProperty('textContent');
+              activatePanel(this.viewNode, sText, this.getAttribute('ignoreIds'), this.getAttribute('observeIds'));
+           ]]></d:handler>
+       </d:element>
+
+</d:namespace>

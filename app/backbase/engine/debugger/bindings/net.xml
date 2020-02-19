@@ -1,0 +1,182 @@
+<d:namespace
+	xmlns:t="http://www.backbase.com/2007/debugger"
+	xmlns:e="http://www.backbase.com/2006/xel"
+	xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:d="http://www.backbase.com/2006/tdl"
+	name="http://www.backbase.com/2007/debugger">
+
+	<d:element name="netInspector" extends="t:baseDebuggerInspector" implements="t:iViewCategory t:iViewSubCategory">
+		<d:template type="application/xhtml+xml">
+			<table cellspacing="0" cellpadding="0" border="0" class="bb-debugger-table">
+				<tbody>
+					<d:content />
+					<tr>
+						<th style="padding-left:20px;">0 Requests</th>
+						<th width="30">0B</th>
+						<th>0ms</th>
+					</tr></tbody>
+			</table>
+		</d:template>
+
+		<d:constructor type="application/javascript">
+			bb.tooling.net.logger = this;
+			bb.tooling.net.node = this.viewGate;
+			bb.tooling.net.node.totalSize = 0;
+			bb.tooling.net.node.totalTime = 0;
+		</d:constructor>
+
+		<d:resource type="text/javascript"><![CDATA[
+
+			bb.tooling.net.prettySize = function(iSize){
+
+				if(iSize > 1024 * 1024)
+					return (Math.round(iSize / 1024 / 10.24) / 100) + 'MB';
+				else if(iSize > 1024)
+					return Math.round(iSize / 1024)+'KB';
+				else
+					return iSize+'B';
+			}
+			bb.tooling.net.prettyTime = function(iTime){
+				if(iTime > 1000)
+					return (Math.round(iTime / 10) / 100) + 's';
+				else
+					return iTime+'ms';
+
+
+			}
+
+
+			bb.tooling.net.createRequestHTML = function createRequestHTML(oRequest){
+				var aReturn = ['<div style="overflow:auto;width:100%;"><table cellspacing="0" cellpadding="0" border="0" class="bb-debugger-headertable">'];
+
+				var oRequestHeaders = oRequest._headers;
+				if (!oRequestHeaders['Host']) oRequestHeaders['Host'] = top.location.host;
+				if (!oRequestHeaders['User-Agent']) oRequestHeaders['User-Agent'] = navigator.userAgent;
+				if (!oRequestHeaders['Accept']) oRequestHeaders['Accept'] = '*/*';
+				if (!oRequestHeaders['Referer']) oRequestHeaders['Referer'] = top.location.href;
+
+				var bHasHeaders = false;
+				for(var i in oRequestHeaders){
+					if ( oRequestHeaders.hasOwnProperty(i) ) {
+						bHasHeaders = true;
+						break;
+					}
+				}
+
+				if(bHasHeaders){
+					aReturn.push('<thead><tr><th colspan="2">Request Headers</th></tr></thead><tbody>');
+					for(var i in oRequestHeaders){
+						if ( oRequestHeaders.hasOwnProperty(i) )
+							aReturn.push('<tr><td class="bb-debugger-nametd">', i, '</td><td class="bb-debugger-valuetd">', oRequestHeaders[i], '</td></tr>');
+					}
+					aReturn.push('</tbody>');
+				}
+				if (oRequest._data) {
+					aReturn.push('<thead><tr><th colspan="2">Request Body</th></tr></thead><tbody>');
+					aReturn.push('<tbody><tr><td colspan="2"><pre class="bb-debugger-responseText">',bb.string.escapeXml(String(oRequest._data)),'</pre></td></tr></thead>');
+				}
+				var sResponseHeaders = oRequest.getAllResponseHeaders();
+				if(sResponseHeaders){
+					aReturn.push('<thead><tr><th colspan="2">Response Headers</th></tr></thead><tbody>');
+					var aSplit = sResponseHeaders.split('\n');
+					for(var i = 0; i < aSplit.length; i++){
+						var aSplit2 = aSplit[i].split(':');
+
+						var sName = aSplit2.shift();
+						var sValue = aSplit2.join(':');
+						aReturn.push('<tr><td class="bb-debugger-nametd">', sName, '</td><td class="bb-debugger-valuetd">', sValue, '</td></tr>');
+					}
+					aReturn.push('</tbody>');
+				}
+				var sResponseText = oRequest.responseText;
+				aReturn.push('<thead><tr><th colspan="2">Response Body</th></tr></thead>');
+				aReturn.push('<tbody><tr><td colspan="2"><pre class="bb-debugger-responseText">',bb.string.escapeXml(sResponseText),'</pre></td></tr></thead>');
+
+				aReturn.push('</table></div>');
+				return aReturn.join('');
+			}
+
+			bb.tooling.net.logRequest = function(oRequest){
+
+				if(bb.tooling.net.aCachedRequests.length){
+					var oReq = bb.tooling.net.aCachedRequests.shift();
+					bb.tooling.net.logRequest(oReq);
+				}
+
+				//Doesnt exist first time create!
+				if (!oRequest.bAddedToLogger){
+					oRequest.bAddedToLogger = true;
+					var sUrl = oRequest._url;
+					var oTr = createGridItem(null, new GenericGridItem(sUrl.substr(sUrl.lastIndexOf('/') + 1), '', '?', new MultiColumn('Nothing yet','text', 3)));
+					bb.tooling.net.node.insertBefore(oTr, bb.tooling.net.node.lastChild);
+					bb.html.addClass(oTr, 'bb-debugger-netisloading');
+					oTr.cells[0].title = sUrl;
+					oTr.cells[0].className += ' bb-debugger-first';
+					oTr.cells[1].innerHTML = '?';
+					oRequest.oTr = oTr;
+					bb.tooling.net.node.parentNode.parentNode.scrollTop = bb.tooling.net.node.parentNode.parentNode.scrollHeight;
+				}
+
+				if(oRequest.readyState == 4 && oRequest.oTr){
+					var iTime = oRequest._timeEndLoad.getTime() - oRequest._timeStartLoad.getTime();
+					var iSize = oRequest.responseText.length;
+					var oTr = oRequest.oTr;
+					bb.html.removeClass(oTr, 'bb-debugger-netisloading');
+					if(oRequest.status != 200 && oRequest.status != 0){
+						var oLabel = bb.selector.query(oTr, '.bb-grid-label span');
+						oLabel.innerHTML += '('+oRequest.status+')';
+						oLabel.className += ' red';
+					}
+					var oLast = bb.tooling.net.node.lastChild;
+
+					oLast.cells[0].innerHTML = bb.tooling.net.node.rows.length - 1 + ' requests';
+
+					bb.tooling.net.node.totalSize += iSize;
+					bb.tooling.net.node.totalTime += iTime;
+					oLast.cells[1].innerHTML = bb.tooling.net.prettySize(bb.tooling.net.node.totalSize);+' - '+bb.tooling.net.node.totalTime+'ms';
+					oLast.cells[2].innerHTML = bb.tooling.net.prettyTime(bb.tooling.net.node.totalTime);
+
+					oTr.appendChild(document.createElement('td'));
+					oTr.cells[1].innerHTML = bb.tooling.net.prettySize(iSize);
+					oTr.cells[2].innerHTML = bb.tooling.net.prettyTime(iTime);
+
+					oTr.loopValue = new XMLHttpItem(oRequest, 3);
+					//Cleanup
+					oRequest.oTr = null;
+				}
+
+			}
+
+		]]></d:resource>
+
+		<d:method name="clear">
+			<d:body type="application/javascript">
+				while(this.viewGate.lastChild.previousSibling)
+					this.viewGate.removeChild(this.viewGate.lastChild.previousSibling);
+
+				this.viewGate.lastChild.cells[0].innerHTML = '0 Requests';
+				this.viewGate.lastChild.cells[1].innerHTML = '0B';
+				this.viewGate.lastChild.cells[2].innerHTML = '0ms';
+				bb.tooling.net.node.totalSize = 0;
+				bb.tooling.net.node.totalTime = 0;
+			</d:body>
+		</d:method>
+
+
+		<d:property name="disabled">
+			<d:setter type="text/javascript">
+				if(this._['_'+name] != value){
+					if(value == false){
+						bb.tooling.currentContext = null;
+						this.viewNode.parentNode.scrollTop = this.viewNode.parentNode.scrollHeight;
+
+					}
+				}
+				this._['_'+name] = value;
+			</d:setter>
+		</d:property>
+
+		<d:property name="viewCategory" onget="return bb.evaluateSmart('string(ancestor::b:tab/@category)', this, bb.tooling.nsResolver);" />
+		<d:property name="viewSubCategory" onget="return 'net';" />
+	</d:element>
+</d:namespace>

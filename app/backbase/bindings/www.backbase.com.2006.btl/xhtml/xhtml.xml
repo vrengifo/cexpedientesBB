@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="positionElement dimensionElement containerElement" src="../visualElement/visualElement.xml"/>
+
+		<d:element name="xhtml" extends="b:positionElement b:dimensionElement b:containerElement">
+			
+
+			<d:method name="__children">
+				
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:template type="text/javascript">
+				// Scan for &lt;b:xml&gt;
+				var aX = bb.xml.getElementsByTagNameNS(this.modelNode, btl.namespaceURI, 'xml');
+				var aS = [];
+				for (var i = aX.length-1; i &gt;= 0 ; i--) {
+					aS.push(aX[i]);
+					var oM = this.modelNode.ownerDocument.createElement('marker');
+					aX[i].parentNode.replaceChild(oM, aX[i]);
+				}
+				aX = aS;
+
+				// Render plain HTML
+				var sRender = '&lt;div&gt;'+bb.xml.serialize(this.modelNode, true)+'&lt;/div&gt;';
+				var oElm = bb.html.createElementFromString(sRender);
+
+				// Replace &lt;b:xml&gt; back into tree.
+				var aM = oElm.getElementsByTagName('marker');
+				for (var i = aX.length-1; i &gt;= 0 ; i--) {
+					bb.construct(aX[i]);
+					var oC = bb.getControllerFromModel(aX[i]);
+					var oTElm = oC.viewNode;
+					oC.viewNode = null;
+					oC.viewGate = null;
+					aM[i].parentNode.replaceChild(oTElm, aM[i]);
+					this.appendChild(oC);
+					oC.viewNode = oTElm;
+					oC.viewGate = oTElm;
+				}
+				return [oElm, oElm];
+			</d:template>
+		</d:element>
+
+		<d:element name="xml" extends="b:positionElement b:dimensionElement b:containerElement">
+			
+
+			<d:template type="text/javascript">
+				var oElm = document.createElement('span');
+				return [oElm, oElm];
+			</d:template>
+		</d:element>
+	</d:namespace>
+</d:tdl>

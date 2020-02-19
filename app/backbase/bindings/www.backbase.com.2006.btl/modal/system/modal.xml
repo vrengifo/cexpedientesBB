@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="modalBase" src="../modalBase.xml"/>
+
+		<d:element name="modal" extends="b:modalBase">
+			
+
+			<d:resource type="text/css"><![CDATA[.btl-modal {
+	position: absolute;
+	overflow: hidden;
+}
+.btl-modal-inner,
+.btl-modal-inner2 {
+	overflow: hidden;
+	height: 100%;
+}
+.btl-modal-inner2 {
+	padding: 1px;
+	border: 1px solid InactiveBorder;
+	background-color: ThreeDFace;
+}
+.btl-modal-head {
+	cursor: move;
+	color: InactiveCaptionText;
+	background-color: InactiveCaption;
+}
+.btl-modal-label {
+	cursor: move;
+	font-weight: bold;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	color: InactiveCaptionText;
+}
+.btl-modal-head .btl-label {
+	padding-top: 3px;
+	padding-bottom: 3px;
+}
+.btl-modal-closeButton {
+	margin-top: 3px;
+	margin-right: 2px;
+	cursor: pointer;
+	float: right;
+	background-color: ButtonFace;
+	border-color: ThreeDHighlight ThreeDDarkShadow ThreeDDarkShadow ThreeDHighlight;
+}
+.btl-modal-closeButton,
+.btl-modal-closeButton-inner {
+	border-width: 1px;
+	border-style: solid;
+}
+.btl-modal-closeButton-inner {
+	border-color: ThreeDFace ThreeDShadow ThreeDShadow ThreeDFace;
+	padding: 0 1px 1px 0;
+}
+.btl-modal-closeButton-icon {
+	position: relative;
+	width: 10px;
+	height: 9px;
+}
+.btl-modal-closeButton-icon div {
+	height: 1px;
+	background-color: ButtonText;
+	position: absolute;
+	overflow: hidden;
+}
+.btl-modal-closeButton-x1l,
+.btl-modal-closeButton-x1r {
+	bottom: 1px;
+}
+.btl-modal-closeButton-x2l,
+.btl-modal-closeButton-x2r {
+	bottom: 2px;
+}
+.btl-modal-closeButton-x3 {
+	bottom: 3px;
+}
+.btl-modal-closeButton-x4 {
+	bottom: 4px;
+}
+.btl-modal-closeButton-x5 {
+	bottom: 5px;
+}
+.btl-modal-closeButton-x6l,
+.btl-modal-closeButton-x6r {
+	bottom: 6px;
+}
+.btl-modal-closeButton-x7l,
+.btl-modal-closeButton-x7r {
+	bottom: 7px;
+}
+.btl-modal-closeButton-x1l,
+.btl-modal-closeButton-x1r,
+.btl-modal-closeButton-x2l,
+.btl-modal-closeButton-x2r,
+.btl-modal-closeButton-x6l,
+.btl-modal-closeButton-x6r,
+.btl-modal-closeButton-x7l,
+.btl-modal-closeButton-x7r {
+	width: 2px;
+}
+.btl-modal-closeButton-x3,
+.btl-modal-closeButton-x5 {
+	width: 4px;
+}
+.btl-modal-closeButton-x4 {
+	width: 2px;
+}
+.btl-modal-closeButton-x1l,
+.btl-modal-closeButton-x7l {
+	left: 1px;
+}
+.btl-modal-closeButton-x1r,
+.btl-modal-closeButton-x7r {
+	right: 1px;
+}
+.btl-modal-closeButton-x2l,
+.btl-modal-closeButton-x6l {
+	left: 2px;
+}
+.btl-modal-closeButton-x2r,
+.btl-modal-closeButton-x6r {
+	right: 2px;
+}
+.btl-modal-closeButton-x3,
+.btl-modal-closeButton-x5 {
+	left: 3px;
+}
+.btl-modal-closeButton-x4 {
+	left: 4px;
+}
+.btl-modal-content {
+	position: relative;
+	overflow: auto;
+	border-top: 1px solid ButtonFace;
+	background-color: ThreeDFace;
+	color: WindowText;
+}
+/* active */
+.btl-modal-active .btl-modal-inner2 {
+	border-color: ActiveBorder;
+}
+.btl-modal-active .btl-modal-head {
+	background-color: ActiveCaption;
+}
+.btl-modal-active .btl-modal-label {
+	color: CaptionText;
+}
+/* button states */
+.btl-modal-closeButton-press {
+	border-color: ThreeDDarkShadow ThreeDHighlight ThreeDHighlight ThreeDDarkShadow;
+}
+.btl-modal-closeButton-press .btl-modal-closeButton-inner {
+	border-color: ThreeDShadow ThreeDFace ThreeDFace ThreeDShadow;
+	padding: 1px 0 0 1px;
+}
+/* fixes */
+.btl-modal,
+.btl-modal * {
+	box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	-khtml-box-sizing: border-box;
+}
+.ie .btl-modal-closeButton-icon {
+	overflow: hidden;
+}
+.ie .btl-modal-label {
+	width: 100%;
+}
+.ie .btl-modal .btl-modal-inner,
+.ie .btl-modal .btl-modal-inner2 {
+	width: 100%;
+}
+.ie .btl-modal .btl-modal-content {
+	width: 100%;
+}]]></d:resource>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-modal btl-modal-closed btl-modal-active btl-ridge">
+					<div class="btl-modal-inner btl-ridge-inner">
+						<div class="btl-modal-inner2">
+							<div class="btl-modal-head btl-dragMove">
+								<div class="btl-modal-closeButton">
+									<div class="btl-modal-closeButton-inner">
+										<div class="btl-modal-closeButton-icon">
+											<div class="btl-modal-closeButton-x1l"/>
+											<div class="btl-modal-closeButton-x1r"/>
+											<div class="btl-modal-closeButton-x2l"/>
+											<div class="btl-modal-closeButton-x2r"/>
+											<div class="btl-modal-closeButton-x3"/>
+											<div class="btl-modal-closeButton-x4"/>
+											<div class="btl-modal-closeButton-x5"/>
+											<div class="btl-modal-closeButton-x6l"/>
+											<div class="btl-modal-closeButton-x6r"/>
+											<div class="btl-modal-closeButton-x7l"/>
+											<div class="btl-modal-closeButton-x7r"/>
+										</div>
+									</div>
+								</div>
+								<textarea class="btl-modal-focus-before-start" tabindex="0" cols="1" rows="1"/>
+								<a class="btl-modal-focus-start btl-modal-label btl-label" onclick="return false" href="#" tabindex="0"> </a>
+							</div>
+							<div class="btl-modal-content">
+								<d:content/>
+							</div>
+							<textarea class="btl-modal-focus-end" tabindex="0" cols="1" rows="1"/>
+							<textarea class="btl-modal-focus-after-end" tabindex="0" cols="1" rows="1"/>
+						</div>
+					</div>
+				</div>
+			</d:template>
+
+			<d:attribute name="width" default="250px"/>
+
+			<d:attribute name="useDragClass" default="true">
+				
+			</d:attribute>
+
+			<d:property name="height">
+				<d:setter type="text/javascript"><![CDATA[
+					this.viewNode.style.height = value;
+					this._._height = value;
+					bb.ui.reflow(this, true, true);
+				]]></d:setter>
+			</d:property>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				// disable user select on modal head
+				var oHead = bb.selector.query(this.viewNode, '.btl-modal-head');
+				bb.html.disableUserSelect(oHead);
+			]]></d:constructor>
+
+			<d:handler event="mousedown" match=".btl-modal-closeButton" type="text/javascript"><![CDATA[
+				bb.html.addClass(event.currentView, 'btl-modal-closeButton-press');
+			]]></d:handler>
+
+			<d:handler event="mouseup" match=".btl-modal-closeButton" type="text/javascript"><![CDATA[
+				bb.html.removeClass(event.currentView, 'btl-modal-closeButton-press');
+			]]></d:handler>
+
+			<d:handler event="mouseleave" match=".btl-modal-closeButton" type="text/javascript"><![CDATA[
+				bb.html.removeClass(event.currentView, 'btl-modal-closeButton-press');
+			]]></d:handler>
+
+			<d:handler event="click" match=".btl-modal-closeButton" type="text/javascript"><![CDATA[
+				this.close();
+			]]></d:handler>
+
+			<d:handler event="reflow" type="text/javascript"><![CDATA[
+				var oElm = bb.selector.query(this.viewNode, '.btl-modal-content');
+				if (this.hasAttribute('height') && this.getAttribute('height') !== 'auto') {
+					btl.html.stretch(oElm);
+				} else {
+					oElm.style.height = '';
+				}
+			]]></d:handler>
+
+			<d:handler event="dragStart" type="text/javascript"><![CDATA[
+				var oCloseButton = bb.selector.query(this.viewNode, '.btl-modal-closeButton');
+				if (btl.containsElement(oCloseButton, event.viewTarget) || event.viewTarget == oCloseButton){
+					event.preventDefault();
+				}
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

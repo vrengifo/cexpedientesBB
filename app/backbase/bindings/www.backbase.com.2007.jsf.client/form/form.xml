@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?><d:namespace xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:c="http://www.backbase.com/2006/command" xmlns:d="http://www.backbase.com/2006/tdl" xmlns:e="http://www.backbase.com/2006/xel" xmlns:xi="http://www.w3.org/2001/XInclude"   name="http://www.backbase.com/2007/jsf/client">
+
+	<d:element name="form" extends="form">
+		
+		<d:method name="submit">
+			<d:body type="text/javascript"><![CDATA[
+				//If not valid do not submit
+				if(bb.instanceOf(this, 'http://www.backbase.com/2007/forms', 'iValidationForm') && !bb.callMethod(this, 'validate')) return;
+				bb.bjsf.sync(this, 'submit');
+			]]></d:body>
+		</d:method>
+		<d:handler event="submit" type="text/javascript"><![CDATA[
+		   event.preventDefault();
+		   bb.callMethod(this, 'submit');
+	   ]]></d:handler>
+	</d:element>
+</d:namespace>

@@ -1,0 +1,148 @@
+<d:namespace
+	xmlns:t="http://www.backbase.com/2007/debugger"
+	xmlns:e="http://www.backbase.com/2006/xel"
+	xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:d="http://www.backbase.com/2006/tdl"
+	name="http://www.backbase.com/2007/debugger">
+
+	<d:element name="position" extends="t:baseDebuggerInspector" implements="t:iViewCategory t:iViewSubCategory">
+		<d:template type="application/xhtml+xml">
+			<div class="bb-debugger-position"><div class="bb-debugger-position-label">offset</div>
+
+				<div class="bb-debugger-position-top">0</div>
+				<div class="bb-debugger-position-left">0</div>
+
+				<div class="bb-debugger-position-margin"><div class="bb-debugger-position-label">margin</div>
+
+					<div class="bb-debugger-position-top">0</div>
+					<div class="bb-debugger-position-left">0</div>
+					<div class="bb-debugger-position-bottom">0</div>
+					<div class="bb-debugger-position-right">0</div>
+
+					<div class="bb-debugger-position-border"><div class="bb-debugger-position-label">border</div>
+
+						<div class="bb-debugger-position-top">0</div>
+						<div class="bb-debugger-position-left">0</div>
+						<div class="bb-debugger-position-bottom">0</div>
+						<div class="bb-debugger-position-right">0</div>
+
+						<div class="bb-debugger-position-padding"><div class="bb-debugger-position-label">padding</div>
+
+							<div class="bb-debugger-position-top">0</div>
+							<div class="bb-debugger-position-left">0</div>
+							<div class="bb-debugger-position-bottom">0</div>
+							<div class="bb-debugger-position-right">0</div>
+
+							<div class="bb-debugger-position-inner"><div class="bb-debugger-position-label">
+								<d:content />0 x 0
+							</div></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</d:template>
+		<d:method name="update">
+			<d:argument name="oElm" />
+			<d:body type="text/javascript"><![CDATA[
+			if(oElm && oElm.nodeType == 1){
+				this.viewNode.style.display = '';
+				var oMargin = bb.tooling.window.bb.html.getBoxObject(oElm, 'margin');
+				var oBorder = bb.tooling.window.bb.html.getBoxObject(oElm, 'border');
+				var oPadding = bb.tooling.window.bb.html.getBoxObject(oElm, 'padding');
+				var oContent = bb.tooling.window.bb.html.getBoxObject(oElm, 'content');
+				var oViewItem = this.viewGate;
+
+				///////////////////Inside//////////////////////
+				oViewItem.innerHTML = oContent.width+' x '+oContent.height;
+
+				///////////////////Padding//////////////////////
+				oViewItem = oViewItem.parentNode;
+				oViewItem = bb.html.getPreviousByNodeType(oViewItem, 1);//Right
+				oViewItem.innerHTML = oPadding.width - oContent.width + oPadding.left -  oContent.left;
+
+				oViewItem = bb.html.getPreviousByNodeType(oViewItem, 1);//Bottom
+				oViewItem.innerHTML = oPadding.height - oContent.height + oPadding.top - oContent.top;
+
+				oViewItem = bb.html.getPreviousByNodeType(oViewItem, 1);//Left
+				oViewItem.innerHTML = oContent.left - oPadding.left;
+
+				oViewItem = bb.html.getPreviousByNodeType(oViewItem, 1);//Top
+				oViewItem.innerHTML = oContent.top - oPadding.top;
+
+				///////////////////Border//////////////////////
+				oViewItem = oViewItem.parentNode;
+				oViewItem = bb.html.getPreviousByNodeType(oViewItem, 1);//Right
+				oViewItem.innerHTML = oBorder.width - oPadding.width + oBorder.left -  oPadding.left;
+
+				oViewItem = bb.html.getPreviousByNodeType(oViewItem, 1);//Bottom
+				oViewItem.innerHTML = oBorder.height - oPadding.height + oBorder.top - oPadding.top;
+
+				oViewItem = bb.html.getPreviousByNodeType(oViewItem, 1);//Left
+				oViewItem.innerHTML = oPadding.left - oBorder.left;
+
+				oViewItem = bb.html.getPreviousByNodeType(oViewItem, 1);//Top
+				oViewItem.innerHTML = oPadding.top - oBorder.top;
+
+				///////////////////Margin//////////////////////
+				oViewItem = oViewItem.parentNode;
+				oViewItem = bb.html.getPreviousByNodeType(oViewItem, 1);//Right
+				oViewItem.innerHTML = oMargin.width - oBorder.width + oMargin.left -  oBorder.left;
+
+				oViewItem = bb.html.getPreviousByNodeType(oViewItem, 1);//Bottom
+				oViewItem.innerHTML = oMargin.height - oBorder.height + oMargin.top - oBorder.top;
+
+				oViewItem = bb.html.getPreviousByNodeType(oViewItem, 1);//Left
+				oViewItem.innerHTML = oBorder.left - oMargin.left;
+
+				oViewItem = bb.html.getPreviousByNodeType(oViewItem, 1);//Top
+				oViewItem.innerHTML = oBorder.top - oMargin.top;
+
+				///////////////////Outside//////////////////////
+				oViewItem = oViewItem.parentNode;
+				oViewItem = bb.html.getPreviousByNodeType(oViewItem, 1);//Left
+				oViewItem.innerHTML = oBorder.left;
+
+				oViewItem = bb.html.getPreviousByNodeType(oViewItem, 1);//Top
+				oViewItem.innerHTML = oBorder.top;
+			} else {
+				this.viewNode.style.display = 'none';
+			}
+			]]></d:body>
+		</d:method>
+
+		<d:property name="disabled">
+			<d:setter type="text/javascript">
+				if(this._['_'+name] != value){
+					if(value == false){
+						var selected = bb.getProperty(bb.tooling.currentTree, 'selectedNode');
+						if(selected){
+							if (bb.getProperty(bb.tooling.currentTree, 'viewCategory') == 'view') {
+								this.update(selected);
+							} else {
+								this.update(bb.tooling.window.bb.getControllerFromModel(selected).viewNode);
+							}
+						}
+					}
+				}
+				this._['_'+name] = value;
+			</d:setter>
+		</d:property>
+
+		<d:property name="viewCategory" onget="return bb.evaluateSmart('string(ancestor::b:tab/@category)', this, bb.tooling.nsResolver);" />
+		<d:property name="viewSubCategory" onget="return 'layout';" />
+
+		<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript">
+			var oThis = this;
+			bb.tooling.root.addEventListener('tree-select',
+				function(eEvent){
+					if(!bb.getProperty(oThis, 'disabled') ){
+						if (eEvent.treeModelTarget){
+							oThis.update(eEvent.treeTarget.viewNode);
+						} else {
+							oThis.update(eEvent.treeViewTarget);
+						}
+					}
+				}, false);
+		</d:handler>
+	</d:element>
+</d:namespace>

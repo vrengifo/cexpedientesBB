@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+<!--
+	TODO: add caching to the elements property
+ -->
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="positionElement dimensionElement containerElement" src="../visualElement/visualElement.xml"/>
+		<d:uses element="disableElement" src="../disableElement/disableElement.xml"/>
+
+		<d:element name="cardStack" extends="b:positionElement b:dimensionElement b:disableElement" abstract="true">
+			
+
+			<!-- EVENTS -->
+			
+
+			<!-- ATTRIBUTES -->
+			<d:attribute name="loop" default="false">
+				
+			</d:attribute>
+
+			<!-- PROPERTIES -->
+			<d:property name="elements">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					var aElements = [];
+					var aChildren = this.getProperty('childNodes');
+					for (var i = 0, iMax = aChildren.length; iMax > i; i++){
+						if (bb.instanceOf(aChildren[i], btl.namespaceURI, 'card')) {
+							aElements[aElements.length] = aChildren[i];
+						}
+					}
+					return aElements;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="selectedIndex">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					var aElements = this.getProperty('elements');
+
+					if (aElements[value]) {
+						if (!aElements[value].getProperty('selected')) {
+							aElements[value].setProperty('selected', true);
+						}
+
+						for (var i = 0, iMax = aElements.length; iMax > i ; i++){
+							if (i !== value && aElements[i].getProperty('selected')) {
+								aElements[i].setProperty('selected', false);
+							}
+						}
+					}
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					var iSelectedIndex = -1;
+					var aElements = this.getProperty('elements');
+
+					for (var i = 0, iMax = aElements.length; iMax > i ; i++) {
+						if (aElements[i].getProperty('selected')) {
+							iSelectedIndex = i;
+							break;
+						}
+					}
+					return iSelectedIndex;
+				]]></d:getter>
+			</d:property>
+
+			<!-- METHODS -->
+			<d:method name="next">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var iIndex = this.getProperty('selectedIndex');
+					var aElements = this.getProperty('elements');
+					var bNext = false;
+
+					if ( !btl.isTrueValue('loop', this.getAttribute('loop'))) {
+						while (iIndex < aElements.length) {
+							if (iIndex + 1 == aElements.length) {
+								break;
+							} else {
+								iIndex++;
+							}
+
+							if (!aElements[iIndex].getProperty('disabled')) {
+								this.setProperty('selectedIndex', iIndex);
+								bNext = true;
+								break;
+							}
+						}
+					} else {
+						var iTemp = this.getProperty('selectedIndex');
+						while (iIndex + 1 != iTemp) {
+							if (iIndex + 1 == aElements.length) {
+								iIndex = 0;
+							} else {
+								iIndex++;
+							}
+
+							if(!aElements[iIndex].getProperty('disabled')){
+								this.setProperty('selectedIndex', iIndex);
+								bNext = true;
+								break;
+							}
+						}
+					}
+					return bNext;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="previous">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var iIndex = this.getProperty('selectedIndex');
+					var aElements = this.getProperty('elements');
+					var bPrevious = false;
+
+					if (!btl.isTrueValue('loop', this.getAttribute('loop'))) {
+						while (iIndex >= 0) {
+							if (iIndex == 0) {
+								break;
+							} else {
+								iIndex--;
+							}
+
+							if(!aElements[iIndex].getProperty('disabled')){
+								this.setProperty('selectedIndex', iIndex);
+								bPrevious = true;
+								break;
+							}
+						}
+					} else {
+						var iTemp = this.getProperty('selectedIndex');
+						while (iIndex - 1 != iTemp) {
+							if (iIndex == 0) {
+								iIndex = aElements.length - 1;
+							} else {
+								iIndex--;
+							}
+
+							if (!aElements[iIndex].getProperty('disabled')) {
+								this.setProperty('selectedIndex', iIndex);
+								bPrevious = true;
+								break;
+							}
+						}
+					}
+					return bPrevious;
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="construct" type="text/javascript"><![CDATA[
+				bb.ui.reflow.add(this);
+			]]></d:handler>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				// sets the initial value of the selected property and attribute of all cards
+				var iSelectedIndex = this.getProperty('selectedIndex');
+				var aElements = this.getProperty('elements');
+
+				// when there is no initial selection, the first element should be selected
+				if (iSelectedIndex === -1) {
+					iSelectedIndex = 0;
+				}
+
+				if (aElements[iSelectedIndex]) {
+					// set selected attribute on the modelnode to make sure the selected state is correct but without executing the changer of the attribute
+					aElements[iSelectedIndex].modelNode.setAttribute('selected', 'true');
+
+					for (var i = 0, iMax = aElements.length; iMax > i ; i++) {
+						if (i != iSelectedIndex) {
+							aElements[i].modelNode.removeAttribute('selected');
+						}
+					}
+				}
+			]]></d:handler>
+
+			<d:handler event="DOMNodeInserted" type="text/javascript"><![CDATA[
+				// If the inserted element is selected, it should be new selected card
+				var oTarget = event.target;
+				if (event.relatedNode == this &&
+						bb.instanceOf(oTarget, 'http://www.backbase.com/2006/btl', 'card') &&
+						oTarget.getProperty('selected')) {
+
+					var aElements = this.getProperty('elements');
+					for (var i = 0, iMax = aElements.length; iMax > i; i++) {
+						if (aElements[i].getProperty('selected') && aElements[i] !== oTarget) {
+							aElements[i].setProperty('selected', false);
+							break;
+						}
+					}
+				}
+			]]></d:handler>
+
+			<d:handler event="DOMNodeRemoved" type="text/javascript"><![CDATA[
+				// If the removed element was selected, a new element should be selected.
+				var oTarget = event.target;
+				if (event.relatedNode == this &&
+						bb.instanceOf(oTarget, btl.namespaceURI, 'card') &&
+						oTarget.getProperty('selected')){
+					// if the following can not be selected, the previous should be selected.
+					if (!this.next())
+						this.previous();
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:interface name="iCard">
+			
+			<d:attribute name="selected">
+				
+			</d:attribute>
+
+			<d:property name="selected">
+				
+			</d:property>
+		</d:interface>
+
+		<d:element name="card" extends="b:dimensionElement b:containerElement b:disableElement" implements="b:iCard" abstract="true">
+			
+
+			
+
+			<d:attribute name="selected">
+				<d:changer type="text/javascript"><![CDATA[
+					if (btl.isTrueValue(name, value)) {
+						var oParent = this.getProperty('parentNode');
+						var aElements = oParent.getProperty('elements');
+						var iIndex = 0;
+						for (var i = 0, iMax = aElements.length; iMax > i; i++) {
+							if (this == aElements[i]) {
+								iIndex = i;
+								break;
+							}
+						}
+						oParent.setProperty('selectedIndex', iIndex);
+
+						bb.command.fireEvent(oParent, 'selectionChanged', false, false);
+
+						bb.command.fireEvent(this, 'select', false, false);
+
+						bb.ui.reflow(oParent, true, true);
+
+					} else {
+						bb.command.fireEvent(this, 'deselect', false, false);
+					}
+				]]></d:changer>
+			</d:attribute>
+
+			<d:property name="selected">
+				<d:getter type="text/javascript"><![CDATA[
+					return btl.isTrueValue('selected', this.getAttribute('selected'));
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					if (value === true) {
+						this.setAttribute('selected', 'true');
+					} else {
+						this.setAttribute('selected', 'false');
+					}
+				]]></d:setter>
+			</d:property>
+
+			<d:handler event="construct" type="text/javascript"><![CDATA[
+				bb.ui.reflow.add(this);
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

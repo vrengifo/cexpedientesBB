@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="card cardStack" src="../cardStack/cardStack.xml"/>
+
+		<d:element name="deck" extends="b:cardStack">
+			
+
+			<d:resource type="text/css"><![CDATA[
+				.btl-deck {
+					overflow: hidden;
+				}
+				.btl-deckItem {
+					display: none;
+					overflow: auto;
+					height: 100%;
+					position: relative;
+				}
+				.btl-deckItem-selected {
+					display: block;
+				}
+				/* fixes */
+				.btl-deck,
+				.btl-deckItem {
+					box-sizing: border-box;
+					-moz-box-sizing: border-box;
+					-khtml-box-sizing: border-box;
+				}
+				.ie .btl-deck,
+				.ie .btl-deckItem {
+					zoom: 1.0;
+				}
+			]]></d:resource>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-deck"><d:content/></div>
+			</d:template>
+
+			<d:method name="repaint">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var aElements = this.getProperty('elements');
+					var iSelectedIndex = this.getProperty('selectedIndex');
+
+					for(var i = 0, iMax = aElements.length; iMax > i; i++){
+						if(i == iSelectedIndex)
+							bb.html.addClass(aElements[i].viewNode, 'btl-deckItem-selected');
+						else
+							bb.html.removeClass(aElements[i].viewNode, 'btl-deckItem-selected');
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="reflow" type="text/javascript"><![CDATA[
+				this.repaint();
+			]]></d:handler>
+
+			<d:handler event="selectionChanged" type="text/javascript"><![CDATA[
+				this.repaint();
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="deckItem" extends="b:card">
+			
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-deckItem"><d:content/></div>
+			</d:template>
+		</d:element>
+	</d:namespace>
+</d:tdl>

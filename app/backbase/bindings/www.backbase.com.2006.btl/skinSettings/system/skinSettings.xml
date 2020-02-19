@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="element" src="../../element/element.xml"/>
+
+		<d:element name="skinSettings" extends="b:element">
+			
+
+			<d:resource type="text/javascript"><![CDATA[
+				btl.skinSettings = {};
+
+				btl.skinSettings.animateTransitions = false;
+				btl.skinSettings.transitionType = 'slide';
+
+				btl.skinSettings.getTransitionType = function btl_skinSettings_getTransitionType(oController){
+					var sTransitionType = 'none';
+					var sWidgetName = oController.getProperty('localName');
+
+					// get global settings
+					if(btl.skinSettings.animateTransitions)
+						sTransitionType = btl.skinSettings.transitionType;
+
+					// get widget type level settings. Widget type level settings are only applied when global settings aren't forced or when widget type level settings are forced.
+					if(btl.skinSettings[sWidgetName]){
+						if(btl.skinSettings[sWidgetName].animateTransitions && (!btl.skinSettings.forceAnimateTransitions || btl.skinSettings[sWidgetName].forceAnimateTransitions))
+							sTransitionType = btl.skinSettings[sWidgetName].transitionType;
+					} else {
+						// create object anyway since there is a test in the following code. The test will always be true as the property will be undefined.
+						btl.skinSettings[sWidgetName] = {};
+					}
+
+					// get local settings. Widget level settings are only applied when global settings aren't forced and when widget type level settings aren't forced.
+					if (oController.hasAttribute('transitionType') && (!btl.skinSettings.forceAnimateTransitions && !btl.skinSettings[sWidgetName].forceAnimateTransitions))
+						sTransitionType = oController.getAttribute('transitionType');
+
+					return sTransitionType;
+				}
+			]]></d:resource>
+
+			<d:resource type="text/css"><![CDATA[/**************************************\
+**	light:          ThreeDHighlight;   **
+**	light (darker): ThreeDLightShadow; **
+**	dark (lighter): ThreeDShadow;      **
+**	dark:           ThreeDDarkShadow;  **
+\**************************************/
+/* border */
+.btl-border,
+.btl-border-top-bottom,
+.btl-border-top {
+	border-top: 1px solid ThreeDShadow; /* dark (lighter) */
+}
+.btl-border,
+.btl-border-left-right,
+.btl-border-right {
+	border-right: 1px solid ThreeDShadow; /* dark (lighter) */
+}
+.btl-border,
+.btl-border-top-bottom,
+.btl-border-bottom {
+	border-bottom: 1px solid ThreeDShadow; /* dark (lighter) */
+}
+.btl-border,
+.btl-border-left-right,
+.btl-border-left {
+	border-left: 1px solid ThreeDShadow; /* dark (lighter) */
+}
+/* bevel */
+.btl-bevel,
+.btl-bevel-top-bottom,
+.btl-bevel-top {
+	border-top: 1px solid ThreeDHighlight; /* light */
+}
+.btl-bevel,
+.btl-bevel-left-right,
+.btl-bevel-right {
+	border-right: 1px solid ThreeDShadow; /* dark (lighter) */
+}
+.btl-bevel,
+.btl-bevel-top-bottom,
+.btl-bevel-bottom {
+	border-bottom: 1px solid ThreeDShadow; /* dark (lighter) */
+}
+.btl-bevel,
+.btl-bevel-left-right,
+.btl-bevel-left {
+	border-left: 1px solid ThreeDHighlight; /* light */
+}
+/* ridge */
+.btl-ridge,
+.btl-ridge-top-bottom,
+.btl-ridge-top {
+	border-top: 1px solid ThreeDLightShadow; /* light (darker) */
+}
+.btl-ridge,
+.btl-ridge-left-right,
+.btl-ridge-right {
+	border-right: 1px solid ThreeDDarkShadow; /* dark */
+}
+.btl-ridge,
+.btl-ridge-top-bottom,
+.btl-ridge-bottom {
+	border-bottom: 1px solid ThreeDDarkShadow; /* dark */
+}
+.btl-ridge,
+.btl-ridge-left-right,
+.btl-ridge-left {
+	border-left: 1px solid ThreeDLightShadow; /* light (darker) */
+}
+.btl-ridge-inner,
+.btl-ridge-inner-top-bottom,
+.btl-ridge-inner-top {
+	border-top: 1px solid ThreeDHighlight; /* light */
+}
+.btl-ridge-inner,
+.btl-ridge-inner-left-right,
+.btl-ridge-inner-right {
+	border-right: 1px solid ThreeDShadow; /* dark (lighter) */
+}
+.btl-ridge-inner,
+.btl-ridge-inner-top-bottom,
+.btl-ridge-inner-bottom {
+	border-bottom: 1px solid ThreeDShadow; /* dark (lighter) */
+}
+.btl-ridge-inner,
+.btl-ridge-inner-left-right,
+.btl-ridge-inner-left {
+	border-left: 1px solid ThreeDHighlight; /* light */
+}
+/* groove */
+.btl-groove,
+.btl-groove-top-bottom,
+.btl-groove-top {
+	border-top: 1px solid ThreeDShadow; /* dark (lighter) */
+}
+.btl-groove,
+.btl-groove-left-right,
+.btl-groove-right {
+	border-right: 1px solid ThreeDHighlight; /* light */
+}
+.btl-groove,
+.btl-groove-top-bottom,
+.btl-groove-bottom {
+	border-bottom: 1px solid ThreeDHighlight; /* light */
+}
+.btl-groove,
+.btl-groove-left-right,
+.btl-groove-left {
+	border-left: 1px solid ThreeDShadow; /* dark (lighter) */
+}
+.btl-groove-inner,
+.btl-groove-inner-top-bottom,
+.btl-groove-inner-top {
+	border-top: 1px solid ThreeDDarkShadow; /* dark */
+}
+.btl-groove-inner,
+.btl-groove-inner-left-right,
+.btl-groove-inner-right {
+	border-right: 1px solid ThreeDLightShadow; /* light (darker) */
+}
+.btl-groove-inner,
+.btl-groove-inner-top-bottom,
+.btl-groove-inner-bottom {
+	border-bottom: 1px solid ThreeDLightShadow; /* light (darker) */
+}
+.btl-groove-inner,
+.btl-groove-inner-left-right,
+.btl-groove-inner-left {
+	border-left: 1px solid ThreeDDarkShadow; /* dark */
+}
+/* head / bar / label / focus indication */
+.btl-head,
+.btl-bar {
+	cursor: default;
+}
+.btl-label {
+	display: block;
+	padding: 5px;
+}
+.btl-focusIndicatorContainer {
+	padding: 2px;
+}
+.btl-focusIndicator {
+	padding: 1px;
+}
+.btl-focusIndicator .btl-label {
+	padding: 2px;
+}
+.btl-focusIndicator-visible {
+	border: 1px dotted ThreeDShadow;  /* dark (lighter) */
+	padding: 0;
+}
+.btl-icon {
+	padding-left: 25px;
+	background-repeat: no-repeat;
+	background-position: 4px center;
+}
+.btl-focusIndicatorContainer .btl-focusIndicator .btl-icon {
+	padding-left: 22px;
+	background-position: 1px center;
+}]]></d:resource>
+
+			<!-- ANIMATION ATTRIBUTES -->
+			<d:attribute name="animateTransitions" default="false" onmap="btl.skinSettings.animateTransitions = btl.isTrueValue(name, value)">
+				
+			</d:attribute>
+		</d:element>
+	</d:namespace>
+</d:tdl>

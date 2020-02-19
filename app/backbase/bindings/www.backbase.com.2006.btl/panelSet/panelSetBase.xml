@@ -1,0 +1,1302 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="positionElement dimensionElement containerElement" src="../visualElement/visualElement.xml"/>
+
+		<d:element name="panelSetBase" extends="b:positionElement b:dimensionElement" abstract="true">
+			
+
+			<d:resource type="text/javascript"><![CDATA[btl.panelSet = {};
+
+//constants
+btl.panelSet.MIN_SIZE          = 10;   // default initial size
+btl.panelSet.DEFAULT_SPLITTER  = 5; // default splitter size
+btl.panelSet.MODE_RESIZE       = 1; 	//
+btl.panelSet.RESIZE_VERTICAL   = 1; 	// type of resize
+btl.panelSet.RESIZE_HORIZONTAL = 2;// type of resize
+btl.panelSet.VIRTUAL_SIZE      = 10000;// size for the initial render
+btl.panelSet.CURSORS	          = ['', 's-resize', 'w-resize', 'move']; // set of splitter cursors
+
+btl.panelSet.oResize = {}; 		// object to keep resize internals
+btl.panelSet.oResize.currentElement = null;
+btl.panelSet.oResize.mode = 0;
+
+btl.panelSet.oResize.lineV = document.createElement('div');
+btl.panelSet.oResize.lineV.className = 'btl-panel-splitter-outline';
+btl.panelSet.oResize.lineV.style.cursor = 'w-resize';
+
+btl.panelSet.oResize.lineH = document.createElement('div');
+btl.panelSet.oResize.lineH.className = 'btl-panel-splitter-outline';
+btl.panelSet.oResize.lineH.style.cursor = 's-resize';
+
+//2 cursor patches because of strange behavior of Opera -
+//it can not change cursor without changing event.target element
+btl.panelSet.oResize.iCursorPatch = 0;
+btl.panelSet.oResize.cursorPatch = [];
+btl.panelSet.oResize.cursorPatch[0] = document.createElement('div');
+btl.panelSet.oResize.cursorPatch[0].className = 'btl-panel-cursor';
+btl.panelSet.oResize.cursor = btl.panelSet.oResize.cursorPatch[0];
+document.body.appendChild( btl.panelSet.oResize.cursorPatch[0]);
+
+if( bb.browser.opera) { //workaround for opera
+	btl.panelSet.oResize.cursorPatch[1] = document.createElement('div');
+	btl.panelSet.oResize.cursorPatch[1].className = 'btl-panel-cursor';
+	document.body.appendChild( btl.panelSet.oResize.cursorPatch[1]);
+}
+
+document.body.appendChild( btl.panelSet.oResize.lineV);
+document.body.appendChild( btl.panelSet.oResize.lineH);
+
+btl.panelSet.initialize = function btl_panelSet_initialize(oPanelSet){
+	var oParent = oPanelSet.getProperty('parentNode');
+	if(!oPanelSet || (oPanelSet.getAttribute('fullScreen') != 'true' && oParent && (oParent.viewGate.offsetWidth < 1 || oParent.viewGate.offsetHeight < 1))){
+		// no use to initialize if panelSet not visible
+		return;
+	}
+
+	/* Set rows and cols width/height */
+	var sCols = oPanelSet.getAttribute('columns');
+	var aColWidth = ['*']; // one column by default
+	if(sCols != ''){
+		aColWidth = bb.string.trim(sCols).split(/\s+/);
+	}
+	var iColCount = aColWidth.length;
+
+	var sRows = oPanelSet.getAttribute('rows');
+	var aRowHeight = ['*']; //one row by default
+	if(sRows != ''){
+		aRowHeight = bb.string.trim(sRows).split(/\s+/);
+	}
+	var iRowCount = aRowHeight.length;
+
+	if (sCols == '' && sRows == '') {
+		bb.command.trace(oPanelSet, '"columns" or "rows" attribute needs to be defined', 3);
+		return;
+	}
+	var aChildren = oPanelSet.getProperty('children');
+
+	//remove splitters
+	if( oPanelSet.__info && oPanelSet.__info.aRowSplitters){
+		var aViewChildren = oPanelSet.viewNode.childNodes;
+		for(var i = aViewChildren.length-1; i >= 0; i--){
+			if( /(^|\s*)btl-splitter(\s|$)/.test(aViewChildren[i].className))
+				oPanelSet.viewNode.removeChild( aViewChildren[i]);
+		}
+	}
+
+
+	var bSplitter = btl.isTrueValue( 'splitter', oPanelSet.getAttribute('splitter') );
+	var iSplitterSize = parseInt(oPanelSet.getAttribute('splitterSize'));
+
+	//there is no splitterSize, so it depends on 'splitter' attribute
+	if(isNaN(iSplitterSize)){
+		iSplitterSize = bSplitter ? btl.panelSet.DEFAULT_SPLITTER : 0;
+	}
+
+	var oPanelSetBoxObject = bb.html.getBoxObject(oPanelSet.viewNode, 'content');
+	var iPanelSetWidth = oPanelSetBoxObject.width;
+	var iPanelSetHeight = oPanelSetBoxObject.height;
+
+
+	//------------------------ setting width (columns) ----------------------
+	var aColSet = []; //applicable real sizes - pt, em, px, cm ( no % and *)
+	var aStarIndex = [];
+	var aCentIndex = [];
+	var iWStars = 0;
+	var iCents = 0;
+	var iSplitCount = iColCount - 1;
+	var iLastNotFixedCol = -1; //stores an index to the last resizable col
+	var realWCentSize  = iPanelSetWidth / 100;
+	iPanelSetWidth += iSplitterSize; //for the last col having no a splitter
+	var iFixedWidth = 0;
+	var iCentWidth = 0;
+
+	for(var i = 0; i < iColCount; i++){
+		if (aChildren[i]) {
+			var oChild = aChildren[i].viewNode;
+			var sWidth = aColWidth[i];
+			var iWidth = parseInt(sWidth);
+
+			var sUnit = sWidth.replace(/^[0-9\.]*/i, '');
+
+			// Use px as unit if no unit is specified.
+			if(sUnit.length == 0){
+				sWidth += (sUnit = 'px');
+			}
+
+			switch(sUnit) {
+				case '*':
+					iWidth = iWidth ? iWidth : 1;
+					iWStars += iWidth;	 // total number of stars
+					iLastNotFixedCol = i;
+					aStarIndex[aStarIndex.length] = i;
+					aColSet.push({
+										'rSize'  : 0,
+										'vSize'  : 0,
+										'iSize'  : iWidth,
+										'sUnit'  : 'px',
+										'bStar'  : true,
+										'bFixed' : false
+									});
+					break;
+				case '%':
+					var iRealSize = Math.floor(realWCentSize*iWidth);
+					iCents += iWidth;
+					iCentWidth += iRealSize;
+					iLastNotFixedCol = i;
+					aCentIndex[aCentIndex.length] = i;
+					aColSet.push({
+										'rSize'  : iRealSize,
+										'vSize'  : iRealSize,
+										'iSize'  : iWidth,
+										'sUnit'  : 'px',
+										'bFixed' : false
+									});
+					break;
+				default:
+					oChild.style.height = '1px'; //fix for FF
+					oChild.style.width = sWidth;
+					var oCoord = bb.html.getBoxObject( oChild, 'border');
+					var iRealSize = oCoord.width;
+					if(iRealSize || (i == 0)){
+						iRealSize += (i+1 < iColCount) ? iSplitterSize : 0; // no splitter for the last column and always splitter for the first one
+					}
+					iFixedWidth += iRealSize;
+					aColSet.push({
+										'rSize'  : iRealSize,
+										'vSize'  : iRealSize,
+										'iSize'  : iWidth,
+										'sUnit'  : sUnit,
+										'bFixed' : true
+									});
+					break;
+			}
+		}
+	}// for i
+
+	var iNotFixed = (iPanelSetWidth - iSplitterSize) - iFixedWidth;
+	if( iNotFixed <= 0) { // not enough space for % panels, size of '*' is 0
+		var vCentSize = this.VIRTUAL_SIZE / iCents;
+		for(var i=0; i < aCentIndex.length; i++){
+			var index = aCentIndex[i];
+			aColSet[index].rSize = 0;
+			aColSet[index].vSize = vCentSize * aColSet[index].iSize;
+		}
+	} else {
+		var iRem = iPanelSetWidth - (iFixedWidth + iCentWidth);
+		if( iRem < 0){ // not enough space for %panels, so fix their size, size of '*' is 0
+			for(var i=aCentIndex.length - 1; i >= 0; i--){
+				var index = aCentIndex[i];
+				var iRealSize = aColSet[index].rSize;
+				if( iRealSize > 0){
+					iRem += iRealSize;
+					if( iRem >=0){ // all fixed
+						aColSet[index].vSize = iRem;
+						break;
+					}
+				}
+				aColSet[index].rSize = aColSet[index].vSize = 0;
+			} //for
+
+		} else { // calculate size for * and recalculate their sizes
+			var iStarSize = Math.floor(iRem / iWStars);
+			for(var i=0; i < aStarIndex.length; i++){
+				var index = aStarIndex[i];
+				var iSize = aColSet[index].iSize * iStarSize;
+				aColSet[index].rSize = aColSet[index].vSize = iSize;
+			}
+			iRem -= iStarSize * iWStars;
+			if( iRem > 0) //save a remain
+				aColSet[ iLastNotFixedCol].rSize += iRem;
+		}
+		var coef = this.VIRTUAL_SIZE / iNotFixed;
+		for(var i=0; i < iColCount; i++){
+			if (aColSet[i]) {
+				if (!aColSet[i].bFixed) {//recalculate virtual sizes
+					aColSet[i].vSize *= coef;
+				}
+			}
+		}
+	}
+
+	//------------------------ setting height (rows) -------------------------
+	var aRowSet = []; //applicable real sizes - pt, em, px, cm ( no % and *)
+	var aStarIndex = [];
+	var aCentIndex = [];
+	var iHStars = 0, iCents = 0;
+	var iSplitCount = iRowCount - 1;
+	var iLastNotFixedRow = -1; //stores an index to the last resizable row
+	var realHCentSize  = iPanelSetHeight / 100;
+	iPanelSetHeight += iSplitterSize; //for the last row having no a splitter
+	var iFixedHeight = 0;
+	var iCentHeight = 0;
+	var iRealSize;
+
+	for (var i = 0; i < iRowCount; i++) {
+		if (aChildren[ i * iColCount]) {
+			var oChild = aChildren[ i * iColCount].viewNode;
+			var sHeight = aRowHeight[i];
+			var iHeight = parseInt(sHeight);
+
+			var sUnit = sHeight.replace(/^[0-9\.]*/i, '');
+			if( sUnit.length == 0){
+				sHeight += (sUnit = 'px');
+			}
+
+			switch(sUnit) {
+				case '*':
+					iHeight = iHeight ? iHeight : 1;
+					iHStars += iHeight;	 // total number of stars
+					iLastNotFixedRow = i;
+					aStarIndex[aStarIndex.length] = i;
+					aRowSet.push({
+										'rSize'  : 0,
+										'vSize'  : 0,
+										'iSize'  : iHeight,
+										'sUnit'  : 'px',
+										'bStar'  : true,
+										'bFixed' : false
+									});
+					break;
+				case '%':
+					iRealSize = Math.floor(realHCentSize*iHeight);
+					iCents += iHeight;
+					iCentHeight += iRealSize;
+					iLastNotFixedRow = i;
+					aCentIndex[aCentIndex.length] = i;
+					aRowSet.push({
+										'rSize'  : iRealSize,
+										'vSize'  : iRealSize,
+										'iSize'  : iHeight,
+										'sUnit'  : 'px',
+										'bFixed' : false
+									});
+					break;
+				default:
+					oChild.style.width =  '1px'; //fix for FF
+					oChild.style.height = sHeight;
+					var oCoord = bb.html.getBoxObject(oChild, 'border');
+					iRealSize = iHeight ? oCoord.height || parseInt(sHeight) : 0;
+					if(iRealSize || i == 0){
+						iRealSize += (i+1 < iRowCount) ? iSplitterSize : 0; // no splitter for the last row and always splitter for the first one
+					}
+					iFixedHeight += iRealSize;
+					aRowSet.push({
+										'rSize'  : iRealSize,
+										'vSize'  : iRealSize,
+										'iSize'  : iHeight,
+										'sUnit'  : sUnit,
+										'bFixed' : true
+									});
+			}
+		}
+	}// for i
+
+	var iNotFixed = iPanelSetHeight - iFixedHeight;
+	if( iNotFixed <= 0) { // not enough space for % panels, size of '*' is 0
+		var vCentSize = this.VIRTUAL_SIZE / iCents;
+		for(var i=0; i < aCentIndex.length; i++){
+			var index = aCentIndex[i];
+			aRowSet[index].rSize = 0;
+			aRowSet[index].vSize = vCentSize * aRowSet[index].iSize;
+		}
+	} else {
+		var iRem = iPanelSetHeight - (iFixedHeight + iCentHeight);
+
+		if( iRem < 0){ // not enough space for %panels, so fix their size, size of '*' is 0
+			for(var i=aCentIndex.length - 1; i >= 0; i--){
+				var index = aCentIndex[i];
+				var iRealSize = aRowSet[index].rSize;
+				if( iRealSize > 0){
+					iRem += iRealSize;
+					if( iRem >=0){ // all fixed
+						aRowSet[index].vSize = iRem;
+						break;
+					}
+				}
+				aRowSet[index].rSize = aRowSet[index].vSize = 0;
+			} //for
+		} else { // calculate size for * and recalculate their sizes
+
+
+			var iStarSize = Math.floor(iRem / iHStars);
+
+			for(var i=0; i < aStarIndex.length; i++){
+				var index = aStarIndex[i];
+				var iSize = aRowSet[index].iSize * iStarSize;
+
+
+				aRowSet[index].rSize = aRowSet[index].vSize = iSize;
+			}
+			iRem -= iStarSize * iHStars;
+			if( iRem > 0){ //save a remain
+				aRowSet[ iLastNotFixedRow].rSize += iRem;
+			}
+		}
+		var coef = this.VIRTUAL_SIZE / iNotFixed;
+		for (var i=0; i < iRowCount; i++) {
+			if (aRowSet[i]) {
+				if (!aRowSet[i].bFixed) {//recalculate virtual sizes
+					aRowSet[i].vSize *= coef;
+				}
+			}
+		}
+	}
+
+	//========= create splitters
+	var iNTotalCols = iColCount * 2 - 1; // number of columns and vertical splitters
+	var iNTotalRows = iRowCount * 2 - 1; // number of rows and horizontal splitters
+	var oDiv = null;
+	var aColSplitters = [];
+	var aRowSplitters = [];
+	var iCurCol;
+	var iCurRow = -1;
+
+	for(var i = 0; i < iNTotalRows; i++) {
+		var bRowSplitter = (i % 2 == 1); //row splitter?
+		offsetX = 0;
+		var curH;
+		if( bRowSplitter){
+			curH = iSplitterSize + 'px';
+			aRowSplitters[iCurRow] = [];
+		} else {
+			iCurRow++;
+			if (aRowSet[iCurRow]) {
+				curH = aRowSet[iCurRow].rSize + 'px';
+			}
+		}
+		iCurCol = -1;
+		for(var j = 0; j < iNTotalCols; j++) {
+			var oStyle, oChild;
+			var bColSplitter = (j % 2 == 1); // column splitter?
+			var curW;
+			if( bColSplitter) {
+				curW = iSplitterSize + 'px';
+			} else {
+				iCurCol++;
+				if (aColSet[iCurCol]) {
+					curW = aColSet[iCurCol].rSize + 'px';
+				}
+			}
+			var iType = (bRowSplitter ? 1 : 0) + (bColSplitter ? 2 : 0);
+
+			if( iType){ //common splitter routine
+				oDiv = document.createElement('div');
+				if( bSplitter){
+					oDiv.setAttribute('splitter', iType);
+					oDiv.style.cursor = this.CURSORS[iType];
+				}
+				bb.html.addClass( oDiv, 'btl-splitter');
+				oStyle = oDiv.style;
+				oStyle.position = 'absolute';
+				oStyle.left = '0';
+				oStyle.top =  '0';
+				oStyle.height = curH;
+				oStyle.width = curW;
+				oPanelSet.viewNode.appendChild( oDiv); // appendChild - in order to be above panels
+				switch( iType) {
+					case 1: // row splitter
+						bb.html.addClass( oDiv, 'btl-row-splitter');
+						oDiv.setAttribute('panelAbove', iCurRow);
+						aRowSplitters[iCurRow][ j] = oDiv;
+						break;
+					case 2: // column splitter
+						bb.html.addClass( oDiv, 'btl-col-splitter');
+						oDiv.setAttribute('panelLeft', iCurCol);
+						if( !i) aColSplitters[ iCurCol] = [];
+						aColSplitters[ iCurCol][ i] = oDiv;
+						break;
+					case 3: // 4 cross splitter
+						bb.html.addClass( oDiv, 'btl-cross-splitter');
+						oDiv.setAttribute('panelAbove', iCurRow);
+						oDiv.setAttribute('panelLeft', iCurCol);
+						aColSplitters[ iCurCol][ i] = oDiv;
+						aRowSplitters[iCurRow][ j] = oDiv;
+						break;
+				} //switch
+			}//if iType
+		}//for( j
+	} //for( i
+
+	var oMainBox = bb.html.getBoxObject(oPanelSet.viewNode, 'content');
+
+	var iStartX = 0, iStartY = 0;
+	var sPos = bb.html.getStyle( oPanelSet.viewNode, 'position');
+	if(sPos == 'absolute' || sPos == 'relative'){
+		// nothing
+	} else {
+		if( !bb.browser.ie && oPanelSet.viewNode.offsetParent){
+			sPos = bb.html.getStyle( oPanelSet.viewNode.offsetParent, 'position');
+			if(sPos == 'absolute' || sPos == 'relative'){
+				var oCoorBox = bb.html.getBoxObject( oPanelSet.viewNode.offsetParent, 'border');
+				iStartX = oMainBox.left - oCoorBox.left;
+				if( iStartX < 0) iStartX = 0;
+				iStartY = oMainBox.top - oCoorBox.top;
+				if( iStartY < 0) iStartY = 0;
+			} else {
+				iStartX = oMainBox.left;
+				iStartY = oMainBox.top;
+			}
+		}
+	}
+
+	var oInfo = {
+						'aRowSplitters'    : aRowSplitters,
+						'aColSplitters'    : aColSplitters,
+						'aRowSet'          : aRowSet,
+						'aColSet'          : aColSet,
+						'oBox'             : oMainBox,
+						'bIsPanelSet'      : true,
+						'oFixBox'          : {},
+						'bSplitter'        : bSplitter, // if panels resizable
+						'iSplitterSize'    : iSplitterSize,
+						'iLastNotFixedRow' : iLastNotFixedRow,
+						'iLastNotFixedCol' : iLastNotFixedCol,
+						'iFixedWidth'      : iFixedWidth, //size of fixed content - fixed columns and splitters
+						'iFixedHeight'     : iFixedHeight,
+						'iStartX'          : iStartX,
+						'iStartY'          : iStartY,
+						'virtHeightAdd'    : 0,		// virtual height change
+						'virtWidthAdd'     : 0		// virtual width change
+					};
+	oPanelSet.__info = oInfo;
+
+	oPanelSet.setProperty('initialized', true);
+	btl.panelSet.repaint(oPanelSet); // no kids
+};
+
+btl.panelSet.repaint = function btl_panelSet_repaint(oPanelSet){
+
+	var oParent = oPanelSet.getProperty('parentNode');
+	if(!oPanelSet || (oPanelSet.getAttribute('fullScreen') != 'true' && oParent && (oParent.viewGate.offsetWidth < 1 || oParent.viewGate.offsetHeight < 1))){
+		// no use to repaint if panelSet not visible
+		return;
+	}
+
+ 	var oInfo = oPanelSet.__info;
+	var iSplitterSize = oInfo.iSplitterSize;
+
+	var aChildren = oPanelSet.getProperty('children');
+	var oMainBox = bb.html.getBoxObject(oPanelSet.viewNode, 'content');
+	if( oMainBox.height < iSplitterSize) oMainBox.height = iSplitterSize;
+	if( oMainBox.width < iSplitterSize) oMainBox.width = iSplitterSize;
+	if( oMainBox.height <= 0 || oMainBox.width <= 0) return;
+
+	var oFixBox = bb.html.getBoxObject(oPanelSet.viewNode, 'border'); // size of padding and border for childs offset
+
+	var iStartX = oInfo.iStartX;
+	var iStartY = oInfo.iStartY;
+
+	oFixBox.left = oMainBox.left - oFixBox.left;
+	oFixBox.top = oMainBox.top - oFixBox.top;
+	oFixBox.width -= oMainBox.width + oFixBox.left;
+	oFixBox.height -= oMainBox.height + oFixBox.top;
+
+	//resize proportionally
+	// on minimize - hide not fixed parts, then reduce and hide fixed parts
+
+	var iAvailHeight = oMainBox.height;
+	var iNewNotFixedHeight = iAvailHeight;
+
+	var iNRows = oInfo.aRowSet.length;
+	var iNCols = oInfo.aColSet.length;
+
+	var offsetY = iStartY;
+
+	var iNTotalCols = iNCols * 2 - 1; // number of columns and vertical splitters
+	var iNTotalRows = iNRows * 2 - 1; // number of rows and horizontal splitters
+
+
+	//recalculate real row height from virtual
+	var iPix = 0; //additional pixels
+	var iLastRow = -1;
+	var aHeights = [], iStarTotal = 0;
+
+	function saveRowSize( index, iSize){//side effect - changing iAvailHeight & iLastRow
+		if( iSize == aHeights[index*2] + aHeights[index*2+1]) return;
+		if( index*2+1 < aHeights.length)
+			iAvailHeight += aHeights[index*2] + aHeights[index*2+1];//update existing sizes
+
+		if( iSize <= iAvailHeight)
+			iAvailHeight -= iSize;
+		else {
+			iSize = iAvailHeight;
+			iAvailHeight = 0;
+		}
+		//splitters
+		if( iSize){
+			iLastRow = index;
+			aHeights[index*2] = index < iNRows - 1 ? iSize - iSplitterSize : iSize; // for the last column
+			aHeights[index*2+1] = iSplitterSize;
+		}else {
+			aHeights[index*2] = 0;
+			if( !index && iNRows > 1) //the first splitter can't be hidden
+				iAvailHeight -= (aHeights[index*2+1] = iSplitterSize);
+			else
+				aHeights[index*2+1] = 0;
+		}
+	}//function saveRowSize
+
+
+
+	for (var i = 0; i < iNRows; i++){
+		if (oInfo.aRowSet[i]) {
+			var iSize = oInfo.aRowSet[i].bFixed ? oInfo.aRowSet[i].rSize : 0;
+			if (iSize < iSplitterSize) {
+				iSize += iPix;
+				iPix = 0;
+			}
+			if (iSize < iSplitterSize) {
+				iSize = 0;
+				iPix += iSize;
+			}
+			saveRowSize(i, iSize);
+		}
+	}
+
+	// now iAvailHeight - is new not fixed height
+	var iNewNotFixedHeight = iAvailHeight;
+	oInfo.iFixedHeight = oMainBox.height - iAvailHeight;
+
+	//not fixed columns
+	if( iAvailHeight > 0){
+		var HCoef = (this.VIRTUAL_SIZE + oInfo.virtHeightAdd) <= 0 ? 0 : (iNewNotFixedHeight / (this.VIRTUAL_SIZE + oInfo.virtHeightAdd));
+		//not empty
+		iPix = 0; //additional pixels
+		for (var i = 0; i < iNRows; i++) {
+			if (oInfo.aRowSet[i]) {
+				if (!oInfo.aRowSet[i].bFixed) {
+					if (oInfo.aRowSet[i].bStar) {
+						iStarTotal += oInfo.aRowSet[i].iSize;
+					}
+					var iSize = Math.floor(oInfo.aRowSet[i].vSize * HCoef);
+					if (iSize < iSplitterSize) {
+						iSize += iPix;
+						iPix = 0;
+					}
+					if (iSize < iSplitterSize) {
+						iSize = 0;
+						iPix += iSize;
+					}
+					oInfo.aRowSet[i].rSize = iSize;
+					if (iSize) {
+						saveRowSize(i, iSize);
+					}
+				}
+			}
+		}
+
+		if( iAvailHeight > 0 && iStarTotal){ //still there is a space - used for hidden not fixed panels
+			var fExtraUnit = iAvailHeight / iStarTotal;
+			for (var i = 0; i < iNRows; i++) {
+				if (oInfo.aRowSet[i]) {
+					if (oInfo.aRowSet[i].bStar){
+						var iSize = aHeights[i*2+1] + oInfo.aRowSet[i].rSize + Math.floor(oInfo.aRowSet[i].iSize * fExtraUnit);
+						if (iSize < iSplitterSize) {
+							iSize += iPix;
+							iPix = 0;
+						}
+						if (iSize < iSplitterSize) {
+							iSize = 0;
+							iPix += iSize;
+						}
+						oInfo.aRowSet[i].rSize = iSize;
+						if (iSize) {
+							saveRowSize( i, iSize);
+						}
+					}
+				}
+			}
+		}
+		if (iAvailHeight > 0){//last try - any column
+			if (iLastRow < 0) {
+				iLastRow = iNRows - 1;
+			}
+			oInfo.aRowSet[iLastRow].rSize += iAvailHeight;
+			aHeights[iLastRow*2] += iAvailHeight;
+		}
+	}
+
+	var aTops = [0];
+	for(var i = 0; i < iNTotalRows; i++)
+		aTops[i+1] = aTops[i] + aHeights[i];
+	//------------------------------- columns ---------------
+	//recalculate real column width from virtual
+	var iAvailWidth = oMainBox.width;
+	var aWidths = [], iStarTotal=0, iLastCol=-1;
+	//fixed columns
+	function saveColSize( index, iSize){//side effect - changing iAvailWidth & iLastCol
+		if( iSize == aWidths[index*2] + aWidths[index*2+1]) return;
+		if( index*2+1 < aWidths.length){
+			iAvailWidth += aWidths[index*2] + aWidths[index*2+1];//update existing sizes
+		}
+
+		if( iSize <= iAvailWidth)
+			iAvailWidth -= iSize;
+		else {
+			iSize = iAvailWidth;
+			iAvailWidth = 0;
+		}
+		//splitters
+		if( iSize){
+			iLastCol = index;
+			aWidths[index*2] = index < iNCols - 1 ? iSize - iSplitterSize : iSize; // for the last column
+			aWidths[index*2+1] = iSplitterSize;
+		}else {
+			aWidths[index*2] = 0;
+			if( !index && iNCols > 1) //the first splitter can't be hidden
+				iAvailWidth -= (aWidths[index*2+1] = iSplitterSize);
+			else
+				aWidths[index*2+1] = 0;
+		}
+	}//function saveColSize
+
+	for(var i = 0; i < iNCols; i++){
+		var iSize = oInfo.aColSet[i].bFixed ? oInfo.aColSet[i].rSize : 0;
+		if( iSize < iSplitterSize) { iSize += iPix; iPix = 0;}
+		if( iSize < iSplitterSize) { iSize = 0; iPix += iSize;}
+		saveColSize( i, iSize);
+	}
+	// now iAvailWidth - is new not fixed width
+	var iNewNotFixedWidth = iAvailWidth;
+	oInfo.iFixedWidth = oMainBox.width - iAvailWidth;
+	//not fixed columns
+	if( iAvailWidth > 0){
+		var WCoef = (this.VIRTUAL_SIZE + oInfo.virtWidthAdd) <= 0 ? 0 : (iNewNotFixedWidth/ (this.VIRTUAL_SIZE + oInfo.virtWidthAdd));
+
+		//not empty
+		iPix = 0; //additional pixels
+		for(var i = 0; i < iNCols; i++)
+			if( !oInfo.aColSet[i].bFixed){
+				if( oInfo.aColSet[i].bStar) iStarTotal += oInfo.aColSet[i].iSize;
+				var iSize = Math.floor( oInfo.aColSet[i].vSize * WCoef);
+				if( iSize < iSplitterSize) { iSize += iPix; iPix = 0;}
+				if( iSize < iSplitterSize) { iSize = 0; iPix += iSize;}
+				oInfo.aColSet[i].rSize = iSize;
+				if(iSize) saveColSize( i, iSize);
+			}
+		if( iAvailWidth > 0 && iStarTotal){ //still there is a space - used for hidden not fixed panels
+			var fExtraUnit = iAvailWidth / iStarTotal;
+			for(var i = 0; i < iNCols; i++)
+				if( oInfo.aColSet[i].bStar){
+					var iSize = aWidths[i*2+1] + oInfo.aColSet[i].rSize + Math.floor( oInfo.aColSet[i].iSize * fExtraUnit);
+					if( iSize < iSplitterSize) { iSize += iPix; iPix = 0;}
+					if( iSize < iSplitterSize) { iSize = 0; iPix += iSize;}
+					oInfo.aColSet[i].rSize = iSize;
+					if(iSize) saveColSize( i, iSize);
+				}
+		}
+		if( iAvailWidth > 0){//last try - any column
+			if( iLastCol < 0) iLastCol = iNCols - 1;
+			oInfo.aColSet[iLastCol].rSize += iAvailWidth;
+			aWidths[iLastCol*2] += iAvailWidth;
+		}
+	}
+	var aLefts = [0];
+	for(var i = 0; i < iNTotalCols; i++){
+		aLefts[i+1] = aLefts[i] + aWidths[i];
+	}
+
+	// output panels and splitters
+	var aColSplitters = oInfo.aColSplitters;
+	var aRowSplitters = oInfo.aRowSplitters;
+	var iCurRow = 0;
+	 var iChildIndex = 0;
+
+	for(var i = 0; i < iNTotalRows; i++) {
+		var bRowSplitter = (i % 2 == 1); //row splitter?
+
+		var iCurCol = 0;
+		var oStyle;
+		for(var j = 0; j < iNTotalCols; j++) {
+			var bColSplitter = (j % 2 == 1); // column splitter?
+
+			var iType = (bRowSplitter ? 1 : 0) + (bColSplitter ? 2 : 0);
+			switch( iType) {
+				case 0: // panel | panelSet
+					oChild = aChildren[ iChildIndex++];
+					oStyle =  oChild.viewNode.style;
+					break;
+				case 1: // row splitter
+					oStyle = aRowSplitters[ iCurRow][j].style;
+					break;
+				case 2: // column splitter
+					oStyle = aColSplitters[ iCurCol][i].style;
+					break;
+				case 3: // 4 cross splitter
+					oStyle = aRowSplitters[ iCurRow][j].style;
+					break;
+			} //switch
+
+			var bVisible = (aWidths[j] * aHeights[i] != 0);
+			oStyle.display = bVisible ? '' : 'none';
+			oStyle.left = (iStartX + aLefts[j]) + 'px';
+			oStyle.top = offsetY + 'px';
+			oStyle.width = aWidths[j] + 'px';
+			oStyle.height = aHeights[i] + 'px';
+			if(bColSplitter){
+				iCurCol++;
+			}
+
+			if( !iType && bVisible){
+				if( oChild.__info && oChild.__info.bIsPanelSet){ //resize internal panelSets
+					btl.panelSet.repaint( oChild, false, true);
+				} else {
+					bb.ui.reflow( oChild, false, true ); //send reflow to all panel children
+				}
+			}
+		}
+		offsetY += aHeights[i];
+
+		if(bRowSplitter){
+			iCurRow++;
+		}
+	}
+
+	 oInfo.oBox = oMainBox;
+	oInfo.oFixBox = oFixBox;
+	oInfo.aTops = aTops;
+	oInfo.aLefts = aLefts;
+	oInfo.aHeights = aHeights;
+	oInfo.aWidths = aWidths;
+};
+
+//========================================= btl.panelSet.defaultMouseOut ==========
+btl.panelSet.defaultMouseOut = function panelSet_defaultMouseOut( event){
+	if( btl.panelSet.oResize.mode == btl.panelSet.MODE_RESIZE)
+		btl.panelSet.resizeMouseMove( event);
+};
+
+//========================================= btl.panelSet.defaultMouseDown ==========
+btl.panelSet.defaultMouseDown = function defaultMouseDown( event){
+	this.oResize.type = event.viewTarget.getAttribute('splitter')*1;
+	if( this.oResize.type && this.oResize.mode != this.MODE_RESIZE){ // start resize
+		this.oResize.mode = this.MODE_RESIZE;
+		bb.html.disableUserSelect( document.body);
+
+		bb.document.addEventListener('mouseup', this.resizeMouseUp, false);
+		bb.document.addEventListener('mousemove', this.resizeMouseMove, false);
+		event.currentTarget.addEventListener('mouseout', this.defaultMouseOut,false);
+
+		this.oResize.currentElement = event.currentTarget;
+		this.oResize.aChildren = event.currentTarget.getProperty('children');
+		this.oResize.bWResized = false;
+		this.oResize.bHResized = false;
+		var oViewNode = event.viewTarget;
+		var oBox = bb.html.getBoxObject( oViewNode, 'border');
+		var iFix = 0;
+		var oMainBox = bb.html.getBoxObject( event.currentTarget.viewNode, 'content');
+		event.currentTarget.__info.oBox = oMainBox;
+
+		this.oResize.bHJustStarted = true;
+		if( this.oResize.type & this.RESIZE_VERTICAL){ // =
+			this.oResize.oldEventY = event.clientY;
+			this.oResize.iRowAbove = event.viewTarget.getAttribute('panelAbove')*1;
+			if( !bb.browser.ie && oViewNode.offsetParent){
+				sPos = bb.html.getStyle( oViewNode.offsetParent, 'position');
+				if(sPos == 'absolute' || sPos == 'relative'){
+					iFix = parseInt(bb.html.getStyle( oViewNode.offsetParent, 'border-top-width'));
+				}
+			}
+			this.oResize.iResizeStartY = oBox.top - oMainBox.top - iFix;
+			if( this.oResize.iResizeStartY < 0) this.oResize.iResizeStartY = 0;
+			this.oResize.iTop = oBox.top;
+			this.oResize.iNewY = oBox.top;
+		}
+		iFix = 0;
+		this.oResize.bWJustStarted = true;
+		if( this.oResize.type & this.RESIZE_HORIZONTAL){ // ||
+			this.oResize.oldEventX = event.clientX;
+			this.oResize.iColLeft = event.viewTarget.getAttribute('panelLeft')*1;
+			if( !bb.browser.ie && oViewNode.offsetParent){
+				sPos = bb.html.getStyle( oViewNode.offsetParent, 'position');
+				if(sPos == 'absolute' || sPos == 'relative'){
+					iFix = parseInt(bb.html.getStyle( oViewNode.offsetParent, 'border-left-width'));
+				}
+			}
+			this.oResize.iResizeStartX = oBox.left - oMainBox.left - iFix;
+			if( this.oResize.iResizeStartX < 0) this.oResize.iResizeStartX = 0;
+			this.oResize.iLeft = oBox.left;
+			this.oResize.iNewX = oBox.left;
+		}
+		this.oResize.oConstraint = oMainBox;
+		this.oResize.iSplitterSize = event.currentTarget.__info.iSplitterSize;
+	}
+};
+
+//========================================= btl.panelSet.resizeMouseMove ==========
+btl.panelSet.resizeMouseMove = function panelSet_resizeMouseMove( event){
+	var oResize = btl.panelSet.oResize;
+	if( oResize.mode == btl.panelSet.MODE_RESIZE){
+		var oInfo = oResize.currentElement.__info;
+		var iSplitterSize = oInfo.iSplitterSize;
+		var oCoord = oInfo.oBox;
+		var oFixBox = oInfo.oFixBox;
+		var iNCols = oInfo.aColSet.length;
+		var iNRows = oInfo.aRowSet.length;
+		var iStartX = oInfo.iStartX;
+		var iStartY = oInfo.iStartY;
+		var iNTotalCols = iNCols * 2 - 1; // number of columns and vertical splitters
+		var iNTotalRows = iNRows * 2 - 1; // number of rows and horizontal splitters
+		var oStyle, bInitialPatch = false;
+		//vertical resizing
+		if( oResize.type & btl.panelSet.RESIZE_VERTICAL) { // && ((!oResize.bHJustStarted || Math.abs( event.clientY - oResize.oldEventY) > 3))){ // =
+			var iDelta = event.clientY - oResize.oldEventY;
+			if( oResize.bHJustStarted && Math.abs( iDelta) > 3) {
+				oResize.bHJustStarted = false;
+				bInitialPatch = true;
+
+				var iRow = oResize.iRowAbove;
+				var bCanUp = (oInfo.aHeights[ iRow*2] > 0);
+				if( bCanUp && (iDelta < 0)){ // direction of moving - up
+					//do nothing
+				} else { // may be down?
+					for(var i = iRow + 1; i < oInfo.aRowSet.length; i++ ){
+						if( oInfo.aHeights[ i*2] > 0) break;
+					}
+					var bCanDown = (i != oInfo.aRowSet.length);
+					if( bCanDown && (!bCanUp || (iDelta > 0))) // if can down but can't up or mouse was moved down
+						iRow = i - 1;
+					//else up
+				}
+				oResize.iRowAbove = iRow;
+				var i = iRow * 2;
+				oResize.iRowAboveTop = oCoord.top + oInfo.aTops[i] - ( i ? oInfo.aHeights[i - 1] : 0);
+				oResize.bBelowIsLast = (iRow + 2 == iNRows);
+				oResize.iMaxY = oResize.iRowAboveTop + ( i ? oInfo.aHeights[i - 1] : 0) + oInfo.aHeights[i] + oInfo.aHeights[i + 1]
+								+ oInfo.aHeights[i + 2]  - ( oResize.bBelowIsLast ? iSplitterSize : 0);
+			} //if just started
+		}
+		if( oResize.type & btl.panelSet.RESIZE_HORIZONTAL) {
+			var iDelta = event.clientX - oResize.oldEventX;
+			if( oResize.bWJustStarted && Math.abs( iDelta) > 3) {
+				oResize.bWJustStarted = false;
+				bInitialPatch = true;
+
+				var iCol = oResize.iColLeft;
+				var bCanLeft = (oInfo.aWidths[ iCol*2] > 0);
+				if( bCanLeft && (iDelta < 0)){ // direction of moving - left
+					//do nothing
+				} else { // may be right?
+					for(var i = iCol + 1; i < oInfo.aColSet.length; i++ ){
+						if( oInfo.aWidths[ i*2] > 0) break;
+					}
+					var bCanRight = (i != oInfo.aColSet.length);
+					if( bCanRight && (!bCanLeft || (iDelta > 0))) // if can right but can't left or mouse was moved right
+						iCol = i - 1;
+					//else left
+				}
+				oResize.iColLeft = iCol;
+				var i = iCol * 2;
+				oResize.iColLeftX = oCoord.left + oInfo.aLefts[i] - (i ? oInfo.aWidths[i - 1] : 0);
+				oResize.bRightIsLast = (iCol + 2 == iNCols);
+				oResize.iMaxX = oResize.iColLeftX + (i ? oInfo.aWidths[i - 1] : 0) + oInfo.aWidths[i] + oInfo.aWidths[i + 1]
+								+ oInfo.aWidths[i + 2] - (oResize.bRightIsLast ? iSplitterSize : 0);
+			} //if just started
+		}
+		if( bInitialPatch)
+			btl.panelSet.positionCursorPatch( event.clientX + bb.viewport.scrollLeft, event.clientY + bb.viewport.scrollTop,
+				btl.panelSet.CURSORS[btl.panelSet.oResize.type]);
+
+		if( !oResize.bHJustStarted || !oResize.bWJustStarted)
+			// NOTE: some browsers (like Safari and Opera) capture also "outwindow"
+			// mouse moves producing negative coordinates; from the other hand
+			// undocumented btl.panelSet.positionCursorPatch method recognizes
+			// negative values as a flag to hide cursor which is not desirable
+			// behavior (bug 9752); so I'm temporarily putting this check for
+			// negative coordinates to prevent this, relying on the thing that
+			// on resize (muse move) cursor should never disappear.
+			btl.panelSet.positionCursorPatch(
+				(event.clientX < 0 ? 0 : event.clientX-Math.round(iSplitterSize/2)) + bb.viewport.scrollLeft,
+				(event.clientY < 0 ? 0 : event.clientY-Math.round(iSplitterSize/2)) + bb.viewport.scrollTop
+			);
+		event.preventDefault();
+	}
+}
+
+//========================================= btl.panelSet.resizeMouseUp ==========
+btl.panelSet.resizeMouseUp = function panelSet_resizeMouseUp( event){
+	var oResize = btl.panelSet.oResize;
+	if( oResize.mode == btl.panelSet.MODE_RESIZE){
+		oResize.currentElement.removeEventListener('mouseout', btl.panelSet.defaultMouseOut, false)
+		bb.document.removeEventListener('mousemove', btl.panelSet.resizeMouseMove, false);
+		bb.document.removeEventListener('mouseup', btl.panelSet.resizeMouseUp, false);
+
+		var oInfo = oResize.currentElement.__info;
+		var iSplitterSize = oInfo.iSplitterSize;
+		var bResized = false;
+		if( oResize.bHJustStarted === false){ // now resize
+			bResized = true;
+			var iRowAbove = oResize.iRowAbove;
+			var i = iRowAbove * 2;
+			var iOldAboveHeight = oInfo.aHeights[i];
+			var iOldBelowHeight = oInfo.aHeights[i+2] + (oResize.bBelowIsLast ? 0 : oInfo.aHeights[i + 3]);
+
+			var iDelta = oResize.iNewY - oResize.iTop - (iRowAbove && !iOldAboveHeight ? iSplitterSize : 0);
+			var iOldFullHeight = iOldAboveHeight + oInfo.aHeights[i + 1] + iOldBelowHeight;
+
+			var iAboveNewHeight = iOldAboveHeight + iDelta;
+			if( iAboveNewHeight < 0) iAboveNewHeight = 0;
+			if( !iRowAbove || iAboveNewHeight > 0) iAboveNewHeight += iSplitterSize;
+			var iBelowNewHeight = iOldFullHeight - iAboveNewHeight;
+			var aRowSet = oInfo.aRowSet;
+			var bRowChanges = ( aRowSet[ iRowAbove].bFixed ? 1 : 0) +
+								( aRowSet[ iRowAbove + 1].bFixed ? 2 : 0);
+
+			if( !bRowChanges) { //non fixed rows, fixed height is not changed
+				var iTotal = aRowSet[ iRowAbove].vSize + aRowSet[ iRowAbove+1].vSize;
+				var Coef = iAboveNewHeight / (iAboveNewHeight + iBelowNewHeight);
+
+				aRowSet[ iRowAbove].vSize = Math.floor( iTotal * Coef);
+				aRowSet[ iRowAbove+1].vSize = iTotal - aRowSet[ iRowAbove].vSize;
+			} else if(bRowChanges < 3) { //one fixed row, most difficult
+				//how many % of VSpace iDelta is?
+				var virtNewHeight;
+				if( bRowChanges & 1) { //above is fixed
+					if(btl.panelSet.VIRTUAL_SIZE + oInfo.virtHeightAdd <= 0 || oInfo.oBox.height == oInfo.iFixedHeight){
+						virtNewHeight = btl.panelSet.VIRTUAL_SIZE;
+					} else
+						virtNewHeight = iBelowNewHeight * (btl.panelSet.VIRTUAL_SIZE + oInfo.virtHeightAdd)/ (oInfo.oBox.height - oInfo.iFixedHeight);
+					oInfo.iFixedHeight -= iOldAboveHeight + oInfo.aHeights[i+1] - iAboveNewHeight;
+					aRowSet[ iRowAbove].rSize = iAboveNewHeight;
+
+					oInfo.virtHeightAdd -= aRowSet[ iRowAbove+1].vSize - virtNewHeight;
+					aRowSet[ iRowAbove+1].vSize = virtNewHeight;
+				} else { //below is fixed
+					if(btl.panelSet.VIRTUAL_SIZE + oInfo.virtHeightAdd <= 0 || oInfo.oBox.height == oInfo.iFixedHeight){
+						virtNewHeight = btl.panelSet.VIRTUAL_SIZE;
+					} else
+						virtNewHeight = iAboveNewHeight * (btl.panelSet.VIRTUAL_SIZE + oInfo.virtHeightAdd)/ (oInfo.oBox.height - oInfo.iFixedHeight);
+					oInfo.iFixedHeight -= iOldBelowHeight - iBelowNewHeight;
+					aRowSet[ iRowAbove + 1].rSize = iBelowNewHeight;
+
+					oInfo.virtHeightAdd -= aRowSet[ iRowAbove].vSize - virtNewHeight;
+					aRowSet[ iRowAbove].vSize = virtNewHeight;
+				}
+			} else { //both rows are fixed
+				aRowSet[ iRowAbove].rSize = iAboveNewHeight;
+				aRowSet[ iRowAbove+1].rSize = iBelowNewHeight;
+			}
+		} //if( !oResize.bHJustStarted)
+		if( oResize.bWJustStarted === false){ // now resize
+			bResized = true;
+			var iColLeft = oResize.iColLeft;
+			var i = iColLeft * 2;
+			var iOldLeftWidth = oInfo.aWidths[i];
+			var iOldRightWidth = oInfo.aWidths[i+2] + (oResize.bRightIsLast ? 0 : oInfo.aWidths[i + 3]);
+
+			var iDelta = oResize.iNewX - oResize.iLeft - (iColLeft && !iOldLeftWidth ? iSplitterSize : 0);
+			var iOldFullWidth = iOldLeftWidth + oInfo.aWidths[i + 1] + iOldRightWidth;
+
+			var iLeftNewWidth = iOldLeftWidth + iDelta;
+			if( iLeftNewWidth < 0) iLeftNewWidth = 0;
+			if( !iColLeft || iLeftNewWidth > 0) iLeftNewWidth += iSplitterSize;
+			var iRightNewWidth = iOldFullWidth - iLeftNewWidth;
+			var aColSet = oInfo.aColSet;
+			var bColChanges = ( aColSet[ iColLeft].bFixed ? 1 : 0) +
+								( aColSet[ iColLeft + 1].bFixed ? 2 : 0);
+
+			if( !bColChanges) { //non fixed cols, fixed width is not changed
+				var iTotal = aColSet[ iColLeft].vSize + aColSet[ iColLeft+1].vSize;
+				var Coef = iLeftNewWidth / (iLeftNewWidth + iRightNewWidth);
+
+				aColSet[ iColLeft].vSize = Math.floor( iTotal * Coef);
+				aColSet[ iColLeft+1].vSize = iTotal - aColSet[ iColLeft].vSize;
+			} else if(bColChanges < 3) { //one fixed row, most difficult
+				//how many % of VSpace iDelta is?
+				var virtNewWidth;
+				if( bColChanges & 1) { //Left is fixed
+					if(btl.panelSet.VIRTUAL_SIZE + oInfo.virtWidthAdd <= 0 || oInfo.oBox.width == oInfo.iFixedWidth){
+						virtNewWidth = btl.panelSet.VIRTUAL_SIZE;
+					} else {
+						virtNewWidth = (iRightNewWidth + (iRightNewWidth ? iSplitterSize : 0)) * (btl.panelSet.VIRTUAL_SIZE + oInfo.virtWidthAdd)/ (oInfo.oBox.width - oInfo.iFixedWidth);
+					}
+					oInfo.iFixedWidth -= iOldLeftWidth + oInfo.aWidths[i+1] - iLeftNewWidth + (iLeftNewWidth ? iSplitterSize : 0)
+					aColSet[ iColLeft].rSize = iLeftNewWidth;
+
+					oInfo.virtWidthAdd -= aColSet[ iColLeft+1].vSize - virtNewWidth;
+					aColSet[ iColLeft+1].vSize = virtNewWidth;
+				} else { //right is fixed
+					if(btl.panelSet.VIRTUAL_SIZE + oInfo.virtWidthAdd <= 0 || oInfo.oBox.width == oInfo.iFixedWidth){
+						virtNewWidth = btl.panelSet.VIRTUAL_SIZE;
+					} else {
+						virtNewWidth = iLeftNewWidth * (btl.panelSet.VIRTUAL_SIZE + oInfo.virtWidthAdd)/ (oInfo.oBox.width - oInfo.iFixedWidth);
+					}
+					oInfo.iFixedWidth -= iOldRightWidth - iRightNewWidth;
+					aColSet[ iColLeft + 1].rSize = iRightNewWidth;
+
+					oInfo.virtWidthAdd -= aColSet[ iColLeft].vSize - virtNewWidth;
+					aColSet[ iColLeft].vSize = virtNewWidth;
+				}
+			} else { //both rows are fixed
+				aColSet[ iColLeft].rSize = iLeftNewWidth;
+				aColSet[ iColLeft+1].rSize = iRightNewWidth;
+			}
+		} //if( !oResize.bWJustStarted)
+		if(bResized){
+			btl.panelSet.repaint(oResize.currentElement);
+		}
+		btl.panelSet.hideCursor();
+		oResize.mode = 0;
+		oResize.type = 0;
+		bb.html.enableUserSelect(document.body);
+	}
+};
+
+//========================================= btl.panelSet.hideCursor ==========
+btl.panelSet.hideCursor = function panelSet_hideCursor(){
+			this.positionCursorPatch( -1000, -1000);
+};
+
+//===================================== btl.panelSet.positionCursorPatch ==========================================
+// Takes care of cursor visualization.
+btl.panelSet.positionCursorPatch = function panelSet_positionCursorPatch( iX, iY, sNewCursor){
+	var oPatch = this.oResize.cursor;
+
+	var oCoord = this.oResize.oConstraint;
+	if( sNewCursor){
+		if( bb.browser.opera){
+			oPatch.style.left = '-100px';
+			oPatch.style.top = '-100px';
+			this.oResize.iCursorPatch = ++this.oResize.iCursorPatch % 2;
+			this.oResize.cursor = this.oResize.cursorPatch[ this.oResize.iCursorPatch];
+			oPatch = this.oResize.cursor;
+		}
+		oPatch.style.cursor = sNewCursor;
+		oPatch.controller =	this.oResize.currentElement;
+
+		if( this.oResize.type & btl.panelSet.RESIZE_VERTICAL)
+			this.oResize.lineH.style.height = this.oResize.iSplitterSize + 'px';
+
+		this.oResize.lineV.style.width = this.oResize.iSplitterSize + 'px';
+		if (oCoord && (iX > 0)){
+
+			if( this.oResize.type & btl.panelSet.RESIZE_HORIZONTAL){
+				this.oResize.lineV.controller =	this.oResize.currentElement;
+				this.oResize.lineV.style.height = oCoord.height + 'px';
+				this.oResize.lineV.style.top = oCoord.top + 'px';
+				this.oResize.lineV.style.left = this.oResize.iLeft + 'px';
+			}
+
+			if( this.oResize.type & btl.panelSet.RESIZE_VERTICAL){
+				this.oResize.lineH.controller =	this.oResize.currentElement;
+				this.oResize.lineH.style.width = oCoord.width + 'px';
+				this.oResize.lineH.style.left = oCoord.left + 'px';
+				this.oResize.lineH.style.top = this.oResize.iTop + 'px';
+			}
+		}
+	}
+
+	var offsetX = oPatch.offsetWidth;
+	var offsetY = oPatch.offsetHeight;
+
+	var newX = iX - (offsetX / 2);
+	var newY = iY - (offsetY / 2);
+	if (oCoord && (newX >= 0)){
+		if( newX < oCoord.left) newX = oCoord.left;
+		else{
+			var iTemp = oCoord.left + oCoord.width - offsetX;
+			if( newX > iTemp) newX = iTemp;
+		}
+		if( newY < oCoord.top) newY = oCoord.top;
+		else {
+			var iTemp = oCoord.top + oCoord.height - offsetY;
+			if( newY > iTemp) newY = iTemp;
+		}
+	}
+	oPatch.style.left = newX + 'px';
+	oPatch.style.top = newY + 'px';
+
+	if (oCoord && (iX >= 0)){
+
+		if( !isNaN(this.oResize.iColLeftX)){
+			if( iX < this.oResize.iColLeftX) iX = this.oResize.iColLeftX;
+			else if( iX > this.oResize.iMaxX) iX = this.oResize.iMaxX;
+		}
+		if( !isNaN(this.oResize.iRowAboveTop)){
+			if( iY < this.oResize.iRowAboveTop) iY = this.oResize.iRowAboveTop;
+			else if( iY > this.oResize.iMaxY) iY = this.oResize.iMaxY;
+		}
+	}
+	if( 0 > iX || ((this.oResize.type & btl.panelSet.RESIZE_HORIZONTAL) && (this.oResize.bWJustStarted === false))){
+		this.oResize.iNewX = iX;
+		this.oResize.lineV.style.left = iX + 'px';
+	}
+
+	if( 0 > iY || ((this.oResize.type & btl.panelSet.RESIZE_VERTICAL) && (this.oResize.bHJustStarted === false))){
+		this.oResize.iNewY = iY;
+		this.oResize.lineH.style.top = iY + 'px';
+	}
+	if( 0 > iX) { // hide
+		this.oResize.lineV.style.height = '1px';
+		this.oResize.lineH.style.width = '1px';
+	}
+};
+]]></d:resource>
+			<d:resource type="text/css"><![CDATA[
+				.btl-panelSet,
+				.btl-panel,
+				.btl-panel-cursor,
+				.btl-panel-splitter-outline {
+					-moz-outline: none; /* to disable focus lines that cause unwanted scrollbars  */
+				}
+				.btl-panelSet {
+					position: relative;
+					height: 100%;
+					width: 100%;
+					padding: 0;
+					margin: 0;
+					overflow: hidden;
+				}
+				.btl-panelSet-fullScreen {
+					position: absolute;
+					right: 0;
+					bottom: 0;
+					top: 0;
+					left: 0;
+				}
+				.btl-panel {
+					position: absolute;
+					margin: 0;
+					overflow: auto;
+				}
+				.btl-panel-cursor {
+					position: absolute;
+					top: -1000px;
+					left: -1000px;
+					width: 100px;
+					height: 100px;
+					z-index: 10001;
+				}
+				.btl-panel-splitter-outline {
+					box-sizing: border-box;
+					-moz-box-sizing: border-box;
+					-khtml-box-sizing: border-box;
+					position: absolute;
+					top: -1000px;
+					left: -1000px;
+					z-index: 10000;
+					border:1px dotted #999;
+					font-size: 0;
+				}
+			]]></d:resource>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-panelSet"><d:content/></div>
+			</d:template>
+
+			<d:attribute name="rows">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					this.reset();
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="columns">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					this.reset();
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="fullScreen">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					if(btl.isTrueValue(name, value)){
+						bb.html.addClass(this.viewNode, 'btl-panelSet-fullScreen');
+					} else {
+						bb.html.removeClass(this.viewNode, 'btl-panelSet-fullScreen');
+					}
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="splitter">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					if( btl.isTrueValue('splitter', value) )
+						bb.html.addClass(this.viewNode, 'btl-panelSplitter')
+					else
+						bb.html.removeClass(this.viewNode, 'btl-panelSplitter')
+				]]></d:mapper>
+				<d:changer type="text/javascript"><![CDATA[
+					this.reset();
+				]]></d:changer>
+			</d:attribute>
+
+
+			<d:attribute name="splitterSize"><!-- Add default="5px" after 4.0 release -->
+				
+			</d:attribute>
+
+			<d:property name="children">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					var aChildren = [];
+					var aChildNodes = this.getProperty('childNodes');
+					for( var i = 0; i < aChildNodes.length; i++) {
+						if(  bb.instanceOf(aChildNodes[i], btl.namespaceURI, 'panelBase') || bb.instanceOf(aChildNodes[i], btl.namespaceURI, 'panelSetBase')  ){
+							aChildren[ aChildren.length] = aChildNodes[i];
+						}
+					}
+					return aChildren;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="initialized" onset="this._['_'+name] = value; if(value) { this.viewNode.style.visibility = ''; }">
+				
+			</d:property>
+
+			<d:method name="reset">
+				
+				<d:body type="text/javascript"><![CDATA[
+					btl.panelSet.initialize(this);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="repaint">
+				
+				<d:body type="text/javascript"><![CDATA[
+					btl.panelSet.repaint(this);
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="construct" type="text/javascript"><![CDATA[
+				bb.ui.reflow.add(this);
+			]]></d:handler>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				// ????
+				this.viewNode.style.visibility = 'hidden';
+				// fix for bug 8093 - this should be fixed in panelSetBase.js at some point (see bug 8475)
+				var oParent = this.getProperty('parentNode');
+				if(bb.instanceOf(oParent, btl.namespaceURI, 'panelSetBase')) {
+					this.viewNode.style.position = "absolute";
+				}
+			]]></d:handler>
+
+			<d:handler event="mousedown" type="text/javascript"><![CDATA[
+				if( btl.isTrueValue('splitter', this.getAttribute('splitter')))
+					btl.panelSet.defaultMouseDown( event);
+			]]></d:handler>
+
+			<d:handler event="reflow" type="text/javascript"><![CDATA[
+				if(this.getProperty('initialized')){
+					this.repaint();
+				} else {
+					// fix for bug 7033
+					var oParent = this.getProperty('parentNode');
+					if(!(this.getAttribute('fullScreen') == 'true') && oParent && (oParent.viewGate.offsetWidth < 1 || oParent.viewGate.offsetHeight < 1)) {
+						this.setAttribute('fullScreen', 'true');
+					}
+					// end of fix
+					this.reset();
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="panelBase" extends="b:containerElement" abstract="true">
+			
+		</d:element>
+	</d:namespace>
+</d:tdl>

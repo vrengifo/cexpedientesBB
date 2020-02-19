@@ -1,0 +1,1822 @@
+<?xml version="1.0" ?>
+<namespace name="http://www.backbase.com/2007/debugger" xmlns="http://www.backbase.com/2006/tdl">
+
+		<resource type="text/css" src="debugger.css" />
+
+		<resource type="text/javascript"><![CDATA[
+
+			bb.tooling.version = 1.1,
+			bb.tooling.namespaceURI = 'http://www.backbase.com/2007/debugger',
+			bb.tooling.net = {
+				logRequest: function(oRequest){
+					if(bb.array.indexOf(bb.tooling.net.aCachedRequests, oRequest) == -1 && oRequest._url.indexOf('tools/debugger') == -1 ){
+						bb.tooling.net.aCachedRequests.push(oRequest);
+					}
+				},
+				aCachedRequests: []
+			};
+
+			bb.tooling.currentContext = null;
+
+			if(!bb.tooling.data){
+				bb.tooling.data = bb.cookie.get('bb-debugger');
+				if(bb.tooling.data){
+					bb.tooling.data = eval('('+bb.tooling.data+')');
+				}
+			}
+			if(!bb.tooling.data || bb.tooling.data.version != bb.tooling.version){
+				bb.tooling.data = {
+					'window':
+					{
+						'style': {
+							'left': '100',
+							'top': '100',
+							'width': '600',
+							'height': '440'
+						},
+						'attributes': {
+							'open': 'false',
+							'maximized': 'false'
+						}
+					},
+					'preferences': {
+						'loadOnStartup': false,
+						'loadOnException': false,
+						'loadInside': 'backbase',
+						'useConsole': false,
+						'modelShowCore': true,
+						'modelShowExt': true,
+						'tdlShowCore': false,
+						'tdlShowExt': false
+					},
+					'category': 'model',
+					'categories':
+					{
+						'model':
+						{
+							'subCategory': 'dom'
+						}
+
+					},
+					'version': bb.tooling.version
+				};
+			}
+
+
+			//--------------------------
+			bb.tooling.init = function(root){
+			//--------------------------
+				JSONRequest.serialize({});
+
+				if( root.instanceOf('http://www.backbase.com/2006/btl', 'window') ){
+					document.body.appendChild(root.viewNode);
+
+					for(var i in bb.tooling.data.window.style){
+						if ( bb.tooling.data.window.style.hasOwnProperty( i ) )
+							root.viewNode.style[i] =  bb.tooling.data.window.style[i]+'px';
+
+					}
+					for(var i in bb.tooling.data.window.attributes){
+						if ( bb.tooling.data.window.attributes.hasOwnProperty( i ) )
+							root.setAttribute(i, bb.tooling.data.window.attributes[i]);
+					}
+					if(root.getAttribute('maximized') == 'true' || root.getAttribute('minimized') == 'true'){
+						root.setProperty('restoreCoordinates', bb.tooling.data.window.style);
+					}
+					bb.tooling.connect(window);
+				} else if ( window.opener ) {
+					bb.tooling.connect(window.opener);
+					//window.resizeTo(bb.tooling.data.window.style.width, bb.tooling.data.window.style.height);
+				}
+
+
+			};
+
+			//--------------------------
+			bb.tooling.exit = function(root){
+			//--------------------------
+				if( root.instanceOf('http://www.backbase.com/2006/btl', 'window') ){
+					var oSaved = bb.getProperty(root, 'restoreCoordinates');
+					if( !oSaved) oSaved = root.viewNode.style;
+
+					for(var i in bb.tooling.data.window.style){
+						if ( bb.tooling.data.window.style.hasOwnProperty( i ) )
+							bb.tooling.data.window.style[i] = parseInt(oSaved[i], 10);
+					}
+					for(var i in bb.tooling.data.window.attributes){
+						if ( bb.tooling.data.window.attributes.hasOwnProperty( i ) )
+							bb.tooling.data.window.attributes[i] = root.modelNode.getAttribute( i );
+					}
+				} else if ( window.opener ) {
+
+					bb.tooling.data.window.style.height = window.outerHeight || bb.viewport.offsetHeight;
+					bb.tooling.data.window.style.width = window.outerWidth || (bb.viewport.offsetWidth + 8);
+
+				}
+
+				var sData = JSONRequest.serialize(bb.tooling.data);
+
+				bb.cookie.set('bb-debugger', sData, 30);
+
+				bb.tooling.window.bb.tooling.notifyDebuggerEnded();
+
+				bb.tooling.disconnect(true);
+
+
+			};
+			//--------------------------
+			bb.tooling.connect = function(targetWindow) {
+			//--------------------------
+				//Reference to the window we are connecting to
+				if(!targetWindow.bb){
+					alert('Fatal error, trying to connect the Backbase Debugger to a window not containing a Backbase engine, using self as fallback');
+					targetWindow = window;
+				}
+
+				bb.tooling.window = targetWindow;
+
+				targetWindow.bb.console = bb.console;
+
+				if(bb.tooling.data.preferences.useConsole) {
+					targetWindow.console2 = window.console;
+					targetWindow.console = bb.console;
+				}
+
+				targetWindow.bb.tooling.net = bb.tooling.net;
+				targetWindow.bb.tooling.root = bb.tooling.root;
+				targetWindow.bb.tooling.switchTo = bb.tooling.switchTo;
+				targetWindow.bb.tooling.handlers = bb.tooling.handlers;
+				targetWindow.bb.tooling.disconnect = bb.tooling.disconnect;
+
+				targetWindow.bb.document.addEventListener('exception', 			targetWindow.bb.tooling.routeHandlers.documentException, 			false);
+				targetWindow.bb.document.addEventListener('DOMNodeInserted',	targetWindow.bb.tooling.routeHandlers.documentDOMNodeInserted,	false);
+				targetWindow.bb.document.addEventListener('DOMNodeRemoved', 	targetWindow.bb.tooling.routeHandlers.documentDOMNodeRemoved, 	false);
+				targetWindow.bb.document.addEventListener('DOMAttrModified',	targetWindow.bb.tooling.routeHandlers.documentDOMAttrModified, 	false);
+
+				bb.tooling.modelTree.repaint();
+				bb.tooling.viewTree.repaint();
+
+				targetWindow.bb.tooling.notifyDebuggerStarted();
+
+				//bb.tooling.notifyDebuggerStarted();
+				if ( !bb.tooling.root.instanceOf('http://www.backbase.com/2006/btl', 'window') ){
+					bb.html.setStyle(bb.tooling.root.viewNode, 'opacity', 1);
+					document.body.firstChild.style.display = 'none';
+				}
+			};
+			//--------------------------
+			bb.tooling.disconnect = function(bDestroy){
+			//--------------------------
+
+				bb.tooling.window.bb.document.removeEventListener('exception', 		bb.tooling.window.bb.tooling.routeHandlers.documentException, 			false);
+				bb.tooling.window.bb.document.removeEventListener('DOMNodeInserted',	bb.tooling.window.bb.tooling.routeHandlers.documentDOMNodeInserted,	false);
+				bb.tooling.window.bb.document.removeEventListener('DOMNodeRemoved', 	bb.tooling.window.bb.tooling.routeHandlers.documentDOMNodeRemoved, 	false);
+				bb.tooling.window.bb.document.removeEventListener('DOMAttrModified',	bb.tooling.window.bb.tooling.routeHandlers.documentDOMAttrModified, 	false);
+				bb.tooling.window.bb.tooling.net = null;
+				bb.tooling.window.bb.tooling.handlers = null;
+				bb.tooling.window.bb.console = null;
+				if(bb.tooling.data.preferences.useConsole) {
+					bb.tooling.window.console = bb.tooling.window.console2;
+					bb.tooling.window.console2 = null;
+				}
+
+				if(!bDestroy){
+					if ( !bb.tooling.root.instanceOf('http://www.backbase.com/2006/btl', 'window') ){
+						bb.html.setStyle(bb.tooling.root.viewNode, 'opacity', 0.5);
+						document.body.firstChild.style.display = '';
+					}
+
+					bb.tooling.modelTree.setProperty('selectedNode', null);
+					bb.tooling.modelTree._.openedTrees = null;
+
+					bb.tooling.viewTree.setProperty('selectedTree', null);
+					bb.tooling.viewTree.setProperty('selectedNode', null);
+					bb.tooling.viewTree._.openedTrees = null;
+
+					bb.tooling.tdlTree.cleanUpdate();
+
+					bb.tooling.net.logger.clear();
+
+					bb.console._log(['Inspecting window reloaded'], 'command');
+
+					bb.tooling.currentContext = null;
+
+					if (window.opener){
+
+						setTimeout(function(){
+
+							//If parent is closed, close!
+							if(!window.opener || window.opener.closed || bb.tooling.window.closed){
+								window.close();
+								return;
+							}
+							try{
+								if(window.opener && window.opener.bb && window.opener.bb.document){
+									bb.tooling.connect(window.opener);
+								} else
+									setTimeout( arguments.callee, 10);
+							}catch(e){
+								window.close();
+							}
+						},50);
+					}
+				}
+			};
+
+
+
+
+			bb.tooling.tree = {};
+
+			bb.tooling.tree.treeClone = document.createElement('div');
+			bb.tooling.tree.treeClone.className = 'tool-tree-item';
+
+			bb.tooling.tree.treeIconClone = document.createElement('div');
+			bb.tooling.tree.treeIconClone.className = 'tool-tree-icon';
+
+			bb.tooling.tree.treeLabelClone = document.createElement('div');
+			bb.tooling.tree.treeLabelClone.className = 'tool-tree-item-label';
+
+			//--------------------------
+			bb.tooling.enableDisable = function(controller, category, subcategory) {
+			//--------------------------
+				var bEnable = false;
+
+				if(category && bb.instanceOf(controller, bb.tooling.namespaceURI, 'iViewCategory') ){
+					var sTestCategory = bb.getProperty(controller, 'viewCategory');
+					bEnable = sTestCategory.indexOf(category) == -1;
+				}
+				if(!bEnable && subcategory && bb.instanceOf(controller, bb.tooling.namespaceURI, 'iViewSubCategory') ){
+					var sTestSubCategory = bb.getProperty(controller, 'viewSubCategory');
+					bEnable = sTestSubCategory.indexOf(subcategory) == -1;
+
+				}
+				bb.setProperty(controller, 'disabled', bEnable);
+				//console.info(controller.modelNode.nodeName+': '+category+', '+subcategory + ' - '+ sTestCategory+ ', '+sTestSubCategory + ' - is '+bEnable);
+			}
+
+			//--------------------------
+			bb.tooling.switchTo = function(category) {
+			//--------------------------
+				var oRootTab = bb.evaluateSmart('.//b:tab[@category="'+category+'"]', bb.tooling.root, bb.tooling.nsResolver);
+				if(oRootTab)
+					oRootTab.setAttribute('selected', 'selected');
+			};
+
+		var TREE_DOCUMENT_NODE_OPEN	= '<span class="blue">';
+		var TREE_DOCUMENT_NODE_CLOSE = '</span>';
+		var TREE_NODE_BEGIN_OPEN	= '<span class="darkblue">&lt;</span><span class="blue">';				// <
+		var TREE_NODE_END_OPEN		= '</span><span class="darkblue">&gt;</span>';							// >
+		var TREE_NODE_BEGIN_CLOSE 	= '</span><span class="darkblue">&lt;&#47;</span><span class="blue">'; 	// </
+		var TREE_NODE_SHORT_CLOSE 	= '</span><span class="darkblue">&#160;&#47;&gt;</span>';				// />
+		var TREE_ATTR_NAME			= '</span><span class="darkblue"> ';									//
+		var TREE_ATTR_VALUE_OPEN	= '="</span><span class="red">';										// ="
+		var TREE_ATTR_VALUE_CLOSE	= '</span><span class="darkblue">"';									// "
+
+		//--------------------------------
+		function INSPECTOR_KillNode(treeNode){
+		//--------------------------------
+			var oLL = treeNode.firstChild;
+			if(oLL){
+				while(oLL = oLL.nextSibling){
+					INSPECTOR_KillNode(oLL);
+				}
+			}
+			treeNode.oRealItem = null;
+		}
+
+
+		//--------------------------------
+		function INSPECTOR_GetTreeItemFromReal(vItem, oTreeItem){
+		//--------------------------------
+			if(vItem.nodeType){
+				var aParents = [vItem];
+				while(vItem = vItem.parentNode)
+					aParents.push(vItem);
+			}else
+				var aParents = vItem;
+
+			for(var i = aParents.length-1; i >= 0; i--){
+				var oKid = oTreeItem.firstChild;
+				//Yes first is skipped but this is icon anyway
+				while(oKid = oKid.nextSibling){
+					if(oKid.oRealItem && oKid.oRealItem == aParents[i]){
+						oTreeItem = oKid;
+						break;
+					}
+				}
+			}
+
+			if(oTreeItem.oRealItem == aParents[0])
+				return oTreeItem;
+		}
+
+		//--------------------------------
+		function INSPECTOR_RenderTreeItem(oElm, oTreeItem, oTree){
+		//--------------------------------
+			//Detect if it's rendering viewTree or not (lowerCase the nodeNames)
+			var	bView = oTree.getProperty('viewCategory') == 'view',
+				oLL = oElm.firstChild,
+				aNodeValue,
+				sValue;
+			while(oLL) {
+				if(oLL.nodeType == 10 || oLL.nodeType == 8){
+					oLL = oLL.nextSibling;
+					continue;
+				}
+				if (oLL.nodeType == 3){
+					sValue = String(oLL.nodeValue).replace(/[ \t\r\n\f]+/g, ' ');
+					if(sValue == ' '){
+						oLL = oLL.nextSibling;
+						continue;
+					} else
+						aNodeValue = [ bb.string.escapeXml(sValue) ];
+				} else if(oLL.nodeType == 9) {
+					aNodeValue = [ TREE_DOCUMENT_NODE_OPEN , oLL.nodeName, TREE_DOCUMENT_NODE_CLOSE ];
+				} else {
+					aNodeValue = [ TREE_NODE_BEGIN_OPEN, (bView ? String(oLL.nodeName).toLowerCase() : oLL.nodeName) ];
+					if(oLL.attributes){
+						var oAttr, aAttributes = oLL.attributes, i = 0, bSkipAttr = false;
+						while(oAttr = aAttributes[i++]){
+							if(oAttr.specified){
+								switch(oAttr.nodeName){
+									case 'bid__':
+									case 'pid__':
+									case 'rid__':
+										continue;
+									break;
+									case 'style':
+										sValue = oAttr.nodeValue || (oLL.style ? String(oLL.style.cssText).toLowerCase() : '');
+									break;
+									case 'class':
+										sValue = oAttr.nodeValue || oLL.className;
+									break;
+									break;
+									default:
+										if(bb.browser.ie && (typeof oLL[oAttr.nodeName] == 'object' || oAttr.nodeValue == '[Object object]'))
+											continue;
+										sValue = oAttr.nodeValue;
+									break;
+								}
+								aNodeValue.push(TREE_ATTR_NAME, oAttr.nodeName, TREE_ATTR_VALUE_OPEN, sValue, TREE_ATTR_VALUE_CLOSE);
+							}
+						}
+					}
+				}
+
+				var oRender = bb.tooling.tree.treeClone.cloneNode(false);
+				oRender.oRealItem = oLL;
+
+				if(oLL.firstChild){
+					oRender.appendChild( bb.tooling.tree.treeIconClone.cloneNode(false) );
+					aNodeValue.push( oLL.nodeType == 9 ? TREE_DOCUMENT_NODE_CLOSE : TREE_NODE_END_OPEN );
+				}else if(oLL.nodeType == 1)
+					aNodeValue.push( TREE_NODE_SHORT_CLOSE );
+
+				var oText = bb.tooling.tree.treeLabelClone.cloneNode(false);
+
+				if(oLL.nodeType == 3){
+					oText.className += ' tool-tree-item-textnode';
+				}
+				//if(oLL.nodeType == COMMENT_NODE || oLL.nodeType == CDATA_SECTION_NODE){
+				//	oText.className += ' tool-tree-item-commentnode';
+				//}
+
+				oText.innerHTML = aNodeValue.join('');
+
+				oRender.appendChild(oText);
+				oTreeItem.appendChild(oRender);
+
+				if( oTree.getOpenedTreeIndex( oRender.oRealItem ) != -1){
+					INSPECTOR_RenderTreeItem( oRender.oRealItem, oRender, oTree);
+					oRender.firstChild.className += ' tool-tree-icon-open';
+				}
+
+				if(oTree.getProperty('selectedNode') == oRender.oRealItem){
+					oTree.select(oRender);
+				}
+				oLL = oLL.nextSibling;
+			}
+
+
+			//Closing the opened element
+			if(oElm.firstChild && oElm.nodeType == 1){
+				var oRender = bb.tooling.tree.treeClone.cloneNode(false);
+				oRender.style.paddingLeft = 0;
+				oRender.innerHTML = '<div>'+TREE_NODE_BEGIN_CLOSE + (bView ? String(oElm.nodeName).toLowerCase() : oElm.nodeName) + TREE_NODE_END_OPEN+'</div>';
+
+				oTreeItem.appendChild(oRender);
+			}
+		}
+		bb.tooling.nsResolver = function(sPrefix) {
+			switch(sPrefix){
+				case 'b':
+					return 'http://www.backbase.com/2006/btl';
+			}
+		};
+		//--------------------------------
+		bb.tooling.tree.highLightChange = function(treeNode) {
+		//--------------------------------
+			treeNode.className += ' tool-tree-item-changed';
+			setTimeout(
+				function(){ bb.html.removeClass(treeNode, 'tool-tree-item-changed'); } ,
+				1500
+			);
+		};
+
+/**
+ * Javascript API for the bb.console methods. The bb.console is only available when the debugger is loaded.
+ * @publish
+ */
+bb.console = {
+    /**
+     * <p>Creates a log message and writes it to the console.</p>
+     * <p>You can specify additional arguments to dynamically format the message.</p>
+     * @param {Object} message The message to be logged.
+     * @return Nothing
+     * @type Void
+     * @publish
+     */
+    log: function(){
+        bb.console._log(arguments, '');
+    },
+
+    /**
+     * <p>Creates a debug message and writes it to the console.</p>
+     * <p>You can specify any number of additional arguments to dynamically format the message.</p>
+     * @param {Object} message The message to be logged.
+     * @return Nothing
+     * @type Void
+     * @publish
+     */
+    debug: function(){
+        bb.console._log(arguments, 'debug');
+    },
+
+    /**
+     * <p>Creates an info message with an info icon.</p>
+     * <p>You can specify any number of additional arguments to dynamically format the message.</p>
+     * @param {Object} message The message to be logged.
+     * @return Nothing
+     * @type Void
+     * @publish
+     */
+    info: function(){
+        bb.console._log(arguments, 'info');
+    },
+
+    /**
+     * <p>Creates a warning message with a warning icon and a different color scheme.</p>
+     * <p>You can specify any number of additional arguments to dynamically format the message.</p>
+     * @param {Object} message The message to be logged.
+     * @return Nothing
+     * @type Void
+     * @publish
+     */
+    warn: function(){
+        bb.console._log(arguments, 'warning');
+    },
+
+    /**
+     * <p>Creates an error message with an error icon and red text.</p>
+     * <p>You can specify any number of additional arguments to dynamically format the message.</p>
+     * @param {Object} message The message to be logged.
+     * @return Nothing
+     * @type Void
+     * @publish
+     */
+    error: function(){
+        bb.console._log(arguments, 'error');
+    },
+
+    /**
+     * <p>Creates a message and writes it to the console. It also indents all future message written to the console.</p>
+     * <p>Call bb.console.groupEnd to close and outdent the messages again.</p>
+     * @param {Object} message The message to be logged.
+     * @return Nothing
+     * @type Void
+     * @publish
+     */
+    group: function bb_console_group(){
+        var ul = bb.tooling._cloneUL.cloneNode(false);
+        bb.console._log(arguments, 'group', [ bb.tooling._cloneIcon.cloneNode(false) ]);
+        bb.console._log(null,null,[ul]);
+        bb.tooling.console._['consoleNode'] = ul;
+    },
+    /**
+     * <p>Undoes indents for the most recently indented group created with bb.console.group.</p>
+     * @return Nothing
+     * @type Void
+     * @publish
+     */
+    groupEnd: function bb_console_groupEnd(){
+        var ul = (bb.tooling.console._['consoleNode'] || bb.tooling.console.viewNode).parentNode.parentNode;
+        if(ul.nodeName.toLowerCase() == 'ul')
+        bb.tooling.console._['consoleNode'] = ul;
+    },
+    /**
+     * <p>Creates and registers a start time for the given name. Call bb.console.timeEnd to print out the elapsed time since bb.console.time was called.</p>
+     * <p>This function is handy for performance measurements.</p>
+     * @param {String} name Name given to the timer.
+     * @return Nothing
+     * @type Void
+     * @publish
+     */
+    time: function(sName){
+        if(!bb.console._timeHolder[sName])
+            bb.console._timeHolder[sName] = new Date();
+    },
+    /**
+     * <p>Prints out the elapsed time since bb.console.time was called.</p>
+     * <p>This function is handy for performance measurements.</p>
+     * @param {String} name Name given to the timer set in bb.console.time.
+     * @return Nothing
+     * @type Void
+     * @publish
+     */
+    timeEnd: function(sName){
+        if(bb.console._timeHolder[sName]){
+            bb.console._log([sName, ': ',new Date() - bb.console._timeHolder[sName], 'ms'    ]);
+            delete bb.console._timeHolder[sName];
+        }
+    },
+    /**
+     * <p>Prints out the XML tree for the specified node, including a gutter showing line numbers.</p>
+     * @param {xmlNode} node The node to pretty print.
+     * @return Nothing
+     * @type Void
+     * @publish
+     */
+    dirxml: function(oNode){
+        if(oNode){
+            if(oNode.modelNode) oNode = oNode.modelNode;
+            var div = document.createElement('div');
+            div.innerHTML = createScriptViewer(oNode);
+            bb.console._log(null,null,[div.firstChild]);
+        }
+    },
+    /**
+     * <p>Prints a tree grid with name/value pairs of the properties of a JavaScript object.</p>
+     * @param {Object} object The object that will have its properties listed.
+     * @return Nothing
+     * @type Void
+     * @publish
+     */
+    dir: function(oObject){
+        if(oObject){
+            var oTable = bb.html.createElementFromString('<table border="0" style="width:100%;" cellspacing="0" cellpadding="0"><tbody></tbody></table>');
+            for(var i in oObject){
+                try{
+                    oTable.firstChild.appendChild(createGridItem(i, oObject[i], 0));
+                }catch(e){}
+            }
+            bb.console._log(null,null, [oTable]);
+        }
+    },
+    /**
+     * <p>Not yet implemented.</p>
+     * @param {Object} object The object that will have its properties listed.
+     * @return Nothing
+     * @type Void
+     */
+    trace: function(){
+        bb.console.warn('bb.console.trace is not implemented yet');
+    },
+    /**
+     * <p>Prints a message with the number of times that this function with the specified name was called.</p>
+     * @param {String} name Name given to the the counter.
+     * @return Nothing
+     * @type Void
+     */
+    count: function(sName){
+        if (!sName) sName = '';
+
+        if (bb.console._countHolder[sName]) {
+            var iCount = ++bb.console._countHolder[sName][0];
+            var oTarget = bb.console._countHolder[sName][1];
+        } else {
+            var iCount = 1;
+            var oTarget = bb.console._log(['']);
+            bb.console._countHolder[sName] = [iCount, oTarget];
+        }
+        oTarget.innerHTML = sName+' '+iCount;
+    },
+    /**
+     * <p>Tests if the first argument (expression) is true. If not, it will throw an error with the other arguments as arguments.</p>
+     * @param {Boolean} expression Expression that should be true.
+     * @param {Object} message to Throw if expression is not true.
+     * @return Nothing
+     * @type Void
+     */
+    assert: function(){
+        if(!arguments[0]){
+            var aArgs = Array.prototype.slice.call(arguments);
+            throw new bb.tooling.window.Error(aArgs.toString());
+        }
+    }
+};
+
+			bb.tooling._cloneUL = document.createElement('ul');
+
+			bb.tooling._cloneIcon = document.createElement('div');
+			bb.tooling._cloneIcon.className = 'bb-console-group-icon';
+
+			bb.tooling._cloneLI = document.createElement('li');
+			bb.tooling._cloneLI.className = 'bb-debugger-console-row';
+
+			bb.tooling._cloneSPAN = document.createElement('span');
+
+			bb.console._timeHolder = {};
+			bb.console._countHolder = {};
+
+			bb.console._log = function _log(args, className, aOut) {
+
+				if (args){
+
+					if (!aOut)
+						aOut = [];
+
+					var iIndex = -1;
+					if(args[0] && typeof args[0] == 'string'){
+
+						var oParts = bb.tooling.formatter.parse( args[++iIndex] );
+
+						for (var i = 0; i < oParts.length; ++i){
+							var oPart = oParts[i];
+							if (oPart && typeof oPart == 'object') {
+								bb.tooling.formatter.formats[oPart.appender](
+									args[++iIndex],
+									aOut,
+									true
+								);
+							}
+							else
+								bb.tooling.formatter.formats['text'](
+									oPart,
+									aOut,
+									true
+								);
+						}
+
+					}
+
+					for (var i = iIndex + 1, iLength = args.length; i < iLength; ++i) {
+						aOut.push( document.createTextNode(' ') );
+						var oPart = args[i];
+						bb.tooling.formatter.formats[typeof oPart == 'string' ? 'text' : 'object'](oPart, aOut, true);
+					}
+
+				}
+
+				var li = bb.tooling._cloneLI.cloneNode(false);
+				if( className ){
+					li.className += ' bb-debugger-console-row-'+className;
+				}
+
+				for (var i = 0, iLength = aOut.length; i < iLength; ++i){
+					li.appendChild( aOut[i] );
+				}
+
+				var bDoScroll = false;
+				//Detect if scrolling is needed
+				var oView = bb.tooling.console.viewNode.parentNode;
+				if(oView.clientHeight < 50 || oView.scrollTop + oView.clientHeight + 10 >= oView.scrollHeight)
+					bDoScroll = true;
+
+				var oList = bb.tooling.console._['consoleNode'] || bb.tooling.console.viewNode; //bb.getProperty(this, 'consoleNode');
+				oList.appendChild(li);
+
+				if(bDoScroll) {
+					if(bb.tooling._scrollTimeout) clearTimeout(bb.tooling._scrollTimeout);
+					bb.tooling._scrollTimeout = setTimeout( function(){ oView.scrollTop = oView.scrollHeight; }, 80);
+				}
+
+				return li;
+			};
+
+
+			bb.tooling.formatter = {};
+
+			bb.tooling.formatter.toString = function toString(oObject, bLog) {
+				try {
+					var sStr = oObject+'';
+					if(!bLog)
+						sStr = sStr.substr(0,100).replace(/\n/gm, '\\n').replace(/\t/gm, '\\t');
+					return sStr;
+				}
+				catch (e){
+					return null;
+				}
+			};
+
+			bb.tooling.formatter.formatNode = function formatNode(oNode, bView){
+				if(oNode.nodeType == 3 || oNode.nodeType == 8 || oNode.nodeType == 4){
+					return [ '<span class="bb-debugger-format bb-debugger-format-string">&quot;', bb.string.escapeXml(bb.tooling.formatter.toString(oNode.nodeValue)), '&quot;</span>'].join('');
+				}
+
+				var aReturn = [bView ? String(oNode.nodeName).toLowerCase() : oNode.nodeName ];
+
+				if(oNode.id)
+					aReturn.push('<span class="bb-debugger-format-nodeId">#', bb.string.escapeXml(oNode.id), '</span>');
+				if (oNode.className){
+					var sClass = String(oNode.className);
+					var iIndex = sClass.indexOf(' ');
+					sClass =  iIndex != -1 ? sClass.substr(0, iIndex) : sClass;
+					aReturn.push('<span class="bb-debugger-format-nodeClass">.', bb.string.escapeXml(sClass), '</span>');
+				}
+
+				return aReturn.join('');
+			}
+
+
+			bb.tooling.formatter.parse = function formatParse(sFormat){
+
+				var aParts = [];
+				var vRegExp = /((^%|[^\\]%)(\d+)?(\.)([a-zA-Z]))|((^%|[^\\]%)([a-zA-Z]))/;
+
+				var oFormatMap = {s: 'text', d: 'integer', i: 'integer', f: 'float'};
+				var m;
+				while (m = vRegExp.exec(sFormat)) {
+					var sType = m[8] ? m[8] : m[5];
+					var appender = sType in oFormatMap ? oFormatMap[sType] : 'object';
+					var precision = m[3] ? parseInt(m[3]) : (m[4] == "." ? -1 : 0);
+
+					aParts.push(sFormat.substr(0, m[0][0] == "%" ? m.index : m.index+1));
+					aParts.push({appender: appender, precision: precision});
+
+					sFormat = sFormat.substr(m.index + m[0].length);
+				}
+
+				aParts.push(sFormat);
+
+				return aParts;
+			};
+
+			bb.tooling.formatter.formats = {
+
+				'float' : function formatFloat(oObject, oOut, bLog){
+					var oNew = bb.tooling._cloneSPAN.cloneNode(false);
+					oNew.className = 'bb-debugger-format bb-debugger-format-number';
+					oNew.innerHTML = bb.string.escapeXml(bb.tooling.formatter.toString(oObject, bLog));
+					oOut.push(oNew);
+				},
+				'integer' : function formatInt(oObject, oOut, bLog){
+					var oNew = bb.tooling._cloneSPAN.cloneNode(false);
+					oNew.className = 'bb-debugger-format bb-debugger-format-number';
+					oNew.innerHTML = bb.string.escapeXml(bb.tooling.formatter.toString(oObject, bLog));
+					oOut.push(oNew);
+				},
+				'null' : function formatNull(oObject, oOut, bLog){
+					var oNew = bb.tooling._cloneSPAN.cloneNode(false);
+					oNew.className = 'bb-debugger-format bb-debugger-format-null';
+					oNew.innerHTML = bb.string.escapeXml(bb.tooling.formatter.toString(oObject, bLog));
+					oOut.push(oNew);
+				},
+				'object' : function formatObject(oObject, oOut, bLog){
+					try {
+						if (oObject === undefined)
+							bb.tooling.formatter.formats['null']('undefined', oOut, bLog);
+						else if (oObject === null)
+							bb.tooling.formatter.formats['null']('null', oOut, bLog);
+						else if (typeof oObject == "string")
+							bb.tooling.formatter.formats['string'](oObject, oOut, bLog);
+						else if (typeof oObject == "number" || typeof oObject == "boolean")
+							bb.tooling.formatter.formats['integer'](oObject, oOut, bLog);
+						else if (typeof oObject == 'function' && typeof oObject.constructor == 'function')
+							bb.tooling.formatter.formats['function'](oObject, oOut, bLog);
+						else if (oObject.modelNode && oObject._)
+							bb.tooling.formatter.formats['model'](oObject.modelNode, oOut, bLog);
+						else if (!oObject._ && 'hasAttribute' in oObject && oObject.hasAttribute('bid__'))
+							bb.tooling.formatter.formats['model'](oObject, oOut, bLog);
+						else if (oObject.nodeType == 9 && oObject == bb.tooling.window.bb.document.modelNode)
+							bb.tooling.formatter.formats['model'](oObject, oOut, bLog);
+						else if (oObject.nodeName && oObject.nodeType && oObject.nodeType != 2){
+							if( oObject.uniqueID || oObject == bb.tooling.window.document || (oObject.ownerDocument && oObject.ownerDocument == bb.tooling.window.document) )
+								bb.tooling.formatter.formats['view'](oObject, oOut, bLog);
+							else
+								bb.tooling.formatter.formats['xml'](oObject, oOut, bLog);
+						}
+						else if (typeof oObject == 'object' && oObject.constructor == Array || oObject.length)
+							bb.tooling.formatter.formats['array'](oObject, oOut, bLog);
+						else if (oObject instanceof bb.tooling.window.Error)
+							bb.tooling.formatter.formats['error'](oObject, oOut, bLog);
+						else if (typeof oObject == 'object')
+							bb.tooling.formatter.formats['object2'](oObject, oOut, bLog);
+						else
+							bb.tooling.formatter.formats['text'](oObject, oOut, bLog);
+					} catch (e) {}
+				},
+
+				'string' : function formatString(oObject, oOut, bLog){
+					var oNew = bb.tooling.formatter.formats._cloneString.cloneNode(false);
+					oNew.innerHTML = ['&quot;',bb.string.escapeXml(bb.tooling.formatter.toString(oObject, bLog)),'&quot;'].join('');
+					oOut.push(oNew);
+				},
+				'text' : function formatText(oObject, oOut, bLog){
+					oOut.push( document.createTextNode( bb.tooling.formatter.toString(oObject, bLog) ) );
+				},
+
+				'model' : function formatModel(oObject, oOut, bLog){
+					var oNew = bb.tooling.formatter.formats._cloneNode.cloneNode(false);
+					oNew.innerHTML = bb.tooling.formatter.formatNode(oObject, false);
+					oNew.setAttribute('islink','true');
+					oNew.setAttribute('category','model');
+					oNew.target = oObject;
+					oOut.push(oNew);
+				},
+				'xml' : function formatXml(oObject, oOut, bLog){
+					var oNew = bb.tooling.formatter.formats._cloneNode.cloneNode(false);
+					oNew.innerHTML = bb.tooling.formatter.formatNode(oObject, false);
+					oNew.setAttribute('islink','true');
+					oNew.setAttribute('category','xml');
+					oNew.target = oObject;
+					oOut.push(oNew);
+				},
+				'view' : function formatView(oObject, oOut, bLog){
+					var oNew = bb.tooling.formatter.formats._cloneNode.cloneNode(false);
+					oNew.innerHTML = bb.tooling.formatter.formatNode(oObject, true);
+					oNew.setAttribute('islink','true');
+					oNew.setAttribute('category','view');
+					oNew.target = oObject;
+					oOut.push(oNew);
+				},
+				'function' : function formatFunction(oObject, oOut, bLog){
+					var sText = bb.tooling.formatter.toString(oObject, bLog);
+					var reName = /function ?(.*?)\(/;
+					var m = reName.exec(sText);
+					var name = m && m[1] ? m[1] : 'function';
+
+					var oNew = bb.tooling._cloneSPAN.cloneNode(false);
+					oNew.className = 'bb-debugger-format bb-debugger-format-function';
+					oNew.innerHTML = bb.string.escapeXml(name)+'()';
+					oNew.setAttribute('islink','true');
+					oNew.setAttribute('category','function');
+					oNew.target = oObject;
+					oOut.push(oNew);
+				},
+				'object2' : function(oObject, oOut, bLog){
+					var sText = bb.tooling.formatter.toString(oObject, bLog);
+					var reObject = /\[object (.*?)\]/;
+					var m = reObject.exec(sText);
+
+					var oNew = bb.tooling._cloneSPAN.cloneNode(false);
+					oNew.className = 'bb-debugger-format bb-debugger-format-object';
+					oNew.innerHTML = m ? m[1] : sText;
+					oOut.push(oNew);
+				},
+				'error' : function(oObject, oOut, bLog){
+					var sText = bb.tooling.formatter.toString(oObject, bLog);
+					var oNew = bb.tooling._cloneSPAN.cloneNode(false);
+					oNew.className = 'bb-debugger-format bb-debugger-format-error';
+					oNew.innerHTML = sText;
+					oOut.push(oNew);
+				},
+				'array' : function formatArray(oObject, oOut, bLog){
+					var oNew = bb.tooling._cloneSPAN.cloneNode(false);
+					oNew.className = 'bb-debugger-format bb-debugger-format-array';
+					oNew.innerHTML = ' [ ';
+					oOut.push(oNew);
+					for(var i = 0, iLength = oObject.length; i < iLength; i++){
+						var oChild = oObject[i];
+						if(!bLog && i == 4){
+							var oNew = bb.tooling._cloneSPAN.cloneNode(false);
+							oNew.className = 'bb-debugger-format bb-debugger-format-array-more';
+							oNew.innerHTML = oObject.length - i +' more... ';
+							oOut.push(oNew);
+							break;
+						}
+						//For now skip the array in array need nicer solution
+						if(typeof oChild == 'object' && oChild.constructor == Array) continue;
+						bb.tooling.formatter.formats['object'](oChild, oOut);
+						if(i < iLength - 1)
+							oOut.push( document.createTextNode(', ') );
+					}
+					var oNew = bb.tooling._cloneSPAN.cloneNode(false);
+					oNew.className = 'bb-debugger-format bb-debugger-format-array';
+					oNew.innerHTML = ' ] ';
+					oOut.push(oNew);
+				}
+
+			}
+
+			bb.tooling.formatter.formats._cloneString = document.createElement('span');
+			bb.tooling.formatter.formats._cloneString.className = 'bb-debugger-format bb-debugger-format-string';
+
+			bb.tooling.formatter.formats._cloneNode = document.createElement('span');
+			bb.tooling.formatter.formats._cloneNode.className = 'bb-debugger-format bb-debugger-format-node';
+
+
+			//FOrmatter?
+
+			//------------------------------
+			function createScriptViewer(oScript) {
+			//------------------------------
+				var sScript = '';
+				if(oScript){
+					if (typeof oScript == 'string'){
+						sScript = bb.string.escapeXml(oScript+'\n');
+					} else if (typeof oScript == 'object' && oScript.nodeType) {
+						sScript = btl.codeHighlighter.xml(oScript);
+					} else if (typeof oScript == 'function' || typeof oScript == 'object') {
+						sScript = bb.string.escapeXml(oScript.toString()+'\n');
+					} else {
+						sScript = 'Unsupported object' + String(oScript);
+					}
+				}
+				return [	'<div class="bb-scriptview"><pre class="bb-scriptview-gutter">',
+							btl.codeHighlighter.getGutter(sScript),
+							'</pre><pre class="bb-scriptview-data">',
+							sScript,
+							'</pre></div>' ].join('');
+			}
+
+			//------------------------------
+			Tdl_Toggle_GridItem = function(oIcon){
+			//------------------------------
+				var oTr = oIcon.parentNode.parentNode.parentNode.parentNode;
+
+				if(bb.html.hasClass(oIcon, 'bb-grid-icon-open')){
+					bb.html.removeClass(oIcon, 'bb-grid-icon-open');
+					while(oTr.nextSibling && oTr.nextSibling.loopLevel > oTr.loopLevel){
+						oTr.nextSibling.loopValue = null;
+						oTr.parentNode.removeChild(oTr.nextSibling);
+					}
+
+				} else {
+					bb.html.addClass(oIcon, 'bb-grid-icon-open');
+					var oTrNext = oTr.nextSibling;
+					if (oTr.loopValue instanceof XMLHttpItem || oTr.loopValue instanceof MultiColumn || oTr.loopValue instanceof GenericGridItem || oTr.loopValue instanceof TDLNode){
+						var oNewTr = createGridItem(null, oTr.loopValue, oTr.loopLevel + 1);
+						oTr.parentNode.insertBefore(oNewTr, oTrNext);
+					} else {
+						for(var i in oTr.loopValue){
+							try{
+								if(/*oTr.loopValue.hasOwnProperty(i) &&*/ oTr.loopValue[i]){
+									var oNewTr = createGridItem(i, oTr.loopValue[i], oTr.loopLevel + 1);
+									oTr.parentNode.insertBefore(oNewTr, oTrNext);
+									//Check for TDL Inspector if al descendants should be opened from the inheritence tree
+									if(oTr.loopValue[i] instanceof TDLNode && oTr.loopValue[i].type != 0 && oNewTr.firstChild.firstChild.firstChild) {
+										Tdl_Toggle_GridItem(oNewTr.firstChild.firstChild.firstChild.firstChild);
+									}
+								}
+							}catch(e){}
+
+						}
+					}
+
+
+
+				}
+			}
+
+			bb.tooling.gridItemCache = document.createElement('tr');
+			bb.tooling.gridItemCache.appendChild(document.createElement('td'));
+			bb.tooling.gridItemCache.firstChild.className = 'bb-grid-labelcell';
+			bb.tooling.gridItemCache.firstChild.appendChild(document.createElement('div'));
+			bb.tooling.gridItemCache.firstChild.firstChild.className = 'bb-grid-cellwidth';
+			bb.tooling.gridItemCache.firstChild.firstChild.appendChild(document.createElement('div'));
+			bb.tooling.gridItemCache.firstChild.firstChild.firstChild.className = 'bb-grid-firsttd';
+
+			//------------------------------
+			bb.tooling.createTDLNode = function(node, type) {
+			//------------------------------
+				var oChilds = [];
+				var oDetails = bb.tooling.window.bb.tdl.object.getDetails(node);
+
+				var oDescendants = bb.tooling.window.bb.tdl.object.getDescendants(node);
+				if(oDescendants.length){
+					var oChildren = {}, i = 0, oChild;
+					while (oChild = oDescendants[i++]){
+						if(type == 1)
+							oChilds.push( new TDLNode(oChild, 1) );
+						else
+							oChildren[bb.tooling.window.bb.tdl.object.getDetails(oChild).name] = new TDLNode(oChild, 1);
+					}
+					if(type == 0)
+						oChilds.push( new GenericGridItem('descends','','', oChildren) );
+				}
+
+				var oDescendants = bb.tooling.window.bb.tdl.object.getExtenders(node);
+				if(oDescendants.length){
+					var oChildren = {}, i = 0, oChild;
+					while (oChild = oDescendants[i++]){
+						if(type == 2){
+							oChilds.push( new TDLNode(oChild, 2) );
+						}
+						else
+							oChildren[bb.tooling.window.bb.tdl.object.getDetails(oChild).name] = new TDLNode(oChild, 2);
+					}
+					if(type == 0)
+						oChilds.push( new GenericGridItem('extends','','', oChildren) );
+				}
+
+				if(!oDetails.isInterface){
+					var oDescendants = bb.tooling.window.bb.tdl.object.getImplementors(node);
+					if(oDescendants.length){
+						var oChildren = {}, i = 0, oChild;
+						while (oChild = oDescendants[i++]){
+							if(type == 3)
+								oChilds.push( new TDLNode(oChild, 3) );
+							else
+								oChildren[bb.tooling.window.bb.tdl.object.getDetails(oChild).name] = new TDLNode(oChild, 3);
+						}
+						if(type == 0)
+							oChilds.push( new GenericGridItem('implements','','', oChildren) );
+					}
+				}
+
+				if (!oChilds.length) return null;
+
+				return oChilds;
+			}
+			//------------------------------
+			bb.tooling.createTDLNodeName = function(node, type) {
+			//------------------------------
+				var oDetails = bb.tooling.window.bb.tdl.object.getDetails(node);
+				var sStyle = '';
+				if(oDetails.isAbstract){
+					sStyle = 'color: gray;';
+				} else if(oDetails.isBehavior) {
+					sStyle = 'color: blue;';
+				} else if(oDetails.isInterface) {
+					sStyle = 'color: green;';
+				}
+				var sNs = '';
+				if(type != 0)
+					sNs = ' ('+oDetails.namespaceURI+')';
+
+				return '<span '+bb.tooling.tdl.createLink(oDetails)+' class="bb-debugger-format boldText" insidetdltree="true" style="'+sStyle+'">'+ oDetails.name + sNs + '<span>';
+			}
+
+			//------------------------------
+			createGridItem = function(name, value, level){
+			//------------------------------
+				if(!level) level = 0;
+				var aOut = [];
+				var bSingleField = false;
+				var sSpecialValue = '';
+				var iColSpan = 2;
+				var childValue = null;
+				if(value instanceof MultiColumn){
+					bSingleField = true;
+					if(value.type == 'script')
+						name = createScriptViewer(value.data);
+					else
+						name = value.data;
+
+					iColSpan = value.colspan;
+					bHasChildren = false;
+				}else if(value instanceof GenericGridItem){
+					name = '<span class="'+value.className+'">'+value.name+'</span>';
+					if(typeof value.value == 'string') {
+						if(value.value == '')
+							bSingleField = true;
+						else
+							aOut.push( document.createTextNode(value.value) );
+					} else
+						aOut.push.apply(aOut, value.value);
+					childValue = value.children;
+
+				}else if(value instanceof XMLHttpItem){
+					name = bb.tooling.net.createRequestHTML(value.request);
+					bSingleField = true;
+					iColSpan = value.colspan;
+					bHasChildren = false;
+				}else if( value instanceof TDLNode) {
+					name = bb.tooling.createTDLNodeName(value.node, value.type);
+					bSingleField = true;
+					iColSpan = value.colspan;
+					bHasChildren = true;
+					childValue = bb.tooling.createTDLNode(value.node, value.type);
+				} else {
+					bb.tooling.formatter.formats['object'](value, aOut);
+					childValue = value;
+				}
+				var bHasChildren = false;
+				try{
+					if(typeof childValue != 'string'){
+						for(var i in childValue){
+							bHasChildren = true;
+							break;
+						}
+					}
+				}catch(e){}
+
+
+				var oTr = bb.tooling.gridItemCache.cloneNode(true);
+				oTr.firstChild.firstChild.firstChild.style.marginLeft = (level * 16) + 'px';
+
+				if(bHasChildren){
+					oTr.firstChild.firstChild.firstChild.appendChild(document.createElement('div'));
+					oTr.firstChild.firstChild.firstChild.firstChild.className = 'bb-grid-icon';
+				}
+
+				oTr.firstChild.firstChild.firstChild.appendChild(document.createElement('div'));
+				oTr.firstChild.firstChild.firstChild.lastChild.className = 'bb-grid-label';
+				oTr.firstChild.firstChild.firstChild.lastChild.innerHTML = name;
+
+				if(bSingleField){
+					oTr.firstChild.colSpan = iColSpan;
+					oTr.firstChild.firstChild.style.width = '100%';
+				} else {
+					oTr.appendChild(document.createElement('td'));
+					for (var i = 0; i < aOut.length; ++i){
+						oTr.lastChild.appendChild( aOut[i] );
+					}
+				}
+				oTr.orgValue 	= value;
+				oTr.loopValue 	= childValue;
+				oTr.loopLevel 	= level;
+
+
+				return oTr;
+			}
+
+			//------------------------------
+			function MultiColumn(vData, sType, iColSpan) {
+			//------------------------------
+				this.data = vData;
+				this.type = sType || 'text';
+				this.colspan = iColSpan || 2;
+			}
+
+			//------------------------------
+			function GenericGridItem(sName, sClass, sValue, oChildren){
+			//------------------------------
+				this.name = sName;
+				this.className = sClass;
+				this.value = sValue;
+				this.children = oChildren;
+			}
+
+			//------------------------------
+			function XMLHttpItem(oRequest, iColSpan){
+			//------------------------------
+				this.request = oRequest;
+				this.colspan = iColSpan || 2;
+			}
+			//------------------------------
+			function TDLNode(oNode, iType, iColSpan){
+			//------------------------------
+				this.node = oNode;
+				this.type = iType || 0; //0 is normal, 1 is descender, 2 is extender, 3 is implementor
+				this.colspan = iColSpan || 2;
+			}
+			bb.tooling.tdl = {};
+			bb.tooling.xel = {};
+
+			//------------------------------
+			bb.tooling.tdl.createLink = function( oDetails ){
+			//------------------------------
+				return 'islink="true" category="tdl" title="'+oDetails.namespaceURI+'" target="'+oDetails.namespaceURI+'#'+oDetails.name+'"';
+			}
+
+			//------------------------------
+			bb.tooling.tdl.getAttributesTree = function( controller, oClass, bFilterCore, bFilterExtends ){
+			//------------------------------
+
+				if (controller){
+
+						var aArr = bb.tooling.window.bb.tdl.object.getAttributes( oClass );
+
+						var aAttrDefined2 = [];
+						var aAttrDefined = controller._ ? controller.modelNode.attributes : null, oAttr, i = 0;
+						if(aAttrDefined){
+							while(oAttr = aAttrDefined[i++]){
+								var oAttr2 = bb.tooling.window.bb.tdl.object.getAttribute(oClass, oAttr.nodeName);
+								var sAttrName = oAttr.nodeName;
+								if(!oAttr2.name && sAttrName != 'bid__' && sAttrName != 'rid__' && sAttrName != 'pid__'){
+									aArr.push( {'name': oAttr.nodeName} );
+								}
+								aAttrDefined2[oAttr.nodeName] = true;
+							}
+						}
+
+						var aAttributes = [];
+
+						for (var i = 0, iLength = aArr.length; i < iLength; i++) {
+							var sClass = '';
+							if(aAttrDefined2[ aArr[i].name ] )
+								sClass = 'boldText';
+
+
+
+							var aName = [aArr[i].name];
+							if(aArr[i].classObject) {
+								//Filter extended functions
+								if(bFilterExtends && aArr[i].classObject != oClass)
+									continue;
+								var oDetails = bb.tooling.window.bb.tdl.object.getDetails(aArr[i].classObject);
+								//Filter for core functions
+								if(bFilterCore && oDetails.namespaceURI == 'http://www.backbase.com/2006/client')
+									continue;
+								aName.push(' <span class="bb-debugger-format" ', bb.tooling.tdl.createLink(oDetails), ' style="color: lightgreen;">(', oDetails.name, ')</span>');
+							}
+
+
+							var aOut = [];
+							if(controller._){
+								if( aArr[i].defaultValue == controller.getAttribute(aArr[i].name) || (!aArr[i].defaultValue && !controller.hasAttribute(aArr[i].name) ) )
+									sClass = 'grayText';
+								bb.tooling.formatter.formats['string'](controller.getAttribute(aArr[i].name), aOut);
+							}
+
+
+							var oChildren = [];
+
+							if(aArr[i].mapper)	oChildren.push(new GenericGridItem('mapper', '', '', new MultiColumn(aArr[i].mapper, 'script') ));
+							if(aArr[i].changer)	oChildren.push(new GenericGridItem('changer', '', '', new MultiColumn(aArr[i].changer, 'script') ));//oChildren['changer'] = aArr[i][2];
+							if(typeof aArr[i].defaultValue == 'string'){
+								oDefault = [];
+								bb.tooling.formatter.formats['string'](aArr[i].defaultValue, oDefault);
+								oChildren.push(new GenericGridItem('default', '', oDefault, null));//oChildren['default'] = aArr[i][1];
+							}
+
+							aAttributes.push(new GenericGridItem(aName.join(''), sClass, aOut, oChildren));
+						}
+
+						if(!aAttributes.length)
+							aAttributes = new MultiColumn('There are no items to show for this object');
+				} else {
+					var aAttributes = new MultiColumn('No objects selected');
+				}
+
+				return createGridItem(null, new GenericGridItem('Attributes', 'boldText', '', aAttributes));
+
+			};
+			//------------------------------
+			bb.tooling.tdl.getPropertiesTree = function( controller, oClass, bFilterCore, bFilterExtends ){
+			//------------------------------
+				if (controller){
+
+					var aArr = bb.tooling.tdl.findExtended(oClass, [], [], 'getProperties');
+
+					var aAttributes = [];
+
+					for (var i = 0, iLength = aArr.length; i < iLength; i++) {
+						//Filter extended functions
+						if(bFilterExtends && aArr[i].classObject != oClass)
+							continue;
+
+						var oProps = aArr[i];
+						var oChildren = [];
+						if(oProps.setter)	oChildren.push(new GenericGridItem('setter', '', '', new MultiColumn(oProps.setter, 'script') ) );
+						if(oProps.getter)	oChildren.push(new GenericGridItem('getter', '', '', new MultiColumn(oProps.getter, 'script') ) );
+
+						var sClass = '';
+						if(oProps.overWritten){
+							sClass = '" style="text-decoration: line-through; color:gray;" title="This property is overruled by a extended class';
+						}
+
+
+						var oOutput = [];
+
+						if(controller._) {
+							try{
+								var oValue = controller.getProperty(oProps.name)
+							}catch(e){
+								var oValue = e
+							}
+							bb.tooling.formatter.formats['object'](oValue, oOutput);
+						}
+
+						var oDetails = bb.tooling.window.bb.tdl.object.getDetails(oProps.classObject);
+
+						//Filter for core functions
+						if(bFilterCore && oDetails.namespaceURI == 'http://www.backbase.com/2006/client')
+							continue;
+
+						aAttributes.push(new GenericGridItem(oProps.name +' <span class="bb-debugger-format" '+bb.tooling.tdl.createLink(oDetails)+' style="color: lightgreen;">('+oDetails.name+')</span>', sClass, oOutput, oChildren ) );
+
+					}
+
+					if(!aAttributes.length)
+						aAttributes = new MultiColumn('There are no items to show for this object');
+				} else {
+					var aAttributes = new MultiColumn('No objects selected');
+				}
+
+				return createGridItem(null, new GenericGridItem('Properties', 'boldText', '', aAttributes));
+			};
+
+			//------------------------------
+			bb.tooling.tdl.getMethodsTree = function( controller, oClass, bFilterCore, bFilterExtends ){
+			//------------------------------
+				if (controller){
+
+					var aArr = bb.tooling.tdl.findExtended(oClass, [], [], 'getMethods');
+
+					var aAttributes = [];
+
+					for (var i = 0, iLength = aArr.length; i < iLength; i++) {
+						//Filter extended functions
+						if(bFilterExtends && aArr[i].classObject != oClass)
+							continue;
+
+						var oChildren = [];
+
+						oChildren.push( new MultiColumn(aArr[i].xmlNode || aArr[i].fn, 'script') );
+
+						var sClass = '';
+						if(aArr[i].overWritten){
+							sClass = '" style="text-decoration: line-through; color:gray;" title="This method is overruled by an extended class';
+						}
+						var oDetails = bb.tooling.window.bb.tdl.object.getDetails(aArr[i].classObject);
+
+						//Filter for core functions
+						if(bFilterCore && oDetails.namespaceURI == 'http://www.backbase.com/2006/client')
+							continue;
+
+						aAttributes.push(new GenericGridItem(aArr[i].name +' <span class="bb-debugger-format" islink="true" '+bb.tooling.tdl.createLink(oDetails)+' style="color: lightgreen;">('+oDetails.name+')</span>', sClass, '', oChildren ) );
+					}
+
+					if(!aAttributes.length)
+						aAttributes = new MultiColumn('There are no items to show for this object');
+				} else {
+					var aAttributes = new MultiColumn('No objects selected');
+				}
+
+				return createGridItem(null, new GenericGridItem('Methods', 'boldText', '', aAttributes));
+			};
+
+			//------------------------------
+			bb.tooling.tdl.getHandlersTree = function( controller, oClass, bFilterCore, bFilterExtends ){
+			//------------------------------
+				if (controller){
+
+					var aArr = bb.tooling.window.bb.tdl.object.getHandlers(oClass);
+
+					var aAttributes = [];
+
+					for (var i = 0, iLength = aArr.length; i < iLength; i++) {
+						//Filter extended functions
+						if(bFilterExtends && aArr[i].classObject != oClass)
+							continue;
+
+						var oChildren = [];
+
+						oChildren.push( new MultiColumn(aArr[i].xmlNode || aArr[i].fn, 'script') );
+
+						var aName = [aArr[i].type];
+
+						if(aArr[i].classObject) {
+							var oDetails = bb.tooling.window.bb.tdl.object.getDetails(aArr[i].classObject);
+															//Filter for core functions
+							if(bFilterCore && oDetails.namespaceURI == 'http://www.backbase.com/2006/client')
+								continue;
+
+							aName.push(' <span class="bb-debugger-format" ', bb.tooling.tdl.createLink(oDetails), ' style="color: lightgreen;">(', oDetails.name, ')</span>');
+						}
+
+						aAttributes.push(new GenericGridItem(aName.join(''), '', '', oChildren) );
+
+					}
+
+					if(!aAttributes.length)
+						aAttributes = new MultiColumn('There are no items to show for this object');
+				} else {
+					var aAttributes = new MultiColumn('No objects selected');
+				}
+
+				return createGridItem(null, new GenericGridItem('Handlers', 'boldText', '', aAttributes));
+			};
+			//------------------------------
+			bb.tooling.xel.getHandlersTree = function ( controller ){
+			//------------------------------
+				if (controller && controller._){
+
+					var aArr = bb.tooling.window.bb.controller.getEventListeners(controller);
+
+					var aAttributes = [];
+
+					for (var i = 0, iLength = aArr.length; i < iLength; i++) {
+
+						aAttributes.push(new GenericGridItem(aArr[i].type + (aArr[i].capture ? ' [capture]' : ''), '', '', [ new MultiColumn(aArr[i].xmlNode || aArr[i].fn, 'script') ] ) );
+
+					}
+
+					if(!aAttributes.length)
+						aAttributes = new MultiColumn('There are no items to show for this object');
+
+				} else {
+					var aAttributes = new MultiColumn('No objects selected');
+				}
+				return createGridItem(null, new GenericGridItem('Instance Handlers', 'boldText', '', aAttributes));
+			};
+
+			//------------------------------
+			bb.tooling.xel.getBehaviorsTree = function ( controller ){
+			//------------------------------
+				if (controller && controller._){
+
+					var aArr = bb.tooling.window.bb.controller.getBehaviors(controller);
+
+					var aAttributes = [];
+					var bShowCore = !bb.tooling.data.preferences['modelShowCore'];
+					var bShowExt = !bb.tooling.data.preferences['modelShowExt'];
+
+					for (var i = 0, iLength = aArr.length; i < iLength; i++) {
+						var oChildren = [
+							bb.tooling.tdl.getAttributesTree(controller, aArr[i], bShowCore, bShowExt).orgValue,
+							bb.tooling.tdl.getPropertiesTree(controller, aArr[i], bShowCore, bShowExt).orgValue,
+							bb.tooling.tdl.getMethodsTree(controller, aArr[i], bShowCore, bShowExt).orgValue,
+							bb.tooling.tdl.getHandlersTree(controller, aArr[i], bShowCore, bShowExt).orgValue
+						];
+						aAttributes.push(new GenericGridItem(bb.tooling.createTDLNodeName(aArr[i], 0), '', '', oChildren ) );
+					}
+
+					if(!aAttributes.length)
+						aAttributes = new MultiColumn('There are no items to show for this object');
+
+				} else {
+					var aAttributes = new MultiColumn('No objects selected');
+				}
+				return createGridItem(null, new GenericGridItem('Instance Behaviors', 'boldText', '', aAttributes));
+			};
+			//------------------------------
+			bb.tooling.tdl.findExtended = function(oClass, aArr, aHasDone, sMethod) {
+			//------------------------------
+				if( bb.array.indexOf(aHasDone, oClass) == -1){
+					aHasDone.push(oClass);
+					var aArr2 = bb.tooling.window.bb.tdl.object[sMethod](oClass);
+					for(var i = 0; i < aArr2.length; i++){
+						aArr2[i].classObject = oClass;
+						for(var j = 0; j < aArr.length; j++){
+							if(aArr[j].name == aArr2[i].name){
+								aArr2[i].overWritten = true;
+								break;
+							}
+						}
+						aArr.push(aArr2[i]);
+					}
+					var aExtends = bb.tooling.window.bb.tdl.object.getExtenders(oClass);
+					for(var j = aExtends.length-1; j >= 0; j--){
+						bb.tooling.tdl.findExtended(aExtends[j], aArr, aHasDone, sMethod);
+					}
+				}
+				return aArr;
+			}
+
+			bb.tooling.handlers = {
+				//For console
+				documentException: function(event){
+					event.stopImmediatePropagation();
+					var sClass = '';
+					switch(event.severity){
+						case 1: //info
+							sClass = '';
+						break;
+						case 2:
+							sClass = 'warning';
+						break;
+						case 3:
+							sClass = 'error';
+						break;
+					}
+					var oArgs = [event.description];
+					if(event.context)
+						oArgs.push(event.context);
+					if(event.executable)
+						oArgs.push(event.executable);
+					bb.console._log(oArgs, sClass);
+				},
+				//For modelTree
+				documentDOMNodeInserted: function(event){
+
+					if(bb.getProperty(bb.tooling.modelTree, 'disabled') ) return;
+
+					var oChange = event.relatedNode;
+					var oElm = INSPECTOR_GetTreeItemFromReal(oChange.modelNode, bb.tooling.modelTree.viewNode.firstChild);
+					if(oElm){
+						if(oElm.childNodes.length == 1){
+							//Add the icon if not their!
+							oElm.firstChild.lastChild.innerHTML = '&gt;'; //     > (not close it)
+							oElm.insertBefore(bb.tooling.tree.treeIconClone.cloneNode(false), oElm.firstChild);
+						} else {
+							//Close it if opened!
+							while(oElm.firstChild.nextSibling.nextSibling){
+								INSPECTOR_KillNode(oElm.lastChild);
+								oElm.removeChild(oElm.lastChild);
+							}
+
+							bb.html.removeClass(oElm.firstChild, 'tool-tree-icon-open');
+						}
+						if( bb.callMethod(bb.tooling.modelTree, 'getOpenedTreeIndex', [ oElm.oRealItem ]) != -1){
+							oElm.firstChild.className += ' tool-tree-icon-open';
+							//rebuild
+							INSPECTOR_RenderTreeItem(oElm.oRealItem, oElm, bb.tooling.modelTree);
+						}
+						bb.tooling.tree.highLightChange(oElm);
+						//Refresh tree if this is currently selected node
+						if (bb.tooling.modelTree.getProperty('selectedTree') == oElm)
+							bb.tooling.modelTree.select(oElm);
+					}
+
+
+				},
+				//For modelTree
+				documentDOMNodeRemoved: function(event){
+
+					if(bb.getProperty(bb.tooling.modelTree, 'disabled') ) return;
+
+					var oChange = event.target;
+
+					var oElm = INSPECTOR_GetTreeItemFromReal(oChange.modelNode, bb.tooling.modelTree.viewNode.firstChild);
+					if(oElm){
+						var oParent = oElm.parentNode;
+						oParent.removeChild(oElm);
+						//No children, clean me up!
+						if(oParent.lastChild.previousSibling == oParent.firstChild.nextSibling){
+							oParent.removeChild(oParent.firstChild);
+							oParent.removeChild(oParent.lastChild);
+							oParent.firstChild.lastChild.innerHTML = '&#160;&#47;&gt;'; //     /> (short close it)
+						}
+						bb.tooling.tree.highLightChange(oParent);
+						//Refresh tree if this is currently selected node
+						if (bb.tooling.modelTree.getProperty('selectedTree') == oElm)
+							bb.tooling.modelTree.select(oParent);
+					}
+
+
+
+				},
+				//For modelTree
+				documentDOMAttrModified: function(event){
+
+					if(bb.getProperty(bb.tooling.modelTree, 'disabled') ) return;
+
+					var oChange = event.target;
+
+					var oElm = INSPECTOR_GetTreeItemFromReal(oChange.modelNode, bb.tooling.modelTree.viewNode.firstChild);
+					if(oElm){
+						var oLL = oElm.childNodes.length == 1 ? oElm.firstChild : oElm.childNodes[1];
+						switch(event.attrChange){
+							case 1: //modification
+								oLL = oLL.firstChild;
+								while(oLL = oLL.nextSibling){
+									if(oLL.innerHTML == ' '+event.attrName+'="'){
+										oLL.nextSibling.innerHTML = event.newValue;
+										bb.tooling.tree.highLightChange(oLL.nextSibling);
+										break;
+									}
+								}
+							break;
+							case 2: //addition
+								var oName = bb.tooling._cloneSPAN.cloneNode(false);
+								oName.className = 'darkblue';
+								oName.innerHTML = ' '+event.attrName+'="';
+								oLL.insertBefore(oName, oLL.lastChild);
+								bb.tooling.tree.highLightChange(oName);
+								var oName = bb.tooling._cloneSPAN.cloneNode(false);
+								oName.className = 'red';
+								oName.innerHTML = event.newValue;
+								oLL.insertBefore(oName, oLL.lastChild);
+								bb.tooling.tree.highLightChange(oName);
+								var oName = bb.tooling._cloneSPAN.cloneNode(false);
+								oName.className = 'darkblue';
+								oName.innerHTML = '"';
+								oLL.insertBefore(oName, oLL.lastChild);
+								bb.tooling.tree.highLightChange(oName);
+							break;
+							case 3: //removal
+								oLL = oLL.firstChild;
+								while(oLL = oLL.nextSibling){
+									if(oLL.innerHTML == ' '+event.attrName+'="'){
+										bb.tooling.tree.highLightChange(oLL.parentNode);
+										oLL.parentNode.removeChild(oLL.nextSibling); //Value
+										oLL.parentNode.removeChild(oLL.nextSibling); //Value
+										oLL.parentNode.removeChild(oLL); //Name
+										break;
+									}
+
+								}
+							break;
+						}
+						//Refresh tree if this is currently selected node
+						if (bb.tooling.modelTree.getProperty('selectedTree') == oElm)
+							bb.tooling.modelTree.select(oElm);
+
+					}
+				},
+
+				//--------------------------------
+				documentMouseover: function(eEvent) {
+				//--------------------------------
+					//Return if hover over self!
+					if (eEvent.viewTarget && eEvent.viewTarget.parentNode && bb.tooling.highLighter.element == eEvent.viewTarget.parentNode)
+						return;
+
+					if (bb.tooling.currentTree.getProperty('viewCategory') == 'view')
+						var oView = eEvent.viewTarget;
+					else
+						var oView = eEvent.target.viewNode;
+
+					bb.tooling.window.bb.tooling.highLighter.position(oView);
+
+					bb.tooling.handlers.preventDefault(eEvent);
+
+				},
+				//--------------------------------
+				documentMousedown: function(eEvent){
+				//--------------------------------
+					if(bb.tooling.currentInspector && eEvent.target != bb.tooling.currentInspector){
+						bb.tooling.handlers.preventDefault(eEvent);
+						setTimeout( function(){
+								if ( ! bb.tooling.root.instanceOf('http://www.backbase.com/2006/btl', 'window') )
+									setTimeout(window.focus, 500);
+								bb.tooling.currentInspector.setProperty('active', false);
+						}, 100);
+
+						bb.tooling.currentTree.selectItem( bb.tooling.currentTree.getProperty('viewCategory') == 'view' ? eEvent.viewTarget : eEvent.target.modelNode);
+
+					}
+				},
+				//--------------------------------
+				preventDefault: function(eEvent){
+				//--------------------------------
+					eEvent.preventDefault();
+					eEvent.stopImmediatePropagation();
+				}
+		};
+
+		]]></resource>
+
+		<interface name="iViewCategory">
+			<property name="viewCategory"/>
+		</interface>
+
+		<interface name="iViewSubCategory">
+			<property name="viewSubCategory"/>
+		</interface>
+
+		<behavior name="debugger">
+			<handler event="construct" type="text/javascript">
+				//Set the root
+				bb.tooling.root = this;
+			</handler>
+			<handler event="destruct" type="text/javascript">
+				bb.tooling.exit(this);
+			</handler>
+			<handler event="DOMNodeInsertedIntoDocument" type="text/javascript">
+				bb.tooling.init(this);
+			</handler>
+			<handler event="view-change" type="text/javascript">
+				if(event.category){
+					bb.tooling.data.category = event.category;
+					if(event.subCategory){
+						if(!bb.tooling.data.categories[event.category]) bb.tooling.data.categories[event.category] = {};
+						bb.tooling.data.categories[event.category].subCategory = event.subCategory;
+					}
+				}
+			</handler>
+			<handler event="mousemove" type="text/javascript"><![CDATA[
+				if(event.viewTarget != this._.currentViewTarget){
+					var oElm = event.viewTarget;
+
+					var oOldElm = this._.currentViewTarget;
+					this._.currentViewTarget = oElm;
+
+					//MOUSEOUT on old element
+					if(oOldElm && oOldElm.getAttribute('islink') == 'true')
+						this.viewMouseOut(oOldElm);
+					else if(oOldElm && oOldElm.parentNode && oOldElm.parentNode.getAttribute('islink') == 'true')
+						this.viewMouseOut(oOldElm.parentNode);
+
+					//MOUSEOVER
+					if(oElm && oElm.getAttribute('islink') == 'true')
+						this.viewMouseOver(oElm);
+					else if(oElm && oElm.parentNode && oElm.parentNode.getAttribute('islink') == 'true')
+						this.viewMouseOver(oElm.parentNode);
+				}
+			]]></handler>
+			<handler event="mouseout" type="text/javascript"><![CDATA[
+
+				if(this._.currentViewTarget){
+					var sClass = 'bb-debugger-format';
+					var oOldElm = this._.currentViewTarget;
+					this._.currentViewTarget = null;
+					//MOUSEOUT on old element
+					if(oOldElm && oOldElm.getAttribute('islink') == 'true')
+						this.viewMouseOut(oOldElm);
+					else if(oOldElm && oOldElm.parentNode && oOldElm.parentNode.getAttribute('islink') == 'true')
+						this.viewMouseOut(oOldElm.parentNode);
+
+				}
+			]]></handler>
+
+			<handler event="click" type="text/javascript"><![CDATA[
+				var oElm = event.viewTarget;
+
+				if(oElm && oElm.getAttribute('islink') == 'true')
+					this.viewClick(oElm);
+				else if(oElm && oElm.parentNode && oElm.parentNode.getAttribute('islink') == 'true')
+					this.viewClick(oElm.parentNode);
+				else if( bb.selector.match(oElm, '.bb-grid-icon') )
+					Tdl_Toggle_GridItem(oElm);
+			]]></handler>
+
+			<method name="toggleDebugger">
+				<argument name="value" />
+				<body type="text/javascript"><![CDATA[
+				if ( this.instanceOf('http://www.backbase.com/2006/btl', 'window') ){
+					this.setAttribute('open', value ? 'true' : 'false');
+				} else {
+					window.focus();
+				}
+				]]></body>
+			</method>
+
+
+			<method name="viewMouseOver">
+				<argument name="target" />
+				<body type="text/javascript"><![CDATA[
+					bb.html.addClass(target, 'bb-debugger-format-hover');
+				]]></body>
+			</method>
+
+			<method name="viewMouseOut">
+				<argument name="target" />
+				<body type="text/javascript"><![CDATA[
+					bb.html.removeClass(target, 'bb-debugger-format-hover');
+				]]></body>
+			</method>
+
+			<method name="viewClick">
+				<argument name="target" />
+				<body type="text/javascript"><![CDATA[
+
+					var category = target.getAttribute('category');
+					switch(category){
+						case 'tdl':
+							bb.tooling.switchTo('tdl');
+							bb.tooling.tdlTree.selectItem( target );
+						break;
+						case 'xml':
+							bb.tooling.switchTo('console');
+							bb.console.dirxml(target.target);
+						break;
+						case 'function':
+							bb.tooling.switchTo('console');
+							bb.console.dirxml(target.target);
+						break;
+						case 'view':
+						case 'model':
+							bb.tooling.switchTo(category);
+							bb.tooling.currentTree.selectItem(target.target);
+						break;
+					}
+				]]></body>
+			</method>
+
+		</behavior>
+
+		<element name="baseDebuggerInspector" abstract="true">
+			<handler event="DOMNodeInsertedIntoDocument" type="application/javascript">
+				var oThis = this;
+				bb.tooling.root.addEventListener('view-change', function(event){bb.tooling.enableDisable(oThis, event.category, event.subCategory);}, false);
+			</handler>
+		</element>
+		<behavior name="tab">
+			<handler event="construct" type="text/javascript"><![CDATA[
+				if(this.modelNode.getAttribute('category') == bb.tooling.data.category)
+					this.modelNode.setAttribute('selected', 'selected');
+
+				var sCategory = bb.evaluateSmart('string(ancestor::b:tab/@category)', this, bb.tooling.nsResolver);
+				if(sCategory && bb.tooling.data.categories[sCategory] && this.modelNode.getAttribute('subCategory') == bb.tooling.data.categories[sCategory].subCategory)
+					this.modelNode.setAttribute('selected', 'selected');
+			]]></handler>
+
+			<handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				if(bb.getProperty(this, 'selected') && bb.evaluateSmart('string(ancestor::b:tab/@category)', this, bb.tooling.nsResolver) == bb.tooling.data.category){
+					//Dirty but does the trick!
+					var oThis = this;
+					setTimeout(function(){ bb.command.fireEvent(oThis, 'select', false, false); }, 200);
+				}
+			]]></handler>
+			<handler event="select" type="text/javascript"><![CDATA[
+				var oEvent = bb.document.createEvent('Events');
+				oEvent.initEvent('view-change', false, false);
+				oEvent.category = this.modelNode.getAttribute('category') || bb.tooling.data.category;
+				oEvent.subCategory = this.modelNode.getAttribute('subCategory') || ( (bb.tooling.data.categories && bb.tooling.data.categories[oEvent.category]) ? bb.tooling.data.categories[oEvent.category].subCategory : null);
+				bb.tooling.root.dispatchEvent(oEvent);
+			]]></handler>
+		</behavior>
+
+		<behavior name="modelContextMenu">
+			<handler event="mouseup" type="text/javascript">
+				var sAction = event.target.getAttribute('label');
+				document.title = sAction;
+				switch(sAction) {
+
+					case 'Delete Node':
+						var oNode = bb.tooling.window.bb.getControllerFromModel(bb.tooling.currentTree.getProperty('selectedNode'));
+						oNode.getProperty('parentNode').removeChild(oNode);
+					break;
+
+				}
+				//alert(event.target.getAttribute('label'));
+			</handler>
+		</behavior>
+
+
+</namespace>

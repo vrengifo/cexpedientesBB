@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"   xmlns:c="http://www.backbase.com/2006/command" xmlns:d="http://www.backbase.com/2006/tdl" >
+	<d:namespace name="http://www.backbase.com/2006/btl">
+		<d:uses interface="iDataCommunicator" src="../../www.backbase.com.2006.btl/dataBinding/dataBinding.xml"/>
+	</d:namespace>
+
+	<d:namespace name="http://www.backbase.com/2007/jsf/client">
+
+		<d:behavior name="remoteJSFData" implements="b:iDataCommunicator">
+			<d:attribute name="dataType" default="application/xml">
+				<d:mapper type="text/javascript"><![CDATA[
+					btl.dataBinding.setType(this, value.toLowerCase());
+				]]></d:mapper>
+			</d:attribute>
+			<d:method name="sendRequest">
+				<d:argument name="action"/>
+				<d:argument name="observer"/>
+				<d:body type="text/javascript"><![CDATA[
+					var oActionGroup = new btl.dataBinding.ActionGroup();
+					oActionGroup.addAction(action);
+					var sData = encodeURIComponent(btl.dataSource.types.getType('application/xml').serialize(oActionGroup, this._.dataSchema.getField('identifier')));
+					bb.bjsf.registerAttributeChange(this.getAttribute(bb.bjsf.identify), 'data', sData);
+					bb.bjsf.registerAttributeChange(this.getAttribute(bb.bjsf.identify), 'observer', observer.getAttribute(bb.bjsf.identify));
+					bb.bjsf.sync(this, 'submit');
+					//Continue with the queue
+					btl.dataSource.requestQueueContinue(this);
+				]]></d:body>
+			</d:method>
+		</d:behavior>
+	</d:namespace>
+</d:tdl>

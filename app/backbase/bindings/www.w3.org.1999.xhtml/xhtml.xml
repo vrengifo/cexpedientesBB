@@ -1,0 +1,1078 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<!--
+		XHTML 1.1 Modules
+		Please refer to: http://www.w3.org/TR/xhtml-modularization/
+	-->
+	<d:namespace name="http://www.w3.org/1999/xhtml">
+		
+
+		<!--
+			Attribute Collection: Common
+		-->
+		<d:element name="xhtmlElement" abstract="true">
+			<d:resource type="text/javascript"><![CDATA[
+				xhtml = {
+					namespaceURI: 'http://www.w3.org/1999/xhtml',
+					handlers: {
+						ieclick: function(){
+							var oController = bb.getControllerFromView(this);
+
+							// Fix IE behaviour for radio button without name attribute (bug 4990)
+							if (this.type == 'radio' && !oController.hasAttribute('name'))
+								this.checked = true;
+
+							// Reliable "change" event firing for IE(checkbox and radio)
+							if( oController.__oldChecked != this.checked ){
+								bb.command.fireEvent(oController, 'change', true, false);
+								oController.__oldChecked = this.checked;
+							}
+						},
+						iefocusin: function(){
+							// Reliable "change" event firing for IE (checkbox and radio)
+							bb.getControllerFromView(this).__oldChecked = this.checked;
+						},
+						change: function(){
+							bb.command.fireEvent( bb.getControllerFromView(this), 'change', true, false);
+						},
+						select: function(){
+							bb.command.fireEvent( bb.getControllerFromView(this), 'select', true, false);
+						},
+						submit: function(oBrowserEvent){
+							oBrowserEvent = oBrowserEvent || event;
+							var oForm = bb.getControllerFromView(this);
+							var bSubmit = true;
+							try {
+								bSubmit = !bb.command.fireEvent( oForm, 'submit', true, true).defaultPrevented;
+							} catch( e ){ //If the submit handler has an error dont submit!
+								bSubmit = false;
+							}
+
+							if (!bSubmit) {
+								if(oBrowserEvent.preventDefault)
+									oBrowserEvent.preventDefault();
+
+								oBrowserEvent.returnValue = false;
+								return false;
+							}
+						},
+						reset: function(){
+							var oForm = bb.getControllerFromView(this);
+							if( !bb.command.fireEvent( oForm, 'reset', true, false).defaultPrevented
+								&& (bb.browser.gecko || bb.browser.webkit)){ //fix 6438
+								var aForms = oForm.viewNode.getElementsByTagName('form');
+								for(var i = aForms.length-1; i >= 0; i--) {
+									aForms[i].reset();
+								}
+							}
+						},
+
+						select_focusHandler: function(){
+							var oSelect = bb.getControllerFromView(this);
+							oSelect._['_initialValue'] = this.value;
+						},
+
+						select_blurHandler: function(){
+							var oSelect = bb.getControllerFromView(this);
+							if(oSelect._['_initialValue'] != this.value) {
+								xhtml.handlers.change.call(this);
+							}
+						},
+
+						select_clickHandler: function(){
+							var oSelect = bb.getControllerFromView(this);
+							oSelect._['_mouseClick'] = true;
+						},
+
+						select_keydownHandler: function(){
+							var oSelect = bb.getControllerFromView(this);
+							oSelect._['_mouseClick'] = false;
+						},
+
+						select_changeHandler: function(){
+							var oSelect = bb.getControllerFromView(this);
+							if(oSelect._['_mouseClick']) {
+								oSelect._['_initialValue'] = this.value;
+								xhtml.handlers.change.call(this);
+							}
+						}
+					}
+				};
+			]]></d:resource>
+
+			<!-- Core -->
+			<d:attribute name="id" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="class" onmap="if(bb.browser.ie){ this.viewNode.className = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="title" onmap="this.viewNode.setAttribute(name, value)"/>
+			<!-- I18N -->
+			<d:attribute name="xml:lang" onmap="this.viewNode.setAttribute(name, value)"/>
+			<!-- From the Bi-directional Text Module -->
+			<d:attribute name="dir" onmap="this.viewNode.setAttribute(name, value)"/>
+			<!-- Style -->
+			<d:attribute name="style" onmap="if(bb.browser.ie){ this.viewNode.style.cssText = value; }else{ this.viewNode.setAttribute(name, value) }"/>
+			<d:template type="text/javascript">
+				var oNode = document.createElement(this.modelNode.localName || this.modelNode.baseName);
+				return [oNode, oNode];
+			</d:template>
+		</d:element>
+
+		<!--
+			Core Modules
+		-->
+		<!--
+			Focus Module
+		-->
+		<d:element name="xhtmlFocusableElement" extends="xhtmlElement" abstract="true">
+			<d:attribute name="accesskey" onmap="if(bb.browser.ie){ this.viewNode.accessKey = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="tabindex" onmap="if(bb.browser.ie){ this.viewNode.tabIndex = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+
+			<d:method name="focus">
+				<d:body type="text/javascript"><![CDATA[
+					if (this.viewNode && this.viewNode.focus)
+						this.viewNode.focus();
+				]]></d:body>
+			</d:method>
+
+			<d:method name="blur">
+				<d:body type="text/javascript"><![CDATA[
+					if (this.viewNode && this.viewNode.blur)
+						this.viewNode.blur();
+				]]></d:body>
+			</d:method>
+		</d:element>
+
+
+		<!--
+			Structure Module
+		-->
+		<d:element name="body" extends="xhtmlElement"/>
+		<d:element name="head">
+			<d:attribute name="profile"/>
+		</d:element>
+		<d:element name="html">
+			<d:attribute name="version"/>
+			<d:attribute name="xmlns"/>
+		</d:element>
+		<d:element name="title"/>
+
+		<!--
+			Text Module: Flow
+		-->
+		<!-- Block -->
+		<d:element name="address" extends="xhtmlElement"/>
+		<d:element name="blockquote" extends="xhtmlElement">
+			<d:attribute name="cite" onmap="this.viewNode.setAttribute(name, value)"/>
+		</d:element>
+		<d:element name="div" extends="xhtmlElement"/>
+		<d:element name="p" extends="xhtmlElement"/>
+		<d:element name="pre" extends="xhtmlElement">
+			<d:attribute name="xml:space" default="preserve" onmap="this.viewNode.setAttribute(name, value)"/>
+		</d:element>
+		<!-- Inline -->
+		<d:element name="abbr" extends="xhtmlElement"/>
+		<d:element name="acronym" extends="xhtmlElement"/>
+		<d:element name="br" extends="xhtmlElement"/>
+		<d:element name="cite" extends="xhtmlElement"/>
+		<d:element name="code" extends="xhtmlElement"/>
+		<d:element name="dfn" extends="xhtmlElement"/>
+		<d:element name="em" extends="xhtmlElement"/>
+		<d:element name="kbd" extends="xhtmlElement"/>
+		<d:element name="q" extends="xhtmlElement">
+			<d:attribute name="cite" onmap="this.viewNode.setAttribute(name, value)"/>
+		</d:element>
+		<d:element name="samp" extends="xhtmlElement"/>
+		<d:element name="span" extends="xhtmlElement"/>
+		<d:element name="strong" extends="xhtmlElement"/>
+		<d:element name="var" extends="xhtmlElement"/>
+		<!-- Heading  -->
+		<d:element name="h1" extends="xhtmlElement"/>
+		<d:element name="h2" extends="xhtmlElement"/>
+		<d:element name="h3" extends="xhtmlElement"/>
+		<d:element name="h4" extends="xhtmlElement"/>
+		<d:element name="h5" extends="xhtmlElement"/>
+		<d:element name="h6" extends="xhtmlElement"/>
+
+		<!-- Hypertext Module -->
+		<d:element name="a" extends="xhtmlFocusableElement">
+			<d:attribute name="charset" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="href">
+				<d:mapper type="text/javascript"><![CDATA[
+					var oNode;
+					// work around bug 6748 in IE with setting .href on <a> with @ in text node
+					if (bb.browser.ie && this.viewNode.childNodes.length == 1 &&
+							(oNode = this.viewNode.firstChild).nodeType == 3 &&
+							oNode.nodeValue.indexOf('@') != -1) {
+						this.viewNode.removeChild(oNode);
+						this.viewNode.href = this.getProperty(name);
+						this.viewNode.appendChild(oNode);
+					} else {
+						this.viewNode.href = this.getProperty(name);
+					}
+				]]></d:mapper>
+			</d:attribute>
+			<d:attribute name="hreflang" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="rel" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="rev" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="type" onmap="this.viewNode.setAttribute(name, value)"/>
+
+			<!--Target Module -->
+			<d:attribute name="target" onmap="this.viewNode.setAttribute(name, value);"/>
+
+			<!-- Name Identification Module -->
+			<d:attribute name="name" onmap="this.viewNode.setAttribute(name, value);"/>
+
+			<d:template type="text/javascript">
+				var oElm = document.createElement('a');
+				// IE requires shape and coords to be added on creation of the element.
+				if (bb.browser.ie) {
+					var sCoords = this.modelNode.getAttribute('coords');
+					var sShape = this.modelNode.getAttribute('shape');
+					if (sCoords != null &amp;&amp; sShape != null)
+						oElm = document.createElement('&lt;a shape="'+ sShape +'" coords="'+ sCoords +'"&gt;');
+				}
+				return [oElm, oElm];
+			</d:template>
+
+			<d:attribute name="coords" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="shape" onmap="this.viewNode.setAttribute(name, value)"/>
+
+			<!-- Implementation -->
+			<d:property name="href" onget="return bb.uri.resolveUri( this.getAttribute(name), this.getProperty('baseURI') );" onset="this.setAttribute(name,  value);"/>
+		</d:element>
+
+		<!-- List Module -->
+		<d:element name="dl" extends="xhtmlElement"/>
+		<d:element name="dt" extends="xhtmlElement"/>
+		<d:element name="dd" extends="xhtmlElement"/>
+		<d:element name="ol" extends="xhtmlElement"/>
+		<d:element name="ul" extends="xhtmlElement"/>
+		<d:element name="li" extends="xhtmlElement"/>
+
+
+		<!-- Text Extension Modules -->
+		<!-- Presentation Module -->
+		<d:element name="b" extends="xhtmlElement"/>
+		<d:element name="big" extends="xhtmlElement"/>
+		<d:element name="hr" extends="xhtmlElement"/>
+		<d:element name="i" extends="xhtmlElement"/>
+		<d:element name="small" extends="xhtmlElement"/>
+		<d:element name="sub" extends="xhtmlElement"/>
+		<d:element name="sup" extends="xhtmlElement"/>
+		<d:element name="tt" extends="xhtmlElement"/>
+
+		<!-- Edit Module -->
+		<d:element name="edit" extends="xhtmlElement" abstract="true">
+			<d:attribute name="cite" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="datetime" onmap="if(bb.browser.ie){ this.viewNode.dateTime = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+		</d:element>
+
+		<d:element name="ins" extends="edit"/>
+		<d:element name="del" extends="edit"/>
+
+		<!-- Bi-directional Text Module -->
+		<!-- attribute "dir" is mapped in the i18n attributes collection -->
+		<d:element name="bdo" extends="xhtmlElement"/>
+
+		<!-- Forms Module -->
+		<!-- Form -->
+		<d:element name="form" extends="xhtmlElement">
+			<d:template type="text/javascript">
+				var oNode = bb.browser.ie ? document.createElement('&lt;form name="' + this.modelNode.getAttribute('name') + '"&gt;') : document.createElement('form');
+				return [oNode, oNode];
+			</d:template>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				bb.html.addEventListener(this.viewNode, 'submit', xhtml.handlers.submit);
+				bb.html.addEventListener(this.viewNode, 'reset', xhtml.handlers.reset);
+			]]></d:constructor>
+
+			<d:destructor type="text/javascript"><![CDATA[
+				bb.html.removeEventListener(this.viewNode, 'submit', xhtml.handlers.submit);
+				bb.html.removeEventListener(this.viewNode, 'reset', xhtml.handlers.reset);
+				//Fix for memory leak in IE: http://ajaxian.com/archives/ie6-leak-on-form-tag
+				if (bb.browser.ie)
+					this.viewNode.removeNode();
+			]]></d:destructor>
+
+			<d:attribute name="accept" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="accept-charset" onmap="if(bb.browser.ie){this.viewNode.acceptCharset = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="action" onmap="this.viewNode.action = this.getProperty(name);"/>
+			<d:attribute name="method" onmap="this.viewNode.setAttribute(name, value)" default="GET"/>
+			<d:attribute name="enctype" onmap="if(bb.browser.ie) this.viewNode.encoding = value; this.viewNode[name] = value;" default="application/x-www-form-urlencoded"/>
+
+			<!--Target Module -->
+			<d:attribute name="target" onmap="this.viewNode.setAttribute(name, value);"/>
+
+			<!-- Name Identification Module -->
+			<d:attribute name="name" onmap="this.viewNode.setAttribute(name, value);"/>
+
+			<!-- autoComplete attribute -->
+			<d:attribute name="autocomplete" onmap="this.viewNode.setAttribute(name, value);"/>
+
+			<!-- SPI Submit -->
+			<d:attribute name="mode" default="replaceChildren"/>
+
+			<!-- Implementation -->
+			<d:property name="action" onget="return bb.uri.resolveUri(this.getAttribute(name), this.getProperty('baseURI') );" onset="this.setAttribute(name,  value);"/>
+			<d:property name="method" onget="return this.viewNode[name].toUpperCase();" onset="this.setAttribute(name,  value);"/>
+			<d:property name="enctype" onget="return this.viewNode[name];" onset="this.setAttribute(name,  value);"/>
+			<d:property name="elements">
+				<d:getter type="text/javascript"><![CDATA[
+					var elements = this.viewNode.elements;
+					var rv = [];
+					for (var i = 0; i < elements.length; i++) {
+						rv.push(bb.getControllerFromView(elements[i]));
+					}
+					return rv;
+				]]></d:getter>
+			</d:property>
+
+			<d:method name="submit">
+				<d:body type="text/javascript"><![CDATA[
+					this.viewNode.submit();
+				]]></d:body>
+			</d:method>
+		</d:element>
+
+		<!-- Form control -->
+		<d:element name="xhtmlControlElement" extends="xhtmlFocusableElement" abstract="true">
+			<d:template type="text/javascript">
+				var oNode = document.createElement(this.modelNode.localName || this.modelNode.baseName);
+				return [oNode, oNode];
+			</d:template>
+
+			<d:attribute name="name" onmap="this.viewNode.name = value">
+				<!--
+					[MSDN] When submitting a form, use the name property to bind the value of the control.
+					The name is not the value displayed for the input type=button, input type=reset, and
+					input type=submit input types. The internally stored value, not the displayed value,
+					is the one submitted with the form.
+
+					Microsoft JScript allows the name to be changed at run time. This does not cause the
+					name in the programming model to change in the collection of elements, but it does
+					change the name used for submitting elements.
+
+					The NAME attribute cannot be set at run time on elements dynamically created with the
+					createElement method. To create an element with a name attribute, include the attribute
+					and value when using the createElement method.
+				-->
+			</d:attribute>
+			<d:attribute name="disabled" onmap="this.viewNode.disabled = value == name"/>
+
+			<!-- autoComplete attribute -->
+			<d:attribute name="autocomplete" onmap="this.viewNode.setAttribute(name, value);"/>
+
+			<!-- Implementation -->
+			<d:property name="form" onget="return this.viewNode[name] ? bb.getControllerFromView(this.viewNode[name]) : null;"/>
+			<d:property name="disabled" onget="return this.viewNode[name];" onset="this.viewNode[name] = value;"/>
+			<d:property name="name" onget="return this.viewNode[name];" onset="this.viewNode[name] = value;"/>
+			<d:property name="value" onget="return this.viewNode[name];" onset="this.viewNode[name] = value;"/>
+			<d:property name="type" onget="return this.viewNode[name];" onset="this.viewNode[name] = value;"/>
+		</d:element>
+
+		<d:element name="input" extends="xhtmlControlElement">
+			<d:resource type="text/javascript"><![CDATA[
+				xhtml.input = {
+					DOMActivateTypes:	{
+						radio: true,
+						checkbox: true,
+						button: true,
+						submit: true,
+						reset: true
+					}
+				};
+			]]></d:resource>
+			<!-- Prevent children from appending (IE) -->
+			<d:method name="__children">
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:template type="text/javascript">
+				var oNode;
+				if (bb.browser.ie) {
+					var s = '&lt;input ';
+					var i = 0, oAttr, aAttrs = this.modelNode.attributes;
+					while (oAttr = aAttrs[i++]) {
+						if (oAttr.nodeName.indexOf('on') != 0)
+							s += oAttr.nodeName + '="' + bb.string.escapeXml(oAttr.nodeValue) + '" ';
+					}
+					s += '/&gt;';
+					oNode = bb.html.createElementFromString(s);
+				} else {
+					oNode = document.createElement('input');
+				}
+				return [oNode, oNode];
+			</d:template>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				if( bb.browser.ie && (this.viewNode.type == 'checkbox' || this.viewNode.type == 'radio')){
+					bb.html.addEventListener(this.viewNode, 'focusin', xhtml.handlers.iefocusin);
+					bb.html.addEventListener(this.viewNode, 'click', xhtml.handlers.ieclick);
+				} else {
+					bb.html.addEventListener(this.viewNode, 'change', xhtml.handlers.change);
+				}
+				bb.html.addEventListener(this.viewNode, 'select', xhtml.handlers.select);
+			]]></d:constructor>
+
+			<d:destructor type="text/javascript"><![CDATA[
+				bb.html.removeEventListener(this.viewNode, 'change', xhtml.handlers.change);
+				bb.html.removeEventListener(this.viewNode, 'select', xhtml.handlers.select);
+			]]></d:destructor>
+
+			<d:attribute name="accept" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="alt" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="checked" onmap="this.viewNode.defaultChecked = value == name;"/>
+			<d:attribute name="maxlength" onmap="this.viewNode.maxLength = value;"/>
+			<d:attribute name="readonly" onmap="this.viewNode.readOnly = value == name;"/>
+			<d:attribute name="size" onmap="this.viewNode.size = value;"/>
+			<d:attribute name="src" onmap="this.viewNode.src = this.getProperty(name);"/>
+			<d:attribute name="type" default="text" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="value" onmap="this.viewNode.defaultValue = value;"/>
+
+			<!-- Server-side Image Map Module -->
+			<d:attribute name="ismap" onmap="this.viewNode.isMap = value == name;"/>
+			<d:attribute name="usemap" onmap="if(bb.browser.ie){ this.viewNode.useMap = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+
+			<!-- Implementation -->
+			<d:property name="src" onget="return bb.uri.resolveUri(this.getAttribute(name), this.getProperty('baseURI') );" onset="this.setAttribute(name,  value);"/>
+			<d:property name="value" onget="return this.viewNode[name];" onset="this.viewNode[name] = value;"/>
+			<d:property name="checked" onget="return this.viewNode[name];" onset="this.viewNode[name] = value;"/>
+
+			<!-- Handlers -->
+			<d:handler event="click" type="text/javascript"><![CDATA[
+				if (this.getProperty('type') in xhtml.input.DOMActivateTypes) {
+					var oEvent = bb.document.createEvent('UIEvents');
+					oEvent.initUIEvent('DOMActivate', true, true, window, event.detail);
+					if (!this.dispatchEvent(oEvent))
+						event.preventDefault();
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="textarea" extends="xhtmlControlElement">
+			<!--
+				When appending a child node to the element, the core replaces consecutive white space
+				with a single white space character.
+
+				In order to prevserve white space, the __children method has been overidden.
+
+				The text content property can be used since according to the xhtml 1 specification the textarea element
+				may only contain text and not markup.
+			-->
+
+
+			<d:attribute name="accesskey" onmap="if(bb.browser.ie){ this.viewNode.accessKey = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="cols" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="readonly" onmap="this.viewNode.readOnly = value == name;"/>
+			<d:attribute name="rows" onmap="this.viewNode.setAttribute(name, value)"/>
+
+			<d:method name="__children">
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				var sText = this.getProperty('textContent');
+				// set defaultValue to enable reset
+				this.viewNode.defaultValue = sText;
+				this.viewNode.value = sText;
+				bb.html.addEventListener(this.viewNode, 'change', xhtml.handlers.change);
+				bb.html.addEventListener(this.viewNode, 'select', xhtml.handlers.select);
+			]]></d:constructor>
+
+			<d:destructor type="text/javascript"><![CDATA[
+				bb.html.removeEventListener(this.viewNode, 'change', xhtml.handlers.change);
+				bb.html.removeEventListener(this.viewNode, 'select', xhtml.handlers.select);
+			]]></d:destructor>
+		</d:element>
+
+		<d:element name="select" extends="xhtmlControlElement">
+			<d:template type="text/javascript">
+				var oNode;
+				if(bb.browser.ie) {
+					var s = '&lt;select ';
+					var i = 0, oAttr, aAttrs = this.modelNode.attributes;
+					while (oAttr = aAttrs[i++]) {
+						if (oAttr.nodeName.indexOf('on') != 0)
+							s += oAttr.nodeName+'="'+oAttr.nodeValue+'" ';
+					}
+					s += '&gt;&lt;/select&gt;';
+					oNode = bb.html.createElementFromString(s);
+				}
+				else {
+					oNode = document.createElement('select');
+					oNode.multiple = this.modelNode.getAttribute('multiple') == 'multiple';
+				}
+				return [oNode, oNode];
+			</d:template>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				// For IE and Opera, the HTML select fires a change event when a (closed) select is
+				// navigated using the up/down keys (see bug 10673).
+				// The following workaround for IE and Opera ensures these browsers behave the same
+				// way as Firefox and Safari.
+				// In the workaround, the standard HTML change event is pre-processed and change events
+				// generated by kepresses are ignored.
+				// To generate a change event when the select element is blurred (assuming selection has changed)
+				// the value of the select when it is blurred is compared with the value at the last change event
+				// (or the initial value when it was focused if no intermediate change event has occured).
+				if (bb.browser.ie || bb.browser.opera) {
+					bb.html.addEventListener(this.viewNode, 'focus', xhtml.handlers.select_focusHandler);
+					bb.html.addEventListener(this.viewNode, 'blur', xhtml.handlers.select_blurHandler);
+					bb.html.addEventListener(this.viewNode, 'click', xhtml.handlers.select_clickHandler);
+					bb.html.addEventListener(this.viewNode, 'keydown', xhtml.handlers.select_keydownHandler);
+					bb.html.addEventListener(this.viewNode, 'change', xhtml.handlers.select_changeHandler);
+				} else {
+					bb.html.addEventListener(this.viewNode, 'change', xhtml.handlers.change);
+				}
+			]]></d:constructor>
+
+			<d:destructor type="text/javascript"><![CDATA[
+				if (bb.browser.ie || bb.browser.opera) {
+					bb.html.removeEventListener(this.viewNode, 'focus', xhtml.handlers.select_focusHandler);
+					bb.html.removeEventListener(this.viewNode, 'blur', xhtml.handlers.select_blurHandler);
+					bb.html.removeEventListener(this.viewNode, 'click', xhtml.handlers.select_clickHandler);
+					bb.html.removeEventListener(this.viewNode, 'keydown', xhtml.handlers.select_keydownHandler);
+					bb.html.removeEventListener(this.viewNode, 'change', xhtml.handlers.select_changeHandler);
+				} else {
+					bb.html.removeEventListener(this.viewNode, 'change', xhtml.handlers.change);
+				}
+			]]></d:destructor>
+
+			<d:attribute name="size" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="multiple" onmap="this.viewNode.multiple = value == name;"/>
+
+			<!-- Implementation -->
+			<d:property name="type" onget="return this.viewNode[name];" onset="this.setAttribute(name,  value)"/>
+			<d:property name="value" onget="return this.viewNode[name];" onset="this.viewNode[name] = value;"/>
+			<d:property name="multiple" onget="return this.viewNode[name];" onset="this.setAttribute(name,  value)"/>
+			<d:property name="selectedIndex" onget="return this.viewNode[name];" onset="this.viewNode[name] = value;"/>
+			<d:property name="options">
+				<d:getter type="text/javascript"><![CDATA[
+					var options = this.viewNode.options;
+					var rv = [];
+					for (var i=0; i<options.length; i++) {
+						rv.push(bb.getControllerFromView(options[i]));
+					}
+					return rv;
+				]]></d:getter>
+			</d:property>
+
+			<d:method name="blur">
+				<d:body type="text/javascript"><![CDATA[
+					if (this.viewNode && this.viewNode.blur)
+						this.viewNode.blur();
+
+					// bug 5146 - select control does not blur (when calling method) in IE6
+					// no browser check is left intentionally: keep behaviour across
+					// --------------
+					// 23/07/2007 : Added browser check anyway since tab order got messed up in opera.
+					// Also moved from handler to method as the issue was when calling the method.
+					if (bb.browser.ie)
+						document.body.focus();
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="DOMNodeInserted" type="text/javascript"><![CDATA[
+				/* IE7 does not properly repaint when options that are longer than the select
+				   are added. We need to force a repaint. This is not a problem when the width
+				   is not auto. Purposely not checking if an option is added or that the added
+				   element is a direct child of the select, because that is not expected from a
+				   select and would only add overhead. */
+				if (bb.browser.ie && bb.browser.version == 7) {
+					var sWidth = this.viewNode.style.width;
+					if (!sWidth || sWidth == 'auto') {
+						this.viewNode.style.width = 'auto';
+					}
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="option" extends="xhtmlElement">
+			<d:template type="text/javascript">
+				// a fix for the bug #6975, the default options for the select are not set while creating them
+				var oNode = document.createElement(this.modelNode.localName || this.modelNode.baseName);
+				var sSelected = this.modelNode.getAttribute('selected');
+				if (sSelected == 'selected' || sSelected == 'true') {
+					oNode.defaultSelected = true;
+				}
+				return [oNode, oNode];
+			</d:template>
+
+			<d:attribute name="disabled" onmap="this.viewNode.disabled = value == name"/>
+			<d:attribute name="label" onmap="if(bb.browser.ie){ this.viewNode.text = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="selected" onmap="this.viewNode.selected = value == name"/>
+			<d:attribute name="value" onmap="this.viewNode.setAttribute(name, value)"/>
+
+			<!-- Implementation -->
+			<d:property name="disabled" onget="return this.viewNode[name];" onset="this.viewNode[name] = value"/>
+			<d:property name="selected" onget="return this.viewNode[name];" onset="this.viewNode[name] = value"/>
+			<d:property name="value" onget="return this.viewNode[name];" onset="this.viewNode[name] = value"/>
+
+			<!-- IE does not register the text content of an option as value. We need to explicitly enable this. -->
+			<d:constructor type="text/javascript"><![CDATA[
+				if (bb.browser.ie && !this.hasAttribute('value'))
+					this.viewNode.value = this.getProperty('textContent');
+			]]></d:constructor>
+
+			<!-- If the textContent has changed, the value should be set again (see constructor) -->
+			<d:handler event="DOMCharacterDataModified" type="text/javascript"><![CDATA[
+				if (bb.browser.ie && !this.hasAttribute('value'))
+					this.viewNode.value = this.getProperty('textContent');
+			]]></d:handler>
+
+			<d:handler event="click" type="text/javascript"><![CDATA[
+				var oEvent = bb.document.createEvent('UIEvents');
+				oEvent.initUIEvent('DOMActivate', true, true, window, event.detail);
+				if (!this.dispatchEvent(oEvent))
+					event.preventDefault();
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="button" extends="xhtmlControlElement">
+			<d:template type="text/javascript">
+				var oNode;
+				if(bb.browser.ie) {
+					oNode = document.createElement('&lt;button type="' + this.getAttribute('type') + '" name="' + ( this.modelNode.getAttribute('name') || '') + '" value="' + ( this.modelNode.getAttribute('value') || '' ) + '"&gt;');
+				} else {
+					oNode = document.createElement('button');
+				}
+				return [oNode, oNode];
+			</d:template>
+
+			<d:attribute name="type" default="submit" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="value">
+				<d:mapper type="text/javascript"><![CDATA[
+					// Bug 8212: IE overwrites button textContent when setting value
+					if (!bb.browser.ie)
+						this.viewNode.setAttribute(name, value)
+				]]></d:mapper>
+			</d:attribute>
+
+			<!-- Implementation -->
+			<d:property name="type" onget="return this.viewNode[name];" onset="this.setAttribute(name,  value)"/>
+			<d:property name="value">
+				<d:getter type="text/javascript"><![CDATA[
+					// Bug 8212: IE overwrites button textContent when setting value
+					if (!bb.browser.ie)
+						return this.viewNode[name];
+					else
+						return this.modelNode.getAttribute('value') || '';
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					// Bug 8212: IE overwrites button textContent when setting value
+					if (!bb.browser.ie)
+						this.viewNode[name] = value;
+					else
+						this.modelNode.setAttribute('value', value);
+				]]></d:setter>
+			</d:property>
+
+			<!-- Handlers -->
+			<d:handler event="click" type="text/javascript"><![CDATA[
+				var oEvent = bb.document.createEvent('UIEvents');
+				oEvent.initUIEvent('DOMActivate', true, true, window, event.detail);
+				if (!this.dispatchEvent(oEvent))
+					event.preventDefault();
+			]]></d:handler>
+		</d:element>
+		<d:element name="fieldset" extends="xhtmlElement"/>
+		<d:element name="label" extends="xhtmlElement">
+			<d:attribute name="accesskey" onmap="if(bb.browser.ie){ this.viewNode.accessKey = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="for" onmap="if(bb.browser.ie){ this.viewNode.htmlFor = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+		</d:element>
+		<!-- ??? -->
+		<d:element name="legend" extends="xhtmlElement">
+			<d:attribute name="accesskey" onmap="if(bb.browser.ie){ this.viewNode.accessKey = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+		</d:element>
+		<d:element name="optgroup" extends="xhtmlElement">
+			<d:attribute name="disabled" onmap="this.viewNode.disabled = value == name;"/>
+			<d:attribute name="label" onmap="this.viewNode.setAttribute(name, value)"/>
+		</d:element>
+
+		<!--
+			Table Modules
+		-->
+		<!--
+			Tables Module
+		-->
+		<d:element name="table" extends="xhtmlElement">
+			<d:attribute name="border" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="cellpadding" onmap="if(bb.browser.ie){ this.viewNode.cellPadding = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="cellspacing" onmap="if(bb.browser.ie){ this.viewNode.cellSpacing = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="frame" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="rules" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="summary" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="width" onmap="this.viewNode.setAttribute(name, value)"/>
+		</d:element>
+		<d:element name="tableChild" extends="xhtmlElement" abstract="true">
+			<d:attribute name="align" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="char" onmap="if(bb.browser.ie){ this.viewNode.ch = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="charoff" onmap="if(bb.browser.ie){ this.viewNode.chOff = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="valign" onmap="if(bb.browser.ie){ this.viewNode.vAlign = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+		</d:element>
+
+		<d:element name="caption" extends="xhtmlElement"/>
+
+		<d:element name="tableCol" extends="tableChild" abstract="true">
+			<d:attribute name="span" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="width" onmap="this.viewNode.setAttribute(name, value)"/>
+		</d:element>
+		<d:element name="colgroup" extends="tableCol"/>
+		<d:element name="col" extends="tableCol">
+			<d:template type="text/javascript">
+				var oGate = document.createElement('col');
+				var oElm = oGate;
+				var oParent = this.getProperty('parentNode');
+				if (bb.browser.ie &amp;&amp; oParent &amp;&amp; oParent.getProperty('localName') != 'colgroup') {
+					oGate = document.createElement('&lt;col span="' + this.modelNode.getAttribute('span') + '"&gt;');
+					oElm = document.createElement('colgroup');
+					oElm.appendChild(oGate);
+				}
+				return [oElm, oGate];
+			</d:template>
+		</d:element>
+
+		<d:element name="tr" extends="tableChild">
+			<d:template type="text/javascript">
+				var oElm = document.createElement('tr');
+
+				if (bb.browser.ie){
+					var oTable = this.getProperty('parentNode');
+					if (oTable &amp;&amp; oTable.viewGate &amp;&amp; oTable.viewGate.nodeName == 'TABLE'){
+						if (!oTable.viewGate.tBodies[0])
+							oTable.viewGate.appendChild(document.createElement('tbody'));
+						oTable.viewGate = oTable.viewGate.tBodies[0];
+					}
+				}
+				return [oElm, oElm];
+			</d:template>
+		</d:element>
+		<d:element name="tbody" extends="tableChild"/>
+		<d:element name="thead" extends="tableChild"/>
+		<d:element name="tfoot" extends="tableChild"/>
+
+		<d:element name="tableCell" extends="tableChild" abstract="true">
+			<d:attribute name="abbr" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="axis" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="colspan" onmap="if(bb.browser.ie){ this.viewNode.colSpan = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="headers" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="rowspan" onmap="if(bb.browser.ie){ this.viewNode.rowSpan = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="scope" onmap="this.viewNode.setAttribute(name, value)"/>
+			<!-- Cyrille: just as a note on these attributes, they are quite necessary for certain rendering problems
+				in Firefox where we need to be able to set height of tablecells to 100% in order to solve it. Maybe it
+				could be solved by CSS though.... -->
+			<d:attribute name="width" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="height" onmap="this.viewNode.setAttribute(name, value)"/>
+		</d:element>
+		<d:element name="th" extends="tableCell"/>
+		<d:element name="td" extends="tableCell"/>
+		<!--
+			Image Module
+		-->
+		<d:element name="img" extends="xhtmlElement">
+			<d:template type="text/javascript">
+				var oGate;
+				var oImg = oGate = document.createElement('img');
+				//Create fake SPAN for IMG, this is needed in IE for tooltips
+				if (bb.browser.ie)
+					oGate = document.createElement('span')
+				return [oImg, oGate];
+			</d:template>
+			<d:attribute name="alt" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="height">
+				<d:mapper type="text/javascript"><![CDATA[
+					if (bb.browser.ie)
+						this.viewNode.style.height = value;
+					else
+						this.viewNode.setAttribute(name, value);
+
+					//this.viewNode.setAttribute('height', value); // FF: ok! .... IE % doesn't work ...  % is calculated different from browser behavior
+					//this.viewNode.height = value; //% doesn't work in either browser
+					//this.viewNode.style.height = value; // FF: doesn't work for not specifying px ... IE: OK ...  % is calculated different from browser behavior
+					//this.viewNode.style.posHeight = value; // FF: no, IE % don't work
+					//this.viewNode.style.pixelHeight = value; // FF: no, IE % don't work
+
+					// Make sure that width is set to at least display partially. More or less emulating browser.
+					if (this.modelNode.getAttribute('width') == null)
+						this.setAttribute('width',  value);
+				]]></d:mapper>
+			</d:attribute>
+			<d:attribute name="longdesc" onmap="if(bb.browser.ie){ this.viewNode.longDesc = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="src" onchange="this.viewNode.src = this.getProperty(name);"/>
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				if (this.hasAttribute('src')) {
+					// fixes IE known issue kb#319546 (http://support.microsoft.com/kb/319546)
+					if (bb.browser.ie && bb.browser.version < 7) {
+						var oNode	= this;
+						setTimeout(function() {
+							if (oNode.viewNode)
+								oNode.viewNode.src	= oNode.getProperty('src');
+						});
+					} else {
+						this.viewNode.src = this.getProperty('src');
+					}
+				}
+			]]></d:handler>
+			<d:attribute name="width">
+				<d:mapper type="text/javascript"><![CDATA[
+					if (bb.browser.ie)
+						this.viewNode.style.width = value;
+					else
+						this.viewNode.setAttribute(name, value);
+
+					//this.viewNode.setAttribute('width', value); // FF: ok! .... IE % doesn't work ...  % is calculated different from browser behavior
+					//this.viewNode.width = value; //% doesn't work in either browser
+					//this.viewNode.style.width = value; // FF: doesn't work for not specifying px ... IE: OK ... % is calculated different from browser behavior
+					//this.viewNode.style.posWidth = value; // FF: no, IE % don't work
+					//this.viewNode.style.pixelWidth = value; // FF: no, IE % don't work
+
+					// Make sure that height is set to at least display partially. More or less emulating browser.
+					if (this.modelNode.getAttribute('height') == null)
+						this.setAttribute('height',  value);
+				]]></d:mapper>
+			</d:attribute>
+
+			<!-- Name Identification Module -->
+			<d:attribute name="name" onmap="this.viewNode.setAttribute(name, value);"/>
+
+			<!-- Server-side Image Map Module -->
+			<d:attribute name="ismap" onmap="if(bb.browser.ie){ this.viewNode.isMap = (value == name); }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="usemap" onmap="if(bb.browser.ie){ this.viewNode.useMap = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+
+			<!-- Implementation -->
+			<d:property name="src" onget="return bb.uri.resolveUri(this.getAttribute(name), this.getProperty('baseURI'));" onset="this.setAttribute(name,  value);"/>
+		</d:element>
+
+		<!--
+			Object Module
+		-->
+		<!-- important: (content of) object tag is not parsed, but passed to shadow tree -->
+		<!-- basically we leave rendering of this object completely to the browser. There are too many inconsistencies between
+			IE and Mozilla to create a solution conform the standards ( param movie <> attribute src ) -->
+		<d:element name="object" extends="xhtmlFocusableElement">
+			<d:template type="text/javascript">
+				var oXml	= this.modelNode.cloneNode(true), oAttr, i = 0;
+				while (oAttr = oXml.attributes[i++]) {
+					if (oAttr.nodeName.indexOf('on') == 0)
+						oXml.removeAttribute(oAttr.nodeName);
+				}
+				var oNode = bb.html.createElementFromString(bb.xml.serialize(oXml));
+				return [oNode, oNode];
+			</d:template>
+
+			<d:attribute name="archive" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="classid" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="codebase" onmap="if(bb.browser.ie){ this.viewNode.codeBase = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="codetype" onmap="if(bb.browser.ie){ this.viewNode.codeType = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="data" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="declare" onmap="this.viewNode.declare = value == name;"/>
+			<d:attribute name="height" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="name" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="standby" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="type" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="width" onmap="this.viewNode.setAttribute(name, value)"/>
+
+			<d:attribute name="usemap" onmap="if(bb.browser.ie){ this.viewNode.useMap = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+
+			<!-- Implementation -->
+			<!-- Override __children to assure that param tags aren't rendered the usual way. -->
+			<d:method name="__children">
+				<d:body type="text/javascript"/>
+			</d:method>
+		</d:element>
+
+		<d:element name="param">
+			<d:attribute name="id" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="name" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="type" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="value" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="valuetype" onmap="this.viewNode.setAttribute(name, value)"/>
+		</d:element>
+
+
+		<!-- Client-side Image Map Module -->
+		<d:element name="area" extends="xhtmlFocusableElement">
+			<d:template type="text/javascript">
+				var oElm = document.createElement('area');
+				var sCoords = this.modelNode.getAttribute('coords');
+				var sShape = this.modelNode.getAttribute('shape');
+				// IE requires shape and coords to be added on creation of the element.
+				if (sCoords != null &amp;&amp; sShape != null &amp;&amp; bb.browser.ie)
+					oElm = document.createElement('&lt;area shape="'+ sShape +'" coords="'+ sCoords +'"&gt;');
+				return [oElm, oElm];
+			</d:template>
+
+			<d:attribute name="alt" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="coords" onmap="this.viewNode.setAttribute(name, value)"/>
+			<d:attribute name="href" onmap="this.viewNode.href = this.getProperty(name);"/>
+			<d:attribute name="nohref" onmap="this.viewNode.noHref = value == name;"/>
+			<d:attribute name="shape" onmap="this.viewNode.setAttribute(name, value)"/>
+
+			<!--Target Module -->
+			<d:attribute name="target" onmap="this.viewNode.setAttribute(name, value);"/>
+
+			<!-- Implementation -->
+			<d:property name="href" onget="return bb.uri.resolveUri(this.getAttribute(name), this.getProperty('baseURI'));" onset="this.setAttribute(name,  value);"/>
+		</d:element>
+
+		<d:element name="map" extends="xhtmlElement">
+			<d:attribute name="id" onmap="this.viewNode.setAttribute(name, value); this.viewNode.setAttribute('name', value);"/>
+
+			<!-- Name Identification Module -->
+			<d:attribute name="name" onmap="this.viewNode.setAttribute(name, value);"/>
+
+			<d:template type="text/javascript">
+				var oNode = bb.browser.ie ? document.createElement('&lt;map name="' + this.modelNode.getAttribute('id') + '"&gt;') : document.createElement('map');
+				return [oNode, oNode];
+			</d:template>
+		</d:element>
+
+
+		<!-- Frames Module -->
+		<d:element name="frameset" extends="xhtmlElement">
+			<d:attribute name="cols" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="rows" onmap="this.viewNode.setAttribute(name, value);"/>
+		</d:element>
+		<d:element name="frame" extends="xhtmlElement">
+			<d:attribute name="frameborder" onmap="if(bb.browser.ie){ this.viewNode.frameBorder = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="longdesc" onmap="if(bb.browser.ie){ this.viewNode.longDesc = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="marginheight" onmap="if(bb.browser.ie){ this.viewNode.marginHeight = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="marginwidth" onmap="if(bb.browser.ie){ this.viewNode.marginWidth = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="marginwidth" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="noresize" onmap="if(bb.browser.ie){ this.viewNode.noResize = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="scrolling" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="src" onmap="this.viewNode.src = this.getProperty(name);"/>
+
+			<!-- Name Identification Module -->
+			<d:attribute name="name" onmap="this.viewNode.setAttribute(name, value);"/>
+
+			<!-- Implementation -->
+			<d:property name="src" onget="return bb.uri.resolveUri(this.getAttribute(name), this.getProperty('baseURI'));" onset="this.setAttribute(name,  value);"/>
+		</d:element>
+
+		<d:element name="noframes" extends="xhtmlElement"/>
+		<!--
+			Iframe Module
+		-->
+		<d:element name="iframe" extends="xhtmlElement">
+			<d:attribute name="frameborder" onmap="if(bb.browser.ie){ this.viewNode.frameBorder = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="height" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="longdesc" onmap="if(bb.browser.ie){ this.viewNode.longDesc = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="marginheight" onmap="if(bb.browser.ie){ this.viewNode.marginHeight = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="marginwidth" onmap="if(bb.browser.ie){ this.viewNode.marginWidth = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="scrolling" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="src" onmap="this.viewNode.src = this.getProperty(name);"/>
+			<d:attribute name="width" onmap="this.viewNode.setAttribute(name, value);"/>
+
+			<!-- Name Identification Module -->
+			<!-- no use for this in IE really, it doesn't work when you try to set this value later -->
+			<d:attribute name="name" onmap="this.viewNode.setAttribute(name, value);"/>
+
+			<!-- Implementation -->
+			<d:property name="src" onget="return bb.uri.resolveUri(this.getAttribute(name), this.getProperty('baseURI'));" onset="this.setAttribute(name,  value);"/>
+
+			<d:template type="text/javascript">
+				var oNode = null;
+				/*
+					Creating a different template for IE since the name will not be really registered otherwise.
+					Without the fix you can not target the frame with a form (for example).
+				*/
+				if (bb.browser.ie) {
+					oNode = document.createElement('&lt;iframe name="' + this.getAttribute('name') + '"&gt;');
+				} else {
+					oNode = document.createElement('iframe');
+				}
+				return [oNode, oNode];
+			</d:template>
+		</d:element>
+
+		<!--
+			Metainformation Module
+		-->
+		<d:element name="meta">
+			<d:attribute name="content" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="http-equiv" onmap="if(bb.browser.ie){ this.viewNode.httpEquiv = value; }else{ this.viewNode.setAttribute(name, value); }"/>
+			<d:attribute name="name" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="scheme" onmap="this.viewNode.setAttribute(name, value);"/>
+		</d:element>
+
+		<!--
+			Scripting Module
+		-->
+		<d:element name="script" extends="xhtmlElement">
+			<d:template type="text/javascript">
+				var oNode = document.createElement('script');
+				return [oNode, null];
+			</d:template>
+
+			<d:method name="__children">
+				<d:body type="application/javascript"/>
+			</d:method>
+			<!--
+				The handler introduced to solve IE specific issue (moment of script execution) in a generic manner.
+			 -->
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				var aValue = [];
+				for (oXmlNode = this.modelNode.firstChild; oXmlNode; oXmlNode = oXmlNode.nextSibling)
+					aValue.push(oXmlNode.nodeType == 1 ? '' : oXmlNode.nodeValue || oXmlNode.data || '');
+				if (aValue.length)
+					this.viewNode.text = aValue.join('');
+			]]></d:handler>
+
+			<d:attribute name="charset" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="defer" onmap="this.viewNode.defer = value == name;"/>
+			<d:attribute name="src" onmap="this.viewNode.src = this.getProperty(name);"/>
+			<d:attribute name="type" onmap="this.viewNode.type = value == 'application/javascript' ? 'text/javascript' : value;"/>
+
+			<d:attribute name="xml:space" default="preserve" onmap="this.viewNode.setAttribute(name, value);"/>
+
+			<!-- Implementation -->
+			<d:property name="src" onget="return bb.uri.resolveUri( this.getAttribute(name), this.getProperty('baseURI') );" onset="this.setAttribute(name,  value);"/>
+		</d:element>
+
+		<!--
+			Style Sheet Module
+		-->
+		<d:element name="style" extends="xhtmlElement">
+			<d:template type="text/javascript">
+				var oNode = bb.html.addStyleSheet(this.getProperty('textContent'));
+
+				if (bb.browser.webkit)
+					oNode = document.createElement('style');
+
+				return [oNode, null];
+			</d:template>
+
+			<d:attribute name="media" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="title" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="type" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="xml:space" default="preserve" onmap="this.viewNode.setAttribute(name, value);"/>
+		</d:element>
+
+		<!--
+			Link Module
+		-->
+		<d:element name="link" extends="xhtmlElement">
+			<d:attribute name="charset" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="href" onmap="this.viewNode.href = this.getProperty(name);"/>
+			<d:attribute name="hreflang" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="media" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="rel" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="rev" onmap="this.viewNode.setAttribute(name, value);"/>
+			<d:attribute name="type" onmap="this.viewNode.setAttribute(name, value);"/>
+			<!--Target Module -->
+			<d:attribute name="target" onmap="this.viewNode.setAttribute(name, value);"/>
+			<!-- Implementation -->
+			<d:property name="href" onget="return bb.uri.resolveUri( this.getAttribute(name), this.getProperty('baseURI') );" onset="this.setAttribute(name,  value);"/>
+		</d:element>
+
+		<!--
+			Base Module
+		-->
+		<d:element name="base" extends="xhtmlElement">
+			<d:attribute name="href" onmap="this.viewNode.setAttribute(name, value);"/>
+			<!--Target Module -->
+			<d:attribute name="target" onmap="this.viewNode.setAttribute(name, value);"/>
+		</d:element>
+	</d:namespace>
+</d:tdl>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="infoBoxBase" src="../infoBoxBase.xml"/>
+
+		<d:element name="infoBox" extends="b:infoBoxBase">
+			
+
+			<d:resource type="text/css"><![CDATA[
+				.btl-infoBox {
+					position: absolute;
+					top: -10000px;
+					left: -10000px;
+					background-color: InfoBackground;
+					z-index: 850;
+				}
+			]]></d:resource>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-infoBox btl-bevel"><d:content/></div>
+			</d:template>
+
+			<d:method name="open">
+				<d:argument name="destination"/>
+				<d:body type="text/javascript"><![CDATA[
+					if (!destination)
+						destination = this.getProperty('listeners')[0];
+
+					if (destination){
+						if ( this.callSuper('open', [destination]) ){
+							// position the infoBox if super function is okay!
+							bb.html.position(this.viewNode, destination.viewNode, 'after-start');
+						}
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="close">
+				<d:body type="text/javascript"><![CDATA[
+					this.callSuper('close');
+					this.viewNode.style.left = '-10000px';
+					this.viewNode.style.top = '-10000px';
+				]]></d:body>
+			</d:method>
+
+			<d:destructor type="text/javascript"><![CDATA[
+				if(this.viewNode && this.viewNode.parentNode)
+					this.viewNode.parentNode.removeChild(this.viewNode);
+				this.callSuper('__destructor');
+			]]></d:destructor>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				// Append the viewNode to the body to ensure independent rendering.
+				document.body.appendChild(this.viewNode);
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

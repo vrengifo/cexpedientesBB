@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:c="http://www.backbase.com/2006/command" xmlns:d="http://www.backbase.com/2006/tdl" xmlns:e="http://www.backbase.com/2006/xel" xmlns:xi="http://www.w3.org/2001/XInclude">
+
+    <d:namespace name="http://www.backbase.com/2007/jsf/client">
+        <d:uses element="suggestBox" src="../../www.backbase.com.2006.btl/suggestBox/chameleon/suggestBox.xml"/>
+
+        <d:element name="suggestBox" extends="b:suggestBox">
+            <d:attribute name="partialInput"/>
+
+            <d:method name="getSuggestions">
+                <d:body type="application/javascript"><![CDATA[
+                    bb.callMethod(this, 'setAttribute', ['partialInput', bb.getProperty(this, 'label')]);
+                    var oEvent = bb.callMethod( bb.document, 'createEvent', ['Events']);
+                    oEvent.initEvent('populate', true, false);
+                    bb.callMethod( this, 'dispatchEvent',[oEvent]);
+                ]]></d:body>
+            </d:method>
+        </d:element>
+    </d:namespace>
+
+</d:tdl>

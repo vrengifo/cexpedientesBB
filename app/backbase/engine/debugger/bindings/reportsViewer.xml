@@ -1,0 +1,105 @@
+<d:namespace
+	xmlns:t="http://www.backbase.com/2007/debugger"
+	xmlns:e="http://www.backbase.com/2006/xel"
+	xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:d="http://www.backbase.com/2006/tdl"
+	name="http://www.backbase.com/2007/debugger">
+
+	<d:element name="reportsViewer" implements="t:iViewCategory">
+		<d:template type="application/xhtml+xml">
+			<div style="width:100%;height:100%;overflow:auto;">
+				<div style="padding:40px;text-align:center;">Select a report from the left.</div>
+				<d:content />
+			</div>
+		</d:template>
+
+		<d:method name="update">
+			<d:argument name="sData" />
+			<d:body type="text/javascript">
+				this.viewNode.innerHTML = sData;
+			</d:body>
+		</d:method>
+		<d:property name="viewCategory" onget="return 'reports';" />
+	</d:element>
+
+	<d:element name="reportContainer">
+		<d:template type="application/xhtml+xml">
+			<table cellpadding="0" cellspacing="0" class="bb-debugger-table"><thead><tr><th>Reports</th></tr></thead>
+			<tbody><d:content /></tbody></table>
+		</d:template>
+		<d:property name="selectedReport">
+			<d:getter>
+				return this.selectSingleNode('t:report[@selected="selected"]');
+			</d:getter>
+		</d:property>
+		<d:handler event="click" type="application/javascript" phase="capture">
+			var oSelected = this.getProperty('selectedReport');
+			if(oSelected){
+				bb.html.removeClass(oSelected.viewNode, 'bb-debugger-selected');
+				oSelected.removeAttribute('selected');
+			}
+		</d:handler>
+
+		<d:method name="refresh">
+			<d:body type="application/javascript">
+				var oSelected = this.getProperty('selectedReport');
+				if(oSelected){
+					oSelected.refresh();
+				}
+			</d:body>
+		</d:method>
+
+	</d:element>
+
+	<d:element name="report">
+		<d:template type="application/xhtml+xml">
+			<tr class="bb-debugger-report"><td><d:content /></td></tr>
+		</d:template>
+
+		<d:attribute name="label" onmap="this.viewGate.innerHTML = value;" />
+
+		<d:attribute name="selected">
+			<d:mapper type="text/javascript">
+				if(value == 'selected'){
+					bb.html.addClass(this.viewNode, 'bb-debugger-selected');
+					this.refresh();
+				}
+			</d:mapper>
+		</d:attribute>
+
+		<d:method name="refresh">
+			<d:body type="application/javascript">
+				var oReporter = bb.document.getElementById('reportViewer');
+				var sResult = this.report();
+				oReporter.update(sResult);
+			</d:body>
+		</d:method>
+
+		<d:handler event="click" type="text/javascript">
+			event.target.setAttribute('selected', 'selected');
+		</d:handler>
+
+		<d:constructor type="text/javascript">
+			var sUrl = this.modelNode.getAttribute('url');
+			if(sUrl){
+				var oRequest = new XMLHttpRequest();
+				oRequest.open('GET', bb.uri.resolveUri(sUrl, bb.getProperty(this, 'baseURI') ) , false);
+				oRequest.send(null);
+				try {
+					var oData = eval(oRequest.responseText);
+
+					for(var i in oData){
+						if ( oData.hasOwnProperty(i) )
+							this[i] = oData[i];
+
+					}
+					this.init();
+				}catch(e){
+					//TODO error message
+				}
+			}
+		</d:constructor>
+
+
+	</d:element>
+</d:namespace>

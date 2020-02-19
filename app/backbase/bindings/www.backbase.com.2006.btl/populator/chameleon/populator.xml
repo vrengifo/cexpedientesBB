@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="populatorBase" interface="iPopulator" src="../populatorBase.xml"/>
+
+		<d:element name="populator" extends="b:populatorBase" implements="b:iPopulator">
+			
+			<d:resource type="text/css"><![CDATA[
+				.btl-populatorMessage {
+					display: none;
+				}
+				.btl-populatorMessage-visible {
+					display: block;
+				}
+				.btl-populatorMessage .btl-label {
+					padding-top: 2px;
+					padding-bottom: 2px;
+				}
+				.btl-populatorMessage-content {
+					background-image: url(media/circle.gif);
+				}
+				.btl-tree .btl-populatorMessage .btl-label {
+					padding-top: 0;
+					padding-bottom: 0;
+				}
+			]]></d:resource>
+
+			<d:resource type="image/gif" src="media/circle.gif"/>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-populatorMessage">
+					<div class="btl-populatorMessage-content btl-label btl-icon">Loading, please wait.</div>
+					<d:content/>
+				</div>
+			</d:template>
+
+			<d:property name="loading">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					if (value)
+						bb.html.addClass(this.viewNode, ['btl-populatorMessage-visible']);
+					else
+						bb.html.removeClass(this.viewNode, ['btl-populatorMessage-visible']);
+					this._._loading = value;
+				]]></d:setter>
+			</d:property>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				// When the populator has children, these will be used as loading message
+				// This means that the default message (contained in the first child of the root of the template) should be hidden
+				if (this.getProperty('firstChild'))
+					this.viewNode.firstChild.style.display = 'none';
+			]]></d:handler>
+
+			<d:handler event="DOMNodeInserted" type="text/javascript"><![CDATA[
+				// When the populator has children, these will be used as loading message
+				// This means that the default message (contained in the first child of the root of the template) should be hidden
+				if (event.relatedNode == this && this.getProperty('firstChild'))
+					this.viewNode.firstChild.style.display = 'none';
+			]]></d:handler>
+
+			<d:handler event="DOMNodeRemoved" type="text/javascript"><![CDATA[
+				// When the populator has children, these will be used as loading message
+				// When the children are removed, the default message (contained in the first child of the root of the template) should be shown
+				if (event.relatedNode == this && this.getProperty('childNodes').length <= 1)
+					this.viewNode.firstChild.style.display = 'block';
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

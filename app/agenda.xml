@@ -1,0 +1,74 @@
+<div id="work-area"
+	xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:b="http://www.backbase.com/2006/btl"
+	xmlns:c="http://www.backbase.com/2006/command"
+	xmlns:e="http://www.backbase.com/2006/xel"
+	xmlns:bf="http://www.backbase.com/2007/forms"
+	xmlns:xi="http://www.w3.org/2001/XInclude">
+	<b:tabBox height="100%">
+		<b:tab icon="backbaseWindow" label="Agenda" class="textBackground">
+			<b:toolBar>
+				<b:toolBarButton id="default-option" icon="icon-listar">
+					<e:handler event="click">
+						<c:create destination="id('area-ciudad')" mode="replace">
+							<div id="area-ciudad">
+								<b:box width="290px" height="31%" position="relative" left="15px" top="20px" padding="5px" backgroundColor="#FFFFFF"> 
+									<!--<div>
+										<form name="buscaCiudad" method="POST" action="busca.php" bf:destination="id('result')" bf:mode="replaceChildren">
+											<input type="text" name="criterioCiudad" id="criterioCiudad" bf:required="true" />&nbsp;&nbsp;
+											<button type="submit">Buscar</button>
+										</form>
+									</div>-->
+									<b:listGrid width="260px" height="100%" readonly="true" rowClasses="rowClass1, rowClass2">
+										<b:dataSource id="dsAgenda" name="dsAgenda" e:behavior="b:remoteData" url="scripts/agenda.php?accion=l" dataType="application/xml" />
+										<b:listGridCol select="codigo" label="Cod." width="50px" />
+										<b:listGridCol select="nombre" label="Nombre" width="200px" />
+									</b:listGrid>
+								</b:box>
+							</div>
+						</c:create>
+					</e:handler>
+					Listar
+				</b:toolBarButton>
+				<b:toolBarButton icon="icon-nuevo">
+					<e:handler event="click">
+						<c:create destination="id('area-ciudad')" mode="replace">
+							<div id="area-ciudad">
+								<b:box width="290px" height="31%" position="relative" left="15px" top="20px" padding="5px" backgroundColor="#FFFFFF">
+									<div>
+										<form name="buscaCiudad" method="POST" action="scripts/ciudad.php?accion=i" bf:destination="id('result')" bf:mode="replace">
+											<table width="100%"  border="0" cellpadding="1" cellspacing="10">
+												<tr>
+													<td colspan="2" align="center">
+														<strong>Ingreso de Ciudad</strong>
+													</td>
+												</tr>
+												<tr>
+													<td width="100" align="right"><strong>C&oacute;digo:</strong></td>
+													<td><input type="text" name="codigoCiudad" id="codigoCiudad" bf:required="true" /></td>
+												</tr>
+												<tr>
+													<td width="100" align="right"><strong>Nombre:</strong></td>
+													<td><input type="text" name="nombreCiudad" id="nombreCiudad" bf:required="true" /></td>
+												</tr>
+												<tr>
+													<td colspan="2" align="center">
+														<button type="submit">Registrar</button>
+													</td>
+												</tr>
+											</table>
+										</form>
+										<div id="result" />
+									</div>
+								</b:box>
+							</div>
+						</c:create>
+						<c:focus with="id('codigoCiudad')" />
+					</e:handler>
+					Nuevo
+				</b:toolBarButton>
+			</b:toolBar>
+			<div id="area-ciudad" />
+		</b:tab>
+	</b:tabBox>
+</div>

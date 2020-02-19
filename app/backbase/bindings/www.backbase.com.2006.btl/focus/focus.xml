@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="disableElement" src="../disableElement/disableElement.xml"/>
+
+		<d:element name="focusableElement" extends="b:disableElement" abstract="true">
+			
+
+			<d:resource type="text/css"><![CDATA[
+				.btl-invisibleFocusInput {
+					/* Minimize the input size. Setting the display to none would not allow focus */
+					width: 0 !important;
+					height: 0 !important;
+					/* IE 5.5 might need to have the font-size and line-height minimized in order to prevent the element from being bigger than specified */
+					font-size: 1px !important;
+					line-height: 1px !important;
+					/* safety measure to hide a possible border */
+					border-style: none !important;
+					/* safety measure to minimize the size of the input */
+					padding: 0 !important;
+					/* disable any browser based outline  */
+					-moz-outline: none !important;
+					outline: none !important;
+					/* by default it has a text cursor*/
+					cursor:default;
+					overflow: hidden;
+				}
+				.opera .btl-invisibleFocusInput,
+				.ie .btl-invisibleFocusInput {
+					/* hide in Opera and IE6*/
+					opacity: 0;
+				}
+				.webkit .btl-invisibleFocusInput {
+					/* can't be smaller than 1px because then safari won't focus it anymore */
+					width: 1px !important;
+					height: 1px !important;
+					/* as the input will be 1px by 1px, a white background might be visible, it should be transparent */
+					background-color: transparent !important;
+				}
+				.btl-invisibleFocusAnchor {
+					/* Anchors usually have an underline to indicate that it's an anchor. This should be disabled as the content is a space. */
+					text-decoration: none !important;
+					/* disable any browser based outline  */
+					-moz-outline: none !important;
+					outline: none !important;
+					/* can't be smaller than 3px because then safari won't focus it anymore */
+					font-size: 3px !important;
+					line-height: 3px !important;
+					/* extra safety measures */
+					border-style: none !important;
+					padding: 0 !important;
+					margin: 0 !important;
+				}
+			]]></d:resource>
+
+			<d:attribute name="accesskey" onmap="this.getProperty('focusElement').accessKey = value">
+				
+			</d:attribute>
+
+			<d:attribute name="tabindex" onmap="this.getProperty('focusElement').tabIndex = parseInt(value)">
+				
+			</d:attribute>
+
+			<d:property name="focusElement">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					if(!this._['_focusElement']){
+						var sTagName = this.viewNode.tagName.toLowerCase();
+						if(sTagName == 'a' || sTagName == 'input')
+							this._['_focusElement'] = this.viewNode;
+					}
+
+					if(!this._['_focusElement']){
+						var oA = this.viewNode.getElementsByTagName('a')[0];
+						if(oA){
+							if(this == bb.getControllerFromView(oA))
+								this._['_focusElement'] = oA;
+						}
+					}
+
+					if(!this._['_focusElement']){
+						var oInput = this.viewNode.getElementsByTagName('input')[0];
+						if(oInput){
+							if(this == bb.getControllerFromView(oInput))
+								this._['_focusElement'] = oInput;
+						}
+					}
+
+					return this._['_focusElement'];
+				]]></d:getter>
+			</d:property>
+
+			<d:method name="focus">
+				
+				<d:body type="text/javascript"><![CDATA[
+					this.getProperty('focusElement').focus();
+				]]></d:body>
+			</d:method>
+
+			<d:method name="blur">
+				
+				<d:body type="text/javascript"><![CDATA[
+					this.getProperty('focusElement').blur();
+				]]></d:body>
+			</d:method>
+
+			<d:method name="disableView">
+				<d:body type="text/javascript"><![CDATA[
+					this.callSuper('disableView');
+
+					// get the focusElement
+					var oElm = this.getProperty('focusElement');
+
+					// Disable activation by user
+					oElm.disabled = true;
+
+					// Disable keyboard access
+					this._._enabledTabIndex = parseInt(this.getAttribute('tabindex')) || 0;
+					oElm.tabIndex = -1;
+
+					// Prevent focus lines and focus pseudo class from being applied
+					oElm.onmousedown = btl.funcReturnFalse;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="enableView">
+				<d:body type="text/javascript"><![CDATA[
+					this.callSuper('enableView');
+
+					// get the focusElement
+					var oElm = this.getProperty('focusElement');
+
+					// Enable activation by user
+					oElm.disabled = false;
+
+					// Enable keyboard access
+					oElm.tabIndex = this._._enabledTabIndex || 0;
+					oElm.onmousedown = null;
+				]]></d:body>
+			</d:method>
+
+			<!--
+				The focus event handler sets the class to the element indicated as "btl-focusIndicator"
+				to visualize focus.
+			 -->
+			<d:handler event="focus" type="text/javascript"><![CDATA[
+				var oFocusIndicator = bb.selector.query(this.viewNode, '.btl-focusIndicator');
+				if(oFocusIndicator && bb.getControllerFromView(oFocusIndicator) == this){
+					bb.html.addClass(oFocusIndicator, 'btl-focusIndicator-visible');
+				}
+			]]></d:handler>
+
+			<d:handler event="blur" type="text/javascript"><![CDATA[
+				var oFocusIndicator = bb.selector.query(this.viewNode, '.btl-focusIndicator');
+				if(oFocusIndicator && bb.getControllerFromView(oFocusIndicator) == this){
+					bb.html.removeClass(oFocusIndicator, 'btl-focusIndicator-visible');
+				}
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

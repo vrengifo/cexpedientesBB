@@ -1,0 +1,658 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:bb="http://www.backbase.com/2006/client" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="rangeFormField" src="../rangeFormField/rangeFormField.xml"/>
+		<d:uses element="dropDown" src="../dropDown/dropDown.xml"/>
+		<d:uses element="positionElement dimensionElement" src="../visualElement/visualElement.xml"/>
+		<d:uses element="focusableElement" src="../focus/focus.xml"/>
+
+		<d:element name="calendarBase" extends="b:rangeFormField b:dropDown b:positionElement b:dimensionElement b:focusableElement" abstract="true">
+			
+
+			<d:resource type="text/javascript"><![CDATA[btl.calendar = function btl_calendar(oCalendar){
+
+	var dt = new Date();
+	this.iDisplayYear = dt.getFullYear();
+	this.iDisplayMonth = dt.getMonth();
+
+	this.oSelectedDate = dt;
+
+	this.elmPreviousYear = null;
+	this.elmPreviousMonth = null;
+	this.elmNextMonth = null;
+	this.elmNextYear = null;
+	this.elmGoto = null;
+	this.oDisabledDates = { 'days' : {}};
+
+	this.calendarFrom = '0000-01-01';
+	this.calendarTo = '9999-12-31';
+
+	this.initialized = false;
+
+
+	var lang = oCalendar.getAttribute('language');
+	if (btl.calendar.localeTable[lang] == undefined){
+			lang = "en";
+	}
+	this.locale = btl.calendar.localeTable[lang];
+	this.language = lang;
+
+	this._range_days = [];
+
+	this.one_day = 1000*60*60*24;
+
+	var d = oCalendar.getAttribute('min');
+	d = d.split(/\/|\-/);
+	if (d.length == 3)
+		this.calendarFrom = new Date( parseInt(d[0]), parseInt(d[1])-1, parseInt(d[2]));
+
+	d = oCalendar.getAttribute('max');
+	d = d.split(/\/|\-/);
+	if (d.length == 3)
+		this.calendarTo = new Date( parseInt(d[0]), parseInt(d[1])-1, parseInt(d[2]));
+};
+
+// Special thanks to Matt Kruse <matt@mattkruse.com> (http://www.mattkruse.com/) for writing the original script
+// Convert a Date String => Date Object, depending on sFormat
+btl.calendar.getDateFromFormat = function btl_calendar_getDateFromFormat(sValue, sFormat, sLanguage){
+	if (!sValue || sValue == '')
+		return new Date();
+
+	var oLocale = btl.calendar.localeTable[sLanguage ? sLanguage : 'en'];
+
+	var iValue  = 0;
+	var iFormat = 0;
+	var cChar;
+	var sToken;
+
+	var oDate 	= new Date();
+
+	var sYear	= oDate.getFullYear() + '';
+	var sMonth	= oDate.getMonth() + 1 + '';
+	var sDate 	= oDate.getDate() + '';
+
+	while (iFormat < sFormat.length) {
+		cChar  = sFormat.charAt(iFormat);
+		sToken = '';
+		while (sFormat.charAt(iFormat) == cChar && iFormat < sFormat.length) {
+			sToken += sFormat.charAt(iFormat++);
+		}
+
+		if (sToken == 'yyyy' || sToken == 'yy') {
+			sYear = btl.calendar.getInt(sValue, iValue, sToken.length, sToken.length);
+			if (sYear == null) {
+				sYear = oDate.getFullYear() + '';
+			}
+			iValue += sYear.length;
+			if (sYear.length == 2) {
+				iYear = parseInt(sYear,10);
+				sYear = (iYear > oDate.getYear()-90) ? 1900 + iYear : 2000 + iYear;
+			}
+		} else if (sToken == 'MMMM') {
+			for (var i = 11; i >= 0; i--) {
+				var crtMonth = oLocale.Months[i].toLowerCase();
+				if (sValue.substring(iValue, iValue + crtMonth.length).toLowerCase() == crtMonth) {
+					sMonth = i + 1;
+					iValue += crtMonth.length;
+					break;
+				}
+			}
+		} else if (sToken == 'MMM') {
+			for (var i = 23; i >= 12; i--) {
+				var crtMonth = oLocale.Months[i].toLowerCase();
+				if (sValue.substring(iValue, iValue + crtMonth.length).toLowerCase() == crtMonth){
+					sMonth = i - 11;
+					iValue += crtMonth.length;
+					break;
+				}
+			}
+		} else if (sToken == 'ddd' || sToken == 'dddd') {
+			for (var i = 0; i < oLocale.Days.length; i++) {
+				if (sValue.substring(iValue, iValue + oLocale.Days[i].length).toLowerCase() == oLocale.Days[i].toLowerCase()){
+					iValue += oLocale.Days[i].length;
+					break;
+				}
+			}
+		} else if (sToken == 'MM' || sToken == 'M') {
+			sMonth = this.getInt(sValue, iValue, sToken.length, 2);
+			if (sMonth === null) {
+				sMonth = oDate.getMonth() + 1 + '';
+			}
+			iValue += sMonth.length;
+		} else if (sToken == 'dd' || sToken == 'd') {
+			sDate = this.getInt(sValue, iValue, sToken.length, 2);
+			if (sDate == null) {
+				sDate = oDate.getDate()+'';
+			}
+			iValue += sDate.length;
+		} else {
+			if (sValue.substring(iValue, iValue + sToken.length) != sToken) {
+			} else {
+				iValue += sToken.length;
+			}
+		}
+	}
+	return new Date(sYear, parseInt(sMonth, 10) - 1, parseInt(sDate, 10));
+};
+//returns true if need something changed
+btl.calendar.setDate = function btl_calendar_setDate(elem, d){
+ 	if( !d instanceof Date) return bRet;
+ 	var bRet = !elem.oSelectedDate || !d || elem.oSelectedDate.valueOf() != d.valueOf();
+
+	elem.oSelectedDate = d;
+	elem.iDisplayYear = d.getFullYear();
+	elem.iDisplayMonth = d.getMonth();
+	return bRet;
+};
+
+// Customize to other language / locale if required, remember to keep the same order.
+btl.calendar.localeTable = {
+	en : {
+		Days : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'S', 'M', 'T', 'W', 'T', 'F', 'S'],
+		Months : ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+		Format: 'MM/dd/yyyy',
+		StartDay : 1
+	},
+	de : {
+		Days : ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'S', 'M', 'D', 'M', 'D', 'F', 'S'],
+		Months : ['Januar', 'Februar', 'M&#228;rz', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember', 'Jan', 'Feb', 'M&#228;r', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'],
+		Format: 'dd/MM/yyyy',
+		StartDay : 1
+	},
+	nl : {
+		Days : ['Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Z', 'M', 'D', 'W', 'D', 'V', 'Z'],
+		Months : ['Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni', 'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'],
+		Format: 'dd/MM/yyyy',
+		StartDay : 1
+	}
+};
+
+btl.calendar.aMonthLengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+btl.calendar.rIntegerPattern = /^\d+$/;
+
+// Helper function which returns the number of days in a month (including leap years).
+btl.calendar.getDaysInMonth = function btl_calendar_getDaysInMonth(iMonth, iYear){
+	if(iMonth==1 && (iYear % 4 == 0 && (iYear % 100 != 0 || iYear % 400 == 0))) return 29;
+	return this.aMonthLengths[iMonth];
+};
+
+// Helper function sees if the value is a integer
+// returns integer in string format if valid, otherwise null
+btl.calendar.getInt = function btl_calendar_getInt(sValue, i, iMin, iMax){
+	for(var j = iMax; j >= iMin; j--){
+		var sToken = sValue.substring(i, i+j);
+		if(this.rIntegerPattern.test(sToken)) return sToken;
+	}
+	return null;
+};
+btl.calendar.isRestricted = function btl_calendar_isRestricted( _calendar, oDate, iDow){
+	if( arguments.length < 3)
+		iDow = oDate.getDay();
+
+	return  (oDate < _calendar.calendarFrom)
+			 || (oDate > _calendar.calendarTo)
+			 || _calendar.oDisabledDates[oDate.valueOf()]
+			 || _calendar.oDisabledDates.days[iDow] ? true : false;
+}
+//oSelected = { iDate : [1, 2, ...], ...} date - int / array of int
+btl.calendar.getDaysInfo = function btl_calendar_getDaysInfo(_calendar){
+	// Calculate the Previous / Next month, start day etc.
+	var iMonthPrevious = (_calendar.iDisplayMonth == 0) ? 11 : _calendar.iDisplayMonth - 1;
+	var iMonthAfter = (_calendar.iDisplayMonth == 11)?  0 : _calendar.iDisplayMonth + 1;
+
+	var iDaysInMonthPrevious = btl.calendar.getDaysInMonth(iMonthPrevious, _calendar.iDisplayYear);
+	var iDaysInMonthCurrent = btl.calendar.getDaysInMonth(_calendar.iDisplayMonth, _calendar.iDisplayYear);
+	var iDaysInMonthAfter = btl.calendar.getDaysInMonth(iMonthAfter, _calendar.iDisplayYear);
+
+	var iFirst = 0;
+	var sFirst = _calendar.locale.Days[new Date(_calendar.iDisplayYear, _calendar.iDisplayMonth, 1).getDay()];
+
+	// Calculate the position of the first day of the month
+	var j = null;
+	for(var i = 0; i < 7; i++){
+		j = i + _calendar.locale.StartDay;
+		if( j > 6 ) j -= 7;
+		if(_calendar.locale.Days[j] == sFirst) iFirst = i;
+	}
+
+	// Loop counters
+	var iDayCount = 1;
+	var iDayInMonthBefore = iFirst - 1;
+	var iDayInMonthAfter = 1;
+
+	// Today
+	var oDate = new Date();
+	var iPresentYear = oDate.getFullYear();
+	var iPresentMonth = oDate.getMonth();
+	var iPresentDay = oDate.getDate();
+
+	// Create an array of day numbers and class names, this has 6 x 7 x 2 = 84 members
+						//(6 weeks, 7 days, 2 values per day)
+	var aResult = [];
+
+	var strTmpDate = '';
+	var nrTmpDate = 0;
+
+	var iSelYear = _calendar.oSelectedDate.getFullYear(),
+	iSelMonth = _calendar.oSelectedDate.getMonth(),
+	iSelDay = _calendar.oSelectedDate.getDate();
+
+	for(var i = 0; i < 6; i++){
+		for(var j = 0; j < 7; j++) {
+			var bSelected = false, bToday = false, obj;
+			var iDow = (j + _calendar.locale.StartDay) % 7;
+
+			if(i == 0 && j < iFirst) {// Month Before
+				obj = { 'iDay' : iDaysInMonthPrevious - iDayInMonthBefore,
+						'iYear' : _calendar.iDisplayYear - (_calendar.iDisplayMonth ? 0 : 1),
+						'iMonth' : _calendar.iDisplayMonth > 0 ? _calendar.iDisplayMonth : 12,
+						'iDow' : iDow,
+						'sClass' : 'btl-calendar-previousMonth',
+						'bPreviousMonth':true };
+				iDayInMonthBefore--;
+			 } else if(iDayCount > iDaysInMonthCurrent) {// Month After
+				obj = { 'iDay' : iDayInMonthAfter,
+						'iYear' : _calendar.iDisplayYear + (_calendar.iDisplayMonth < 11 ? 0 : 1),
+						'iMonth' : (_calendar.iDisplayMonth + 1) % 12 + 1,
+						'iDow' : iDow,
+						'sClass' : 'btl-calendar-nextMonth',
+						'bNextMonth':true};
+				iDayInMonthAfter++;
+			 } else { //Current month
+				var sClassName = 'btl-calendar-currentMonth';
+
+				var strTmpDate = _calendar.iDisplayYear + "-" + (_calendar.iDisplayMonth + 1) + "-" + iDayCount;
+
+				//check for today
+				if ( _calendar.iDisplayYear == iPresentYear
+						&& _calendar.iDisplayMonth == iPresentMonth
+						&& iDayCount == iPresentDay ){
+					sClassName += ' btl-calendar-today';
+					bToday = true;
+				}
+
+				//check for currently selected day
+				if( _calendar.iDisplayYear == iSelYear
+						&& _calendar.iDisplayMonth == iSelMonth
+						&& iDayCount == iSelDay){
+					bSelected = true;
+					sClassName += ' btl-calendar-selected-day';
+				}
+				obj = {	'iDay' : iDayCount,
+						'iYear' : _calendar.iDisplayYear,
+						'iMonth' : _calendar.iDisplayMonth + 1,
+						'iDow' : iDow,
+					   	'sClass' : sClassName, 'bSelected' : bSelected, 'bToday' : bToday};
+				iDayCount++;
+			}
+			obj.bRestricted =   btl.calendar.isRestricted(_calendar, new Date( obj.iYear, obj.iMonth-1, obj.iDay), iDow);
+			if( obj.bRestricted)
+				obj.sClass += ' btl-calendar-restricted';
+			aResult.push(obj);
+		}
+	}
+	return aResult;
+};
+
+btl.calendar.getFormattedValue = function btl_calendar_getFormattedValue( oDate, sFormat, sLanguage){
+	var iYear, iMonth, iDay;
+	if( oDate instanceof Date){
+		iYear = oDate.getFullYear();
+		iMonth = oDate.getMonth();
+		iDay = oDate.getDate();
+	} else {//backward compatibility - (iYear, iMonth, iDay, sFormat, sLanguage)
+		iYear = arguments[0];
+		iMonth = arguments[1];
+		iDay = arguments[2];
+		sFormat = arguments[3];
+		sLanguage = arguments[4];
+		oDate = new Date(iYear, iMonth, iDay);
+	}
+
+	var dToday = new Date();
+	if(iYear == null) iYear = dToday.getFullYear();
+	if(iMonth == null) iMonth = dToday.getMonth();
+	if(iDay == null) iDay = dToday.getDate();
+
+	var oLocale = btl.calendar.localeTable[ sLanguage ? sLanguage : 'en'];
+
+	if(sFormat == null) sFormat = oLocale.Format;
+	var sValue = sFormat.replace(/(yyyy|yy|MMMM|MMM|MM|M|dddd|ddd|dd|d)/g,
+
+	function($1){
+		switch ($1){
+			case "yyyy": 	return iYear;
+			case "yy": 		return ("" + iYear).substr(2, 4);
+			case "MMMM": 	return oLocale.Months[iMonth];
+			case "MMM":  	return oLocale.Months[iMonth + 12];
+			case "MM":  	return (iMonth < 9) ? "0" + (iMonth + 1) : iMonth + 1;
+			case "M":		return iMonth + 1;
+			case "dddd": 	return oLocale.Days[ oDate.getDay()];
+			case "ddd": 	return oLocale.Days[ oDate.getDay() + 7];
+			case "dd":   	return (iDay < 10) ? "0" + iDay : iDay;
+			case "d":   	return iDay;
+		}
+	});
+
+	return sValue;
+};
+
+btl.calendar.handleChange = function btl_calendar_handleChange(eEvent){
+	bb.getControllerFromView(this).handleChange();
+};
+
+btl.calendar.getMonthLength = function btl_calendar_getMonthLength(iYear, iMonth){
+	var iLength;
+	switch( iMonth ){
+		case 0: // Jan
+		case 2: // Mar
+		case 4: // May
+		case 6: // Jul
+		case 7: // Aug
+		case 9: // Oct
+		case 11: // Dec
+			iLength = 31;
+			break;
+
+		case 1: // Feb
+			if ( iYear % 4 == 0 && ((iYear % 100) || (iYear % 400 == 0)) ){
+				iLength = 29;
+			}else{
+				iLength = 28;
+			}
+			break;
+
+		case 3: // Apr
+		case 5: // Jun
+		case 8: // Sep
+		case 10: // Nov
+			iLength = 30;
+			break;
+	}
+	return iLength;
+};
+
+btl.calendar.isDateInRange = function btl_calendar_isDateInRange(oDate, _calendar){
+	var iCalendarValue = oDate.valueOf();
+	return iCalendarValue <= _calendar.calendarTo.valueOf() && iCalendarValue >= _calendar.calendarFrom.valueOf();
+};
+
+btl.calendar.incrementByMonth = function btl_calendar_incrementByMonth(oDate){
+	var iOriginalYear = oDate.getYear();
+	var iOriginalMonth = oDate.getMonth();
+	var iOriginalDay = oDate.getDate();
+
+	var iMonthLength = btl.calendar.getMonthLength(iOriginalYear, iOriginalMonth);
+
+	var iNextMonthLength = (iOriginalMonth == 11) ? btl.calendar.getMonthLength( iOriginalYear + 1, 0 )
+													 : btl.calendar.getMonthLength( iOriginalYear, iOriginalMonth + 1 );
+
+	var iNewDay = iOriginalDay + iMonthLength;
+
+	if ( iNewDay > iMonthLength + iNextMonthLength ){
+		iNewDay = iMonthLength + iNextMonthLength;
+	}
+
+	oDate.setDate(iNewDay);
+};
+
+btl.calendar.decrementByMonth = function btl_calendar_decrementByMonth(oDate){
+	var iOriginalYear = oDate.getYear();
+	var iOriginalMonth = oDate.getMonth();
+	var iOriginalDay = oDate.getDate();
+
+	var iPreviousMonthLength = (iOriginalMonth == 0) ? btl.calendar.getMonthLength( iOriginalYear - 1, 11 )
+													 : btl.calendar.getMonthLength( iOriginalYear, iOriginalMonth - 1 );
+
+	oDate.setDate(( iOriginalDay > iPreviousMonthLength ) ? 0 : iOriginalDay - iPreviousMonthLength  );
+};
+
+btl.calendar.isDateAvailable = function btl_calendar_isDateAvailable( oDate, _calendar ){
+	var strDateKey = (oDate.getFullYear()) + "-" + (oDate.getMonth()+1) + "-" + oDate.getDate();
+	return !(_calendar._range_days[strDateKey] && _calendar._range_days[strDateKey].indexOf('btl-calendar-restricted') >= 0)
+};
+
+btl.calendar.findBestAvailableDate = function btl_calendar_findBestAvailableDate(oOldDate, oNewDate, _calendar){
+
+	var iInitialDirection = ( oNewDate > oOldDate ) ? -1 : 1;
+
+	if ( oNewDate.valueOf() > _calendar.calendarTo.valueOf() ){
+		oNewDate = new Date( _calendar.calendarTo );
+	} else if ( oNewDate.valueOf() < _calendar.calendarFrom.valueOf() ) {
+		oNewDate = new Date( _calendar.calendarFrom );
+	}
+
+	for ( var oCandidateDate = new Date( oNewDate ); oCandidateDate.valueOf() != oOldDate.valueOf(); oCandidateDate.setDate(oCandidateDate.getDate() + iInitialDirection) ){
+		if ( btl.calendar.isDateAvailable( oCandidateDate, _calendar ) ){
+			return oCandidateDate;
+		}
+	}
+
+	var oCandidateDate = new Date( oNewDate );
+	oCandidateDate.setDate( oCandidateDate.getDate() - iInitialDirection );
+	while ( btl.calendar.isDateInRange(oCandidateDate, _calendar) && !btl.calendar.isDateAvailable( oCandidateDate, _calendar ) )
+	{
+		oCandidateDate.setDate( oCandidateDate.getDate() - iInitialDirection );
+	}
+	if ( !btl.calendar.isDateInRange(oCandidateDate, _calendar) ){
+		oCandidateDate = new Date(oOldDate);
+	}
+	return oCandidateDate;
+};]]></d:resource>
+
+			<d:attribute name="language" default="en">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					var oLocale = btl.calendar.localeTable[value];
+					if (oLocale) {
+						this.calendar.language = value;
+						this.calendar.locale = oLocale;
+						if (!this.getAttribute('format'))
+							this.setAttribute('format', oLocale.Format ? oLocale.Format : 'MM/dd/yyyy');
+					}
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="disabledDates">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					var aDates = value.split(/\s+|,|;/);
+					var oResult = {'days' : {}}; //days - disabled days {0:true, 6:true} - Sunday and Saturday
+					var oDays = {};
+					for (var i = 0; i < 7; i++)
+						oDays[this.calendar.locale.Days[i]] = i;
+
+					for (var i = 0; aDates.length > i; i++) {
+						var d = aDates[i].split(/\/|\-/);
+						if (d.length == 3)
+							oResult[ new Date( parseInt(d[0]), parseInt(d[1])-1, parseInt(d[2])).valueOf()] = true;
+						else if (aDates[i] in oDays) //dow?
+							oResult.days[oDays[aDates[i]]] = true;
+					}
+					this.calendar.oDisabledDates = oResult;
+					if (this.__initialized)
+						this.repaint();
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="readonly">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					this.getProperty('focusElement').setAttribute(name, value);
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="value">
+				<d:mapper type="text/javascript"><![CDATA[
+					this.setProperty('value', value);
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="min" default="1900/01/01">
+				
+			</d:attribute>
+
+			<d:attribute name="max" default="9999/12/30">
+				
+			</d:attribute>
+
+			<d:attribute name="format">
+				
+			</d:attribute>
+
+			<d:attribute name="mode" default="popup">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					if (value == 'inline')
+						this._['_open'] = true;
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="showToday" default="false">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					if (this.__initialized)
+						this.repaint();
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:property name="value">
+				<d:setter type="text/javascript"><![CDATA[
+					var oInput = this.getProperty('focusElement');
+
+					// store value provided in input
+					oInput.value = value;
+
+					// if there is a value
+					if (value != '') {
+						var oSelectedDate = this.getProperty('selectedDate');
+						var sCurrentValue = btl.calendar.getFormattedValue(oSelectedDate, this.getAttribute('format'), this.calendar.language);
+						var oDate = btl.calendar.getDateFromFormat(value, this.getAttribute('format'), this.calendar.language);
+
+						// @TODO: determine what should be done when an invalid value is set and act accordingly
+						// @TODO: depending on the outcome, check if the actual date has been changed rather than the entered string
+						// if (oSelectedDate.valueOf() != oDate.valueOf()){
+
+						// if the value is not equal to the old value
+						/* checking the string value has the (unintended?) added benefit of invalid values being corrected
+							since it will set #selectedDate to oDate even if the dates are the same */
+						if (sCurrentValue != value) {
+							// store the date if the value is valid
+							if (this.validateDate(oDate)) {
+								this.setProperty('selectedDate', oDate);
+							} else {
+								// reset to the old value
+								this.setAttribute('value', sCurrentValue);
+							}
+						}
+					} else {
+						var elmSelDay = this.getProperty('elmDayDisplay');
+						if (elmSelDay) {
+							this.setProperty('selectedDate', null);
+							bb.html.removeClass(elmSelDay, 'btl-calendar-selected-day');
+							this.setProperty('elmDayDisplay', null);
+						}
+					}
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					return this.getProperty('focusElement').value;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="readOnly">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					value ? this.setAttribute('readonly', 'readonly') : this.removeAttribute('readonly');
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					return btl.isTrueValue('readonly', this.getAttribute('readonly'));
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="locale" onget="return this.calendar.locale">
+				
+			</d:property>
+
+			<d:property name="selectedDate">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					var oDt = !value || !(value instanceof Date) ? new Date() : value;
+					btl.calendar.setDate( this.calendar, oDt);
+					var sFormattedValue = btl.calendar.getFormattedValue( oDt, this.getAttribute('format'), this.calendar.language);
+					if (value) {
+					/* XXX: "fixes" that the user can not set the date to the selected date after
+					   the input field has been cleared (bug 11409) */
+					
+						if (this.getAttribute('value') != sFormattedValue) {
+							this.setAttribute('value', sFormattedValue);
+						} else {
+							this.setProperty('value', sFormattedValue);
+						}
+					}
+					this.repaint();
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					return this.calendar.oSelectedDate;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="dropDownElement">
+				<d:getter type="text/javascript"><![CDATA[
+					this.initialize();
+					return this._._dropDownElement;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="calendarElement">
+				
+			</d:property>
+
+			<d:method name="validateValue">
+				
+				<d:argument name="value"/>
+				<d:body type="text/javascript"><![CDATA[
+					var oDate = btl.calendar.getDateFromFormat(value, this.getAttribute('format'), this.calendar.language);
+					return this.validateDate(oDate);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="validateDate">
+				
+				<d:argument name="date"/>
+				<d:body type="text/javascript"><![CDATA[
+					return !btl.calendar.isRestricted(this.calendar, date);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="handleChange">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var oInput = bb.selector.query(this.viewNode, 'input.btl-calendar-input');
+					var value = oInput.value;
+					if (this.getAttribute('value') != value) {
+						this.setAttribute('value', value);
+						bb.command.fireEvent(this, 'change', true, false);
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="open">
+				<d:body type="text/javascript"><![CDATA[
+					if (this.getAttribute('mode') == 'inline')
+						return;
+					this.setProperty('open', true);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="close">
+				<d:body type="text/javascript"><![CDATA[
+					if (this.getAttribute('mode') == 'inline')
+						return;
+					this.setProperty('open', false);
+				]]></d:body>
+			</d:method>
+		</d:element>
+	</d:namespace>
+</d:tdl>

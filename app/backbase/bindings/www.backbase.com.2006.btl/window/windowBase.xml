@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses behavior="drag" src="../dragAndDrop/dragAndDrop.xml"/>
+		<d:uses behavior="resize" src="../resize/resize.xml"/>
+		<d:uses element="positionElement dimensionElement containerElement" src="../visualElement/visualElement.xml"/>
+		<d:uses element="iconElement" src="../iconElement/iconElement.xml"/>
+		<d:uses element="labelImplementor" src="../label/label.xml"/>
+
+		<d:element name="windowBase" extends="b:positionElement b:dimensionElement b:containerElement b:drag b:resize b:iconElement b:labelImplementor" abstract="true">
+			
+
+			
+
+			
+
+			<d:resource type="text/css"><![CDATA[
+				.btl-window-closed {
+					display: none;
+				}
+			]]></d:resource>
+
+			<d:attribute name="open" default="true">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					if (btl.isTrueValue(name, value)){
+						bb.html.removeClass(this.viewNode, 'btl-window-closed');
+						bb.ui.reflow(this);
+					} else {
+						bb.html.addClass(this.viewNode, 'btl-window-closed');
+					}
+				]]></d:mapper>
+				<d:changer type="text/javascript"><![CDATA[
+					bb.command.fireEvent(this, btl.isTrueValue(name, value) ? 'open' : 'close', false, false);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="buttons" default="minimize maximize close">
+				
+			</d:attribute>
+
+			<d:attribute name="dragBehavior" default="move">
+				
+			</d:attribute>
+
+			<d:attribute name="resizeGripSize" default="4px">
+				
+			</d:attribute>
+
+			<d:attribute name="mode" default="float">
+				
+			</d:attribute>
+
+			<d:property name="open">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					return btl.isTrueValue('open', this.getAttribute('open'));
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					if(value == true){
+						this.removeAttribute('open');
+					} else {
+						this.setAttribute('open', 'false');
+					}
+				]]></d:setter>
+			</d:property>
+
+			<d:method name="open">
+				
+				<d:body type="text/javascript"><![CDATA[
+					this.removeAttribute('open');
+				]]></d:body>
+			</d:method>
+
+			<d:method name="close">
+				
+				<d:body type="text/javascript"><![CDATA[
+					this.setAttribute('open', 'false');
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="construct" type="text/javascript"><![CDATA[
+				bb.ui.reflow.add(this);
+			]]></d:handler>
+
+			<d:handler type="text/javascript" event="dragStart"><![CDATA[
+				// don't move maximized window
+				if(event.target == this && this.getProperty('maximized')){
+					event.preventDefault();
+				}
+			]]></d:handler>
+
+			<d:handler type="text/javascript" event="click"><![CDATA[
+				if(event.target != this) return;
+				var sValue = this.getAttribute('buttons');
+				if(sValue.indexOf('maximize') == -1)
+					return; //no maximize functionality when there is no maximize button
+
+				if( event.button == 0 && event.detail >= 2){ // left button double click
+					if( btl.isInsideHead( event.viewTarget, this))
+						this.setProperty('maximized', !this.getProperty('maximized'));
+				 }
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

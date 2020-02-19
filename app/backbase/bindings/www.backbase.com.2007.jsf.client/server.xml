@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:e="http://www.backbase.com/2006/xel" xmlns:d="http://www.backbase.com/2006/tdl" xmlns:bf="http://www.backbase.com/2007/forms"  >
+
+	<d:namespace name="http://www.backbase.com/2007/jsf/client">
+		
+
+		<d:uses element="suggestBox" src="suggestBox/suggestBox.xml"/>
+		<d:uses element="form" src="form/form.xml"/>
+		<d:uses element="updatePanel updatePanelFragment" src="updatePanel/updatePanel.xml"/>
+		<d:uses behavior="serverDropBase" src="dragAndDrop/serverDragAndDrop.xml"/>
+
+		<d:attribute name="attsync" onmap="this._.attsync = value.split(',');">
+			
+		</d:attribute>
+
+		<d:attribute name="handlesync" onmap="this._.handlesync = value.split(',');">
+			
+		</d:attribute>
+
+		<d:element name="server">
+				
+				<d:resource type="text/javascript"><![CDATA[
+
+					//Warning for migration
+					server = {
+						sync: function(controller){
+							bb.command.trace(controller, 'server.sync() has been renamed to bb.bjsf.sync(), refer to the release notes!', 2);
+						}
+					};
+
+					/**
+					 * The bb.bjsf API object.
+					 * @publish
+					 */
+					bb.bjsf = {
+						/**
+						 * The URL where the server page is located.
+						 * @type String
+						 * @property
+						 * @publish
+						 */
+						url:			'',
+						/**
+						 * Determines the ID of the server.
+						 * @type String
+						 * @property
+						 * @publish
+						 */
+						identify:		'',
+						/**
+						 * Determines the ID of the loading message component.
+						 * @type String
+						 * @property
+						 * @publish
+						 */
+						loadingId:		'',
+						fileUploads: 	[],
+						_uidsAttribute:	{},
+						_uidsValue:		{},
+						_uidsHtmlValue:	{},
+						_dirtyAttr:		{},
+						_syncList:		[],
+						bServerSyncBusy:	false,
+
+						/**
+						 * <p>It is used to load a remote data from the server</p>
+						 * @param {String} sUrl 		The URL where the server page view is located.
+						 * @param {Node} controller		The element where the data is being populated.
+						 * @return {Void} Nothing
+						 * @example bb:bb.bjsf.load
+						 * @publish
+						 */
+						//------------------------------
+						load: 			function server_sync(sUrl, controller) {
+						//------------------------------
+							bb.bjsf._syncList.push([false, sUrl, controller]);
+							if(bb.bjsf._syncList.length == 1)
+								bb.bjsf._sync();
+						},
+
+						/**
+						 * <p>It is used to instructs the client components to synchronize with the server</p>
+						 * @param {Node} controller 	The element where values need to be synchronized.
+						 * @param {Event} event 		The event handler that is sent to the server.
+						 * @param {Boolean} bAlwaysCont The Boolean value to specify the server to continue the synchronization.
+						 * @return {Void} Nothing
+						 * @example bb:bb.bjsf.sync
+						 * @publish
+						 */
+						//------------------------------
+						sync: 			function server_sync(controller, event, bAlwaysCont) {
+						//------------------------------
+							var uid = controller.modelNode.getAttribute(bb.bjsf.identify);
+							if ( uid && (!bb.bjsf.bServerSyncBusy || bAlwaysCont) ) {
+								var data = '[evt='+uid+'|event|'+event;
+								for (var i = 2; i < arguments.length; i++) {
+									data += '|'+encodeURIComponent(arguments[i]);
+								}
+								data += ']'+ bb.bjsf.getSubmitString();
+
+
+								bb.bjsf._syncList.push([true, 'BackbaseClientDelta='+encodeURIComponent(data)+bb.bjsf.getHtmlSubmitString(), controller]);
+
+								if(bb.bjsf._syncList.length == 1)
+									bb.bjsf._sync();
+							}
+						},
+						//------------------------------
+						_sync:		function(){
+						//------------------------------
+							bb.bjsf.showLoading();
+							var oSync = bb.bjsf._syncList[0];
+							var fnSucces = function(oRequest, oElement){
+								bb.bjsf.hideLoading();
+								bb.construct(oElement);
+								if (oSync[2]._ && (oElement = bb.getControllerFromModel(oElement)) )
+									oSync[2].appendChild(oElement);
+								bb.bjsf._syncList.shift();
+								if (bb.bjsf._syncList.length){
+									bb.bjsf._sync(); }
+							};
+							//sync[0] is true it's a serversync, otherwise it's a load!
+							if(oSync[0]){
+								if(bb.bjsf.fileUploads.length)
+									bb.bjsf.handleFileUploadLoad(bb.bjsf.fileUploads[0]);
+								else {
+									//sUrl, sMethod, sData, aHeaders, oDest, sMode, fnSuccess, fnError)
+									bb.command.load(bb.bjsf.url, 'POST', oSync[1], null, null, null, fnSucces);
+								}
+							}
+							else{
+								bb.command.load(oSync[1], 'GET', '', null, null, null, fnSucces);
+							}
+						},
+
+						//------------------------------
+						showLoading: 	function server_showLoading() {
+						//------------------------------
+							var msg = bb.document.getElementById(bb.bjsf.loadingId);
+							if (msg != null) {
+								bb.command.show(msg);
+							}
+						},
+
+						//------------------------------
+						hideLoading: 	function server_hideLoading() {
+						//------------------------------
+							var msg = bb.document.getElementById(bb.bjsf.loadingId);
+							if (msg != null) {
+								bb.command.hide(msg);
+							}
+						},
+
+						//------------------------------
+						setAttributeNoDirty:	function server_setAttributeNoDirty(controller, name, value) {
+						//------------------------------
+							var uid = controller.modelNode.getAttribute(bb.bjsf.identify);
+							bb.bjsf._dirtyAttr[uid+'|'+name+'|'+value] = true;
+							bb.bjsf.bServerSyncBusy = true;
+							controller.setAttribute(name, value);
+							bb.bjsf.bServerSyncBusy = false;
+						},
+
+						//------------------------------
+						setProperty:	function server_setProperty(controller, property, value) {
+						//------------------------------
+							var uid = controller.modelNode.getAttribute(bb.bjsf.identify);
+							bb.setProperty(controller, property, value);
+							bb.bjsf.registerAttributeChange(uid, property, value);
+						},
+
+						//------------------------------
+						setValue:	function server_setValue(controller, value) {
+						//------------------------------
+							if ( controller.instanceOf('http://www.backbase.com/2007/forms', 'iInput') ) {
+								var uid = controller.modelNode.getAttribute(bb.bjsf.identify);
+								bb.bjsf.bServerSyncBusy = true;
+								bb.setProperty(controller, 'value', value);
+								bb.bjsf.bServerSyncBusy = false;
+								bb.bjsf.registerValueChange(uid, 'value', value);
+							}
+						},
+
+						//------------------------------
+						registerAttributeChange:	function server_registerAttributeChange(uid, name, value) {
+						//------------------------------
+							if(bb.bjsf._dirtyAttr[uid+'|'+name+'|'+value]){
+								bb.bjsf._dirtyAttr[uid+'|'+name+'|'+value] = false;
+								return;
+							}
+
+							if(!bb.bjsf._uidsAttribute[uid])
+								bb.bjsf._uidsAttribute[uid] = {};
+
+							bb.bjsf._uidsAttribute[uid][name] = value;
+						},
+						//------------------------------
+						registerValueChange:	function server_registerValueChange(uid, name, value) {
+						//------------------------------
+							if(!bb.bjsf._uidsValue[uid])
+								bb.bjsf._uidsValue[uid] = {};
+
+							bb.bjsf._uidsValue[uid][name] = value;
+						},
+						registerHtmlValueChange:	function server_registerHtmlValueChange(uid, values) {
+						//------------------------------
+							if(!bb.bjsf._uidsHtmlValue[uid])
+								bb.bjsf._uidsHtmlValue[uid] = {};
+							bb.bjsf._uidsHtmlValue[uid] = values;
+						},
+						/**
+						 * <p>It allows the components to load the data upon request</p>
+						 * @param {Node} controller		The element where the server data is being populated.
+					 	 * @param {String} sUrl			The URL where the remote data is located.
+					 	 * @return {Void} Nothing
+					 	 * @example bb:bb.bjsf.populate
+					 	 * If sUrl argument is set, the load is triggered which is a GET request and there is no
+					 	 * sync. When ommitted the load is a POST request through a server sync.
+						 * @publish
+						 */
+						//------------------------------
+						populate: 			function server_populate(controller, sUrl) {
+						//------------------------------
+							var bDo=false;
+							/*this check is here because the controller node might contain modelNodes which
+							  are placed there because they contribute to the widget, for extra interaction
+							  purposes (before it was length 5). These widgets should not taken into account
+							  for the descision of loading on the fired populate event. If bDo = false, the
+							  loading is triggered*/
+							if (controller.modelNode.childNodes.length <= 3) {
+								bDo = true;
+								var aChildren = bb.getProperty(controller, 'childNodes');
+								for(var i = 0, iMax = aChildren.length; iMax > i; i++){
+									if(!(bb.instanceOf(aChildren[i], btl.namespaceURI, 'toolTipBase') ||
+										 bb.instanceOf(aChildren[i], btl.namespaceURI, 'label') ||
+										 bb.instanceOf(aChildren[i], btl.namespaceURI, 'contextMenu'))){
+										 bDo = false;
+										 break;
+									}
+								}
+							}
+							if (bDo || controller.modelNode.getAttribute('dirty')=='always') {
+								if (sUrl) {
+									bb.bjsf.load(sUrl, controller);
+								} else {
+									bb.bjsf.sync(controller, 'populate', true);
+								}
+							}
+						},
+						//------------------------------
+						registerFileUpload:	function server_registerFileUpload(controller) {
+						//------------------------------
+							if(bb.array.indexOf(bb.bjsf.fileUploads, controller) == -1)
+								bb.bjsf.fileUploads.push(controller);
+						},
+						//------------------------------
+						getSubmitString: function server_getSubmitString() {
+						//------------------------------
+							var a = [];
+
+							for (var i in bb.bjsf._uidsAttribute) {
+								var obj = bb.bjsf._uidsAttribute[i];
+								for (var j in obj) {
+									a[a.length] = '[att='+i+'|'+j+'|'+encodeURIComponent(obj[j])+']';
+								}
+							}
+							bb.bjsf._uidsAttribute = {};
+
+							for (var i in bb.bjsf._uidsValue) {
+								var obj = bb.bjsf._uidsValue[i];
+								for (var j in obj) {
+									a[a.length] = '[value='+i+'|'+j+'|'+encodeURIComponent(obj[j])+']';
+								}
+							}
+							bb.bjsf._uidsValue = {};
+							return a.join('');
+						},
+						//------------------------------
+						getHtmlSubmitString: function server_getHtmlSubmitString() {
+						//------------------------------
+							var htmlParams = '';
+							for (var i in bb.bjsf._uidsHtmlValue) {
+
+								var pairs = bb.bjsf._uidsHtmlValue[i], i = 0;
+								var pair;
+								while(pair = pairs[i++]) {
+									htmlParams += '&' + pair[0] + '=' + encodeURIComponent(pair[1]);
+								}
+							}
+							bb.bjsf._uidsHtmlValue = {};
+
+							return htmlParams;
+						},
+						//------------------------------
+						handleFileUploadLoad: function server_handleFileUploadLoad(obj){
+						//------------------------------
+							obj.addEventListener(
+								'load',
+								function(event){
+									bb.bjsf.hideLoading();
+									event.target.removeEventListener('load', arguments.callee, false);
+									bb.bjsf.fileUploads.shift();
+									bb.bjsf._sync();
+								},
+								false
+							);
+							bb.callMethod(obj, 'submit');
+						},
+						//------------------------------
+						handleChangeEvent: function server_handleChangeEvent(event){
+						//------------------------------
+
+							var controller = event.target;
+							var uid = controller.modelNode.getAttribute(bb.bjsf.identify);
+							if (uid && (controller.instanceOf('http://www.backbase.com/2007/forms', 'iInput') || controller.instanceOf('http://www.w3.org/1999/xhtml', 'xhtmlControlElement') || controller.instanceOf('http://www.backbase.com/2006/btl', 'formList') || controller.instanceOf('http://www.backbase.com/2006/btl', 'formField') ) ) {
+
+								var name = 'value';
+								if ( controller.instanceOf('http://www.w3.org/1999/xhtml', 'input') && (controller.getProperty('type') == 'checkbox' || controller.getProperty('type') == 'radio'))
+									name = 'checked';
+
+								var value = '';
+								var delim = '||';
+								if ( ( controller.instanceOf('http://www.backbase.com/2007/forms', 'iInputMultiple') || controller.instanceOf('http://www.w3.org/1999/xhtml', 'select') || controller.instanceOf('http://www.backbase.com/2006/btl', 'formList') ) && controller.getProperty('multiple') ) {
+									name = 'multivalue';
+									var options = controller.getProperty('options');
+									var bFirst = true;
+									for (var j = 0; j < options.length; j++) {
+										if (options[j].getProperty('selected')) {
+											if (!bFirst) { value += delim; }
+											else { bFirst = false; }
+											value += options[j].getProperty('value');
+										}
+									}
+								} else {
+									value = controller.getProperty(name);
+								}
+								bb.bjsf.registerValueChange(uid, name, value);
+							}
+
+							if(bb.instanceOf(controller, 'http://www.backbase.com/2007/forms', 'iFileInput')){
+								bb.bjsf.registerFileUpload(controller);
+							}
+							if(controller._.handlesync){
+								for (var i = 0 ; i < controller._.handlesync.length; i++) {
+									if(controller._.handlesync[i] == 'change') {
+										bb.bjsf.sync(controller, 'submit');
+										break;
+									}
+								}
+							}
+						},
+						//------------------------------
+						handleDOMAttrModified: function server_handleDOMAttrModified(event){
+						//------------------------------
+							if(bb.bjsf.identify) {
+								var controller = event.target;
+								var uid = controller.modelNode.getAttribute(bb.bjsf.identify);
+								if(uid){
+									var attributes = controller._.attsync;
+									if (uid && attributes && attributes.length){
+										for (var i = 0 ; i < attributes.length; i++) {
+											if(attributes[i] == event.attrName) {
+												bb.bjsf.registerAttributeChange(uid, event.attrName, event.newValue);
+												break;
+											}
+										}
+									}
+								}
+							}
+						}
+					};
+					bb.document.addEventListener('change', bb.bjsf.handleChangeEvent, false);
+					bb.document.addEventListener('DOMAttrModified', bb.bjsf.handleDOMAttrModified, false);
+
+				]]></d:resource>
+
+			<d:attribute name="url" default="">
+				
+			</d:attribute>
+
+			<d:attribute name="identify" default="">
+				
+			</d:attribute>
+
+			<d:attribute name="loadingMessage" default="">
+				
+			</d:attribute>
+
+			<d:constructor type="application/javascript"><![CDATA[
+				bb.bjsf.url			= bb.uri.resolveUri( this.getAttribute('url'), this.getProperty('baseURI') );
+				bb.bjsf.identify 	= this.getAttribute('identify');
+				bb.bjsf.loadingId	= this.getAttribute('loadingMessage');
+			]]></d:constructor>
+		</d:element>
+		<d:uses behavior="jsfData" src="dataBinding/jsfData.xml"/>
+    </d:namespace>
+</d:tdl>

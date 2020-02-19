@@ -1,0 +1,370 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="treeGridBase treeGridColBase" src="../treeGridBase.xml"/>
+
+		<d:element name="treeGrid" extends="b:treeGridBase">
+			
+
+			<d:resource type="text/css"><![CDATA[/*
+The following classes are added and removed dynamically in the logic of the grid.
+
+	btl-grid-sortable
+		Set on the grid if it is sortable.
+
+	btl-grid-columnHeaders-hidden
+		Set on the grid when all column headers must be hidden.
+
+	btl-grid-scrollbarFillers-hidden
+		Set on the grid when the scrollbar fillers must be hidden.
+
+	btl-grid-columnFillers-hidden
+		Set on the grid when the column fillers must be hidden.
+
+	btl-grid-column-header-active
+		Set on a column header when it is active.
+
+	btl-grid-column-header-sorted-ascending
+		Set on a column header when the column is sorted in ascending order.
+
+	btl-grid-column-header-sorted-descending
+		Set on a column header when the column is sorted in descending order.
+
+	btl-grid-focused
+		Set on the grid when it has focus.
+
+	btl-grid-row-focused
+		Set on a row when it is focused.
+
+	btl-grid-row-selected
+		Set on a row when it is selected.
+
+	btl-grid-row-hidden
+		Set on a row when it is hidden.
+
+	btl-grid-cell-edit
+		Set on a cell when its edit controls are displayed.
+*/
+.btl-treeGrid {
+	position: relative;
+	background-color: #FFF;
+	cursor: default;
+	overflow: hidden;
+}
+.btl-treeGrid .btl-treeGrid-focusElement {
+	position: absolute;
+	top: -20px;
+	left: -20px;
+}
+.btl-treeGrid .btl-grid-clean {
+	border-spacing: 0;
+	border-width: 0;
+	margin: 0;
+	padding: 0;
+}
+.btl-treeGrid .btl-grid-head,
+.btl-treeGrid .btl-grid-topRightFiller {
+	background-image: url(media/columnHeaderBackground.png);
+	background-repeat: repeat-x;
+	background-position: top left;
+	background-color: #EDEDED;
+}
+.btl-treeGrid .btl-grid-head {
+	overflow: hidden;
+	position: relative;
+}
+.btl-treeGrid .btl-grid-head table {
+	table-layout: fixed;
+	width: 100%;
+}
+.btl-treeGrid .btl-grid-topLeftFiller {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 3em;
+}
+.btl-treeGrid .btl-grid-topRightFiller {
+	position: absolute;
+	top: 0;
+	right: 0;
+}
+.btl-treeGrid .btl-grid-topLeftFiller div,
+.btl-treeGrid .btl-grid-topRightFiller div {
+	overflow: hidden;
+}
+.btl-treeGrid .btl-grid-dataViewContainer {
+	overflow: auto;
+}
+.btl-treeGrid .btl-grid-dataViewContainer table {
+	table-layout: fixed;
+	width: 100%;
+}
+.btl-treeGrid .btl-grid-cell {
+	border-color: #aaa;
+	border-style: dotted;
+	border-width: 0;
+	padding: 2px 5px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.btl-treeGrid .btl-grid-row-selected .btl-grid-cell {
+	border-color: #EEEEEE;
+}
+.btl-treeGrid.btl-grid-focused .btl-grid-row-focused .btl-grid-cell {
+	border-width: 1px 0;
+	padding: 1px 5px;
+}
+.btl-treeGrid .btl-grid-cell.btl-grid-cell-edit {
+	border-width: 0;
+	padding: 0;
+}
+.btl-treeGrid .btl-grid-cell-content {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.btl-grid-blurred .btl-chameleon-highlightBackground {
+	background-color: #ccc !important;
+}
+.btl-grid-blurred .btl-chameleon-highlightText {
+	color: #000 !important;
+}
+.btl-treeGrid .rowClass1 {
+	background-color: white;
+}
+.btl-treeGrid .rowClass2 {
+	background-color: #F5F5F5;
+}
+.btl-treeGrid .btl-treeGridCol {
+	text-align: left;
+}
+.btl-treeGrid .btl-treeGridCol-align-center {
+	text-align: center;
+}
+.btl-treeGrid .btl-treeGridCol-align-right {
+	text-align: right;
+}
+.btl-treeGrid .btl-treeGridCol-border {
+	overflow: hidden;
+	position: relative;
+}
+.btl-grid-sortable .btl-grid-sortIndicator {
+	position: absolute;
+	right: 5px;
+	top: 5px;
+	height: 5px;
+	width: 7px;
+	visibility: hidden;
+	background-image: url(media/sortArrow.png);
+	font-size: 0;
+}
+.btl-treeGrid .btl-grid-column-header-sorted-descending .btl-grid-cell-content,
+.btl-treeGrid .btl-grid-column-header-sorted-ascending .btl-grid-cell-content {
+	padding-right: 16px;
+}
+.btl-treeGrid .btl-grid-column-header-sorted-descending .btl-grid-sortIndicator {
+	visibility: inherit;
+	background-position: 0 0;
+}
+.btl-treeGrid .btl-grid-column-header-sorted-ascending .btl-grid-sortIndicator {
+	visibility: inherit;
+	background-position: 0 -5px;
+}
+.btl-treeGridCol .btl-treeGridCol-label {
+	width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.btl-grid-columnFillers-hidden .columnFiller {
+	display: none;
+}
+.btl-grid-scrollbarFillers-hidden .scrollbarFiller {
+	display: none;
+}
+.btl-grid-columnHeaders-hidden {
+	padding-top: 0;
+}
+.btl-grid-columnHeaders-hidden .btl-treeGridCol,
+.btl-grid-columnHeaders-hidden .btl-grid-topRightFiller {
+	display: none;
+}
+.btl-treeGrid .btl-treeGrid-treeIcon {
+	padding-left: 9px;
+	margin-right: 5px;
+	background-image: url(media/openClose.png);
+	background-repeat: no-repeat;
+	background-position: 0 50%;
+	visibility: hidden;
+}
+.btl-treeGrid .btl-treeGrid-row-expandable .btl-treeGrid-treeIcon {
+	visibility: visible;
+}
+.btl-treeGrid .btl-treeGrid-row-populating {
+	font-style: italic;
+}
+.btl-treeGrid .btl-treeGrid-row-open .btl-treeGrid-treeIcon {
+	background-position: -9px 50%;
+}
+.btl-treeGrid .btl-grid-row-hidden {
+	display: none;
+}
+/* fixes */
+.btl-treeGrid,
+.btl-treeGrid * {
+	box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	-khtml-box-sizing: border-box;
+}
+.ie .btl-treeGrid .btl-grid-cell {
+	border-style: solid;
+}
+.btl-treeGrid {
+	outline: none;
+	-moz-outline: none;
+}
+.ie .btl-listGrid .btl-grid-topRightFiller,
+.ie .btl-grid-sortable .btl-listGridCol .btl-grid-sortIndicator {
+	/* make sure font doesnt stretch the element */
+	overflow: hidden;
+}
+.ie .btl-treeGrid .btl-grid-head {
+	/* table would expand too much so it would appear under the top right filler */
+	width: 100%;
+}
+.ie .btl-treeGrid .btl-grid-dataViewContainer {
+	/* without a height, column resize would not work because the clientWidth property was 0 */
+	height: 100%;
+	/* without the width, column resize/reflow would in some cases result in unwanted scrollbars */
+	width: 100%;
+}
+.ie .btl-treeGrid .btl-treeGrid-treeIcon {
+	zoom: 1.0;
+}
+.webkit .btl-treeGrid .btl-treeGrid-treeIcon {
+	width: 9px;
+	height: 9px;
+	display: inline-block;
+}]]></d:resource>
+			<d:resource type="image/png" src="media/sortArrow.png"/>
+			<d:resource type="image/png" src="media/columnHeaderBackground.png"/>
+			<d:resource type="image/png" src="media/openClose.png"/>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-treeGrid btl-grid-scrollbarFillers-hidden btl-grid-blurred">
+					<input class="btl-invisibleFocusInput btl-treeGrid-focusElement" readonly="readonly"/>
+					<div class="btl-grid-head btl-head">
+						<table cellpadding="0" cellspacing="0" border="0">
+							<tbody>
+								<tr><d:content/></tr>
+							</tbody>
+						</table>
+					</div>
+					<div class="btl-grid-topRightFiller btl-head btl-label btl-bevel"> </div>
+					<div class="btl-grid-dataViewContainer" onscroll="bb.getControllerFromView(this).setScrollPosition(this.scrollLeft, this.scrollTop);" tabindex="-1"/>
+				</div>
+			</d:template>
+
+			<d:property name="height">
+				<d:setter type="text/javascript"><![CDATA[
+					this.viewNode.style.height = value;
+					this._._height = value;
+					bb.ui.reflow(this, true, true);
+				]]></d:setter>
+			</d:property>
+
+			<d:method name="createColumnFiller">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var oCol = document.createElement('th');
+					oCol.onmousedown = bb.html.handlePreventDefaultAndStop;
+					oCol.className = 'btl-treeGridCol columnFiller';
+					oCol.innerHTML = '<div class="btl-treeGridCol-border btl-bevel"><div class="btl-grid-cell-content btl-label">&#160;</div></div>';
+					this.viewGate.appendChild(oCol);
+					this.setProperty('viewColumnFiller', oCol);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="setRowSelectedState">
+				
+				<d:argument name="row"/>
+				<d:argument name="state" default="true"/>
+				<d:body type="text/javascript"><![CDATA[
+					if(row){
+						if(state){
+							bb.html.addClass(row, ['btl-chameleon-highlightBackground', 'btl-chameleon-highlightText', 'btl-grid-row-selected']);
+						} else {
+							bb.html.removeClass(row, ['btl-chameleon-highlightBackground', 'btl-chameleon-highlightText', 'btl-grid-row-selected']);
+						}
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="setRowFocusedState">
+				
+				<d:argument name="row"/>
+				<d:argument name="state" default="false"/>
+				<d:body type="text/javascript"><![CDATA[
+					if(row){
+						if(state){
+							bb.html.addClass(row, 'btl-grid-row-focused');
+						} else {
+							bb.html.removeClass(row, 'btl-grid-row-focused');
+						}
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="reflow" type="text/javascript"><![CDATA[
+				var oElm = bb.selector.query(this.viewNode, 'div.btl-grid-dataViewContainer');
+				if (this.hasAttribute('height') && this.getAttribute('height') !== 'auto') {
+					btl.html.stretch(oElm);
+				} else {
+					oElm.style.height = '';
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="treeGridCol" extends="b:treeGridColBase">
+			
+
+			<d:template type="application/xhtml+xml">
+				<th class="btl-treeGridCol">
+					<div class="btl-treeGridCol-border btl-bevel">
+						<div class="btl-grid-sortIndicator"/>
+						<div class="btl-grid-cell-content">
+							<div class="btl-treeGridCol-label btl-label"> </div>
+							<span><d:content/></span>
+						</div>
+					</div>
+				</th>
+			</d:template>
+
+			<d:handler event="mousedown" type="text/javascript"><![CDATA[
+				// Must check target because an editor control might be nested inside and should not trigger this state
+				if(event.target == this){
+					var oParent = this.getProperty('parentNode');
+					var sSortable = oParent.getAttribute('sortable') || 'false';
+					if(event.button == 0 && sSortable == 'true'){
+						bb.html.addClass(this.viewNode, 'btl-grid-column-header-active');
+						var oBackGround = this.viewNode.getElementsByTagName('div')[0];
+						bb.html.replaceClass(oBackGround, 'btl-chameleon-activeBackground', 'btl-chameleon-highlightBackground');
+					}
+				}
+			]]></d:handler>
+
+			<d:handler event="mouseup" type="text/javascript"><![CDATA[
+				// Must check target because an editor control might be nested inside and should not trigger this state
+				if(event.target == this){
+					var oParent = this.getProperty('parentNode');
+					var sSortable = oParent.getAttribute('sortable') || 'false';
+					if(event.button == 0 && sSortable == 'true'){
+						var oBackGround = this.viewNode.getElementsByTagName('div')[0];
+						bb.html.removeClass(this.viewNode, 'btl-grid-column-header-active');
+						bb.html.replaceClass(oBackGround, 'btl-chameleon-highlightBackground', 'btl-chameleon-activeBackground');
+					}
+				}
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

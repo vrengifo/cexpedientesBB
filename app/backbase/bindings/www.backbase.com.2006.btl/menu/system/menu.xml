@@ -1,0 +1,1029 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="element" src="../../element/element.xml"/>
+		<d:uses element="menuBarBase menuItemBase menuPopUpBase" src="../menuBase.xml"/>
+
+		<d:element name="menuBar" extends="b:menuBarBase">
+			
+
+			<d:resource type="text/css"><![CDATA[.btl-menuBar {
+	background-color: Menu;
+	cursor: default;
+}
+.btl-menuBarItem {
+	cursor: pointer;
+	padding: 1px;
+}
+.btl-menuBarItem .btl-label {
+	padding: 4px;
+}
+.btl-menuBarItem .btl-icon {
+	padding-left: 24px;
+}
+.btl-menuBarItem-hover,
+.btl-menuBarItem-active {
+	/* cancel padding due to added border */
+	padding: 0;
+}
+.btl-menuBarSeparator {
+	width: 0;
+	height: 100%;
+	overflow: hidden;
+	padding: 0;
+}
+.btl-menuPopUp {
+	position: absolute;
+	z-index: 10001;
+	background-color: Menu;
+	top: -10000px;
+	left: -10000px;
+	margin-top: 1px;
+	cursor: default;
+}
+.btl-menuPopUpItem {
+	cursor: pointer;
+}
+.btl-menuPopUpItem-expand {
+	cursor: default;
+}
+.btl-menuPopUpItem-label,
+.btl-menuPopUpItem-shortkey {
+	color: MenuText;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+.btl-menuPopUpItem-arrow {
+	width: 16px;
+}
+.btl-menuPopUpItem-expand .btl-menuPopUpItem-arrow {
+	background-image: url(media/arrowBlack.png);
+	background-position: center center;
+	background-repeat: no-repeat;
+}
+.btl-menuPopUpSeparator-div {
+	height: 0;
+	font-size: 0;
+	line-height: 0;
+	overflow: hidden;
+}
+.btl-menuPopUpItem-hover {
+	background-color: Highlight;
+}
+.btl-menuPopUpItem-hover td {
+	color: HighlightText;
+}
+.btl-menuBarItem.btl-disabled,
+.btl-disabled .btl-menuPopUpItem-label {
+	color: GrayText;
+}
+.btl-disabled .btl-menuPopUpItem-arrow {
+	background-image: none;
+}
+/* fixes */
+.ie .btl-menuBar {
+	/* for opacity */
+	zoom: 1.0;
+}
+.ie .btl-menuBarSeparator-div {
+	/* Without this 0 width div, the borders of the horizontal separator do not show... */
+	width: 0;
+}
+.ie5_5 .btl-menuPopUpSeparator-div {
+	height: 2px;
+}]]></d:resource>
+			<d:resource type="image/png" src="media/arrowBlack.png"/>
+			<d:resource type="text/javascript"><![CDATA[btl.menuBar = {};
+
+btl.menuBar.activeMenuBar = null;
+
+/* Set the menuBar to inactive when the user presses mouse down outside the menuBar */
+btl.menuBar.handleMouseDown = function btl_menu_handleMouseDown(oEvent){
+	var oMenu = btl.menuBar.activeMenuBar;
+	var oTarget = oEvent.target;
+	if (oMenu && !btl.controller.containsElement(oMenu, oTarget)) {
+		oMenu.setProperty('active', false);
+	}
+};
+/* Returns the "active" menuPopUp of a menuBar. This is the menuPopUp that should be changed
+when pressing keys. */
+btl.menuBar.getActiveMenuPopUp = function(oMenuBar) {
+	// the first active menupopup is the 'contextmenu'
+	var oActiveMenuPopUp = null;
+	var oSelectedMenuItem = oMenuBar.getProperty('selectedMenuItem');
+	if (oSelectedMenuItem) {
+		var oMenuPopUp = oSelectedMenuItem.getProperty('menuPopUp');
+		if (oMenuPopUp && oMenuPopUp.getProperty('open')) {
+			oActiveMenuPopUp = btl.menuPopUp.getActiveMenuPopUp(oMenuPopUp);
+		}
+	}
+	return oActiveMenuPopUp;
+};
+/* Used for up key.
+	Will open the menuPopUp if the menuPopUp of the selected menu item is not open
+	and will select the last menu item in the menuPopUp.
+*/
+btl.menuBar.goUp = function(oMenuBar) {
+	var oSelectedMenuItem = oMenuBar.getProperty('selectedMenuItem');
+	if (oSelectedMenuItem) {
+		var oMenuPopUp = oSelectedMenuItem.getProperty('menuPopUp');
+		if (oMenuPopUp) {
+			oMenuPopUp.open(oSelectedMenuItem);
+			btl.menuPopUp.goUp(oMenuPopUp);
+		}
+	}
+};
+/* Used for down key.
+	Will open the menuPopUp if the menuPopUp of the selected menu item is not open
+	and will select the first menu item in the menuPopUp.
+*/
+btl.menuBar.goDown = function(oMenuBar) {
+	var oSelectedMenuItem = oMenuBar.getProperty('selectedMenuItem');
+	if (oSelectedMenuItem) {
+		var oMenuPopUp = oSelectedMenuItem.getProperty('menuPopUp');
+		if (oMenuPopUp) {
+			oMenuPopUp.open(oSelectedMenuItem);
+			btl.menuPopUp.goDown(oMenuPopUp);
+		}
+	}
+};
+/* Used for left key.
+	Will select the menu item left of the currently selected menu item and will open
+	its menuPopUp. Will jump to the last menu item when the first menu item was selected.
+*/
+btl.menuBar.goLeft = function(oMenuBar) {
+	var aMenuItems = oMenuBar.getProperty('menuItems');
+	var iMenuItems = aMenuItems.length;
+	if (iMenuItems) {
+		var oSelectedMenuItem = oMenuBar.getProperty('selectedMenuItem');
+		var oNew = null;
+		var oPreceding = null;
+
+		/* If there is a selected menu item, the preceding element should be offered for selection. */
+		if (oSelectedMenuItem) {
+			oPreceding = oSelectedMenuItem.getProperty('previousSibling');
+		}
+
+		/* If there was no selected menu item or no preceding element, the last menu item should be offered for selection. */
+		if (!oPreceding) {
+			oPreceding = aMenuItems[iMenuItems - 1];
+		}
+
+		/* While no new element that could be selected is found and while there still is a preceding element available,
+		\* a new element should be looked for. */
+		while (!oNew && oPreceding) {
+			/* When the element is a menuBarItem and it is "selectable", it can be selected. */
+			if (oPreceding.instanceOf('http://www.backbase.com/2006/btl', 'menuBarItem') && oPreceding.getProperty('selectable')) {
+				oNew = oPreceding;
+				break;
+			}
+
+			/* A selectable menuBarItem has not been found; keep looking */
+			oPreceding = oPreceding.getProperty('previousSibling');
+
+			/* If there was no preceding element, continue at the last menu item. This is only needed when a menu item
+			** was selected, because if no element was selected, the search would have been started at the last element,
+			** meaning that at this time all elements have been checked. There is no possibility of an infinite loop,
+			\* because if there was a selected menu item, it would be sure to be selected as new selectable menu item. */
+			if (oSelectedMenuItem && !oPreceding) {
+				oPreceding = aMenuItems[iMenuItems - 1];
+			}
+		}
+
+		/* Deal with selection/opening when the new element is not already selected. */
+		if (oNew && oNew != oSelectedMenuItem) {
+			oNew.setProperty('selected', true);
+			var oMenuPopUp = oNew.getProperty('menuPopUp');
+			if (oMenuPopUp) {
+				oMenuPopUp.open(oNew);
+				btl.menuPopUp.goDown(oMenuPopUp);
+			}
+		}
+	}
+};
+/* Used for right key.
+	Will select the menu item right of the currently selected menu item and will open
+	its menuPopUp. Will jump to the first menu item when the last menu item was selected.
+*/
+btl.menuBar.goRight = function(oMenuBar) {
+	var aMenuItems = oMenuBar.getProperty('menuItems');
+	var iMenuItems = aMenuItems.length;
+	if (iMenuItems) {
+		var oSelectedMenuItem = oMenuBar.getProperty('selectedMenuItem');
+		var oNew = null;
+		var oNext = null;
+
+		/* If there is a selected menu item, the next element should be offered for selection. */
+		if (oSelectedMenuItem) {
+			oNext = oSelectedMenuItem.getProperty('nextSibling');
+		}
+
+		/* If there was no selected menu item or no next element, the first menu item should be offered for selection. */
+		if (!oNext) {
+			oNext = aMenuItems[0];
+		}
+
+		/* While no new element that could be selected is found and while there still is a next element available,
+		\* a new element should be looked for. */
+		while (!oNew && oNext) {
+			/* When the element is a menuBarItem and it is "selectable", it can be selected. */
+			if (oNext.instanceOf('http://www.backbase.com/2006/btl', 'menuBarItem') && oNext.getProperty('selectable')) {
+				oNew = oNext;
+				break;
+			}
+
+			/* A selectable menuBarItem has not been found; keep looking */
+			oNext = oNext.getProperty('nextSibling');
+
+			/* If there was no next element, continue at the first menu item. This is only needed when a menu item
+			** was selected, because if no element was selected, the search would have been started at the first element,
+			** meaning that at this time all elements have been checked. There is no possibility of an infinite loop,
+			\* because if there was a selected menu item, it would be sure to be selected as new selectable menu item. */
+			if (oSelectedMenuItem && !oNext) {
+				oNext = aMenuItems[0];
+			}
+		}
+
+		/* Deal with selection/opening when the new element is not already selected. */
+		if (oNew && oNew != oSelectedMenuItem) {
+			oNew.setProperty('selected', true);
+			var oMenuPopUp = oNew.getProperty('menuPopUp');
+			if (oMenuPopUp) {
+				oMenuPopUp.open(oNew);
+				btl.menuPopUp.goDown(oMenuPopUp);
+			}
+		}
+	}
+};
+/* Chooses the functions to handle keyboard navigation. */
+btl.menuBar.handleKeyDown = function (oEvent) {
+	var oMenuBar = btl.menuBar.activeMenuBar;
+	if (oMenuBar) {
+		var oActiveMenuPopUp = btl.menuBar.getActiveMenuPopUp(oMenuBar);
+		switch (oEvent.keyIdentifier) {
+			case 'Up':
+				if (oActiveMenuPopUp) {
+					btl.menuPopUp.goUp(oActiveMenuPopUp);
+				} else {
+					btl.menuBar.goUp(oMenuBar);
+				}
+				break;
+			case 'Down':
+				if (oActiveMenuPopUp) {
+					btl.menuPopUp.goDown(oActiveMenuPopUp);
+				} else {
+					btl.menuBar.goDown(oMenuBar);
+				}
+				break;
+			case 'Right':
+				if (oActiveMenuPopUp) {
+					if (!btl.menuPopUp.goRight(oActiveMenuPopUp)) {
+						btl.menuBar.goRight(oMenuBar);
+					}
+				} else {
+					btl.menuBar.goRight(oMenuBar);
+				}
+				break;
+			case 'Left':
+				if (oActiveMenuPopUp) {
+					if (!btl.menuPopUp.goLeft(oActiveMenuPopUp)) {
+						btl.menuBar.goLeft(oMenuBar);
+					}
+				} else {
+					btl.menuBar.goLeft(oMenuBar);
+				}
+				break;
+			case 'Home':
+				if (oActiveMenuPopUp) {
+					btl.menuPopUp.goHome(oActiveMenuPopUp);
+				}
+				break;
+			case 'End':
+				if (oActiveMenuPopUp) {
+					btl.menuPopUp.goEnd(oActiveMenuPopUp);
+				}
+				break;
+			case 'U+001B': //escape
+				if (oActiveMenuPopUp) {
+					btl.menuPopUp.escape(oActiveMenuPopUp);
+				} else {
+					oMenuBar.setProperty('active', false);
+				}
+				break;
+			case 'Enter':
+				if (oActiveMenuPopUp) {
+					if (!btl.menuPopUp.goRight(oActiveMenuPopUp)) {
+						var oSelectedMenuItem = oActiveMenuPopUp.getProperty('selectedMenuItem');
+						if (oSelectedMenuItem && !oSelectedMenuItem.getProperty('disabled')) {
+							var oEvent = bb.document.createEvent('UIEvent');
+							oEvent.initEvent('DOMActivate', true, true);
+							oSelectedMenuItem.dispatchEvent(oEvent);
+						} else {
+							oMenuBar.setProperty('active', false);
+						}
+					}
+				} else {
+					btl.menuBar.goDown(oMenuBar);
+				}
+				break;
+			default:
+				break;
+		}
+		oEvent.stopPropagation();
+		oEvent.preventDefault();
+	}
+};
+
+btl.contextMenu.activeContextMenu = null;
+
+/* Closes the contextMenu when the user presses mouse down outside of the contextMenu */
+btl.contextMenu.handleMouseDown = function btl_contextMenu_handleMouseDown(oEvent){
+	var oMenu = btl.contextMenu.activeContextMenu;
+	var oTarget = oEvent.target;
+
+	if (oMenu && !btl.controller.containsElement(oMenu, oTarget)) {
+		oMenu.close();
+	}
+};
+/* Returns the "active" menuPopUp of a contextMenu. This is the menuPopUp that should be changed
+when pressing keys. */
+btl.contextMenu.getActiveMenuPopUp = function(oContextMenu) {
+	// the first active menupopup is the 'contextmenu'
+	return btl.menuPopUp.getActiveMenuPopUp(oContextMenu);
+};
+/* Chooses the functions to handle keyboard navigation. */
+btl.contextMenu.handleKeyDown = function (oEvent) {
+	var oContextMenu = btl.contextMenu.activeContextMenu;
+	if (oContextMenu) {
+		var oActiveMenuPopUp = btl.contextMenu.getActiveMenuPopUp(oContextMenu);
+		switch (oEvent.keyIdentifier) {
+			case 'Up':
+				btl.menuPopUp.goUp(oActiveMenuPopUp);
+				break;
+			case 'Down':
+				btl.menuPopUp.goDown(oActiveMenuPopUp);
+				break;
+			case 'Right':
+				btl.menuPopUp.goRight(oActiveMenuPopUp);
+				break;
+			case 'Left':
+				if (oActiveMenuPopUp != oContextMenu) {
+					btl.menuPopUp.goLeft(oActiveMenuPopUp);
+				}
+				break;
+			case 'Home':
+				btl.menuPopUp.goHome(oActiveMenuPopUp);
+				break;
+			case 'End':
+				btl.menuPopUp.goEnd(oActiveMenuPopUp);
+				break;
+			case 'U+001B': //escape
+				if (oActiveMenuPopUp != oContextMenu) {
+					btl.menuPopUp.escape(oActiveMenuPopUp);
+				} else {
+					oContextMenu.close();
+				}
+				break;
+			case 'Enter':
+				if (oActiveMenuPopUp) {
+					if (!btl.menuPopUp.goRight(oActiveMenuPopUp)) {
+						var oSelectedMenuItem = oActiveMenuPopUp.getProperty('selectedMenuItem');
+						if (oSelectedMenuItem && !oSelectedMenuItem.getProperty('disabled')) {
+							var oEvent = bb.document.createEvent('UIEvent');
+							oEvent.initEvent('DOMActivate', true, true);
+							oSelectedMenuItem.dispatchEvent(oEvent);
+						} else {
+							oContextMenu.close();
+						}
+					}
+				}
+				break;
+			default:
+				break;
+		}
+		oEvent.stopPropagation();
+		oEvent.preventDefault();
+	}
+};
+
+btl.menuPopUp = {};
+/* Returns the "active" menuPopUp of a menuPopUp. This is the menuPopUp that should be changed
+when pressing keys. */
+btl.menuPopUp.getActiveMenuPopUp = function(oMenuPopUp) {
+	var oActiveMenuPopUp = oMenuPopUp;
+	var oSelectedMenuItem = oMenuPopUp.getProperty('selectedMenuItem');
+	if (oSelectedMenuItem) {
+		var oSubMenuPopUp = oSelectedMenuItem.getProperty('menuPopUp');
+		if (oSubMenuPopUp && oSubMenuPopUp.getProperty('open')) {
+			oActiveMenuPopUp = btl.contextMenu.getActiveMenuPopUp(oSubMenuPopUp);
+		}
+	}
+	return oActiveMenuPopUp;
+};
+/* Used for up key.
+	Will select the menu item above the currently selected menu item. Will jump
+	to the last menu item when the first menu item was selected. If no menu item
+	was selected, it this will select the last.
+*/
+btl.menuPopUp.goUp = function(oMenuPopUp) {
+	var aMenuItems = oMenuPopUp.getProperty('menuItems');
+	var iMenuItems = aMenuItems.length;
+	if (iMenuItems) {
+		var oSelectedMenuItem = oMenuPopUp.getProperty('selectedMenuItem');
+		var oNew = null;
+		var oPreceding = null;
+
+		/* If there is a selected menu item, the preceding element should be offered for selection. */
+		if (oSelectedMenuItem) {
+			oPreceding = oSelectedMenuItem.getProperty('previousSibling');
+		}
+
+		/* If there was no selected menu item or no preceding element, the last menu item should be offered for selection. */
+		if (!oPreceding) {
+			oPreceding = aMenuItems[iMenuItems - 1];
+		}
+
+		/* While no new element that could be selected is found and while there still is a preceding element available,
+		\* a new element should be looked for. */
+		while (!oNew && oPreceding) {
+			/* When the element is a menuPopUpItem and it is "selectable", it can be selected. */
+			if (oPreceding.instanceOf('http://www.backbase.com/2006/btl', 'menuPopUpItem') && oPreceding.getProperty('selectable')) {
+				oNew = oPreceding;
+				break;
+			}
+
+			/* A selectable menuPopUpItem has not been found; keep looking */
+			oPreceding = oPreceding.getProperty('previousSibling');
+
+			/* If there was no preceding element, continue at the last menu item. This is only needed when a menu item
+			** was selected, because if no element was selected, the search would have been started at the last element,
+			** meaning that at this time all elements have been checked. There is no possibility of an infinite loop,
+			\* because if there was a selected menu item, it would be sure to be selected as new selectable menu item. */
+			if (oSelectedMenuItem && !oPreceding) {
+				oPreceding = aMenuItems[iMenuItems - 1];
+			}
+		}
+
+		/* Deal with selection/opening when the new element is not already selected. */
+		if (oNew && oNew != oSelectedMenuItem) {
+			if (oSelectedMenuItem) {
+				oSelectedMenuItem.setProperty('selected', false);
+				var oMenuPopUp = oSelectedMenuItem.getProperty('menuPopUp');
+				if (oMenuPopUp) {
+					oMenuPopUp.close();
+				}
+			}
+			oNew.setProperty('selected', true);
+			return true;
+		}
+	}
+	return false;
+};
+/* Used for up key.
+	Will select the menu item below the currently selected menu item. Will jump
+	to the last menu item when the first menu item was selected. If no menu item
+	was selected, it this will select the first.
+*/
+btl.menuPopUp.goDown = function(oMenuPopUp) {
+	var aMenuItems = oMenuPopUp.getProperty('menuItems');
+	var iMenuItems = aMenuItems.length;
+	if (iMenuItems) {
+		var oSelectedMenuItem = oMenuPopUp.getProperty('selectedMenuItem');
+		var oNew = null;
+		var oNext = null;
+
+		/* If there is a selected menu item, the next element should be offered for selection. */
+		if (oSelectedMenuItem) {
+			oNext = oSelectedMenuItem.getProperty('nextSibling');
+		}
+
+		/* If there was no selected menu item or no next element, the first menu item should be offered for selection. */
+		if (!oNext) {
+			oNext = aMenuItems[0];
+		}
+
+		/* While no new element that could be selected is found and while there still is a next element available,
+		\* a new element should be looked for. */
+		while (!oNew && oNext) {
+			/* When the element is a menuPopUpItem and it is "selectable", it can be selected. */
+			if (oNext.instanceOf('http://www.backbase.com/2006/btl', 'menuPopUpItem') && oNext.getProperty('selectable')) {
+				oNew = oNext;
+				break;
+			}
+
+			/* A selectable menuPopUpItem has not been found; keep looking */
+			oNext = oNext.getProperty('nextSibling');
+
+			/* If there was no next element, continue at the first menu item. This is only needed when a menu item
+			** was selected, because if no element was selected, the search would have been started at the first element,
+			** meaning that at this time all elements have been checked. There is no possibility of an infinite loop,
+			\* because if there was a selected menu item, it would be sure to be selected as new selectable menu item. */
+			if (oSelectedMenuItem && !oNext) {
+				oNext = aMenuItems[0];
+			}
+		}
+
+		/* Deal with selection/opening when the new element is not already selected. */
+		if (oNew && oNew != oSelectedMenuItem) {
+			if (oSelectedMenuItem) {
+				oSelectedMenuItem.setProperty('selected', false);
+				var oMenuPopUp = oSelectedMenuItem.getProperty('menuPopUp');
+				if (oMenuPopUp) {
+					oMenuPopUp.close();
+				}
+			}
+			oNew.setProperty('selected', true);
+			return true;
+		}
+	}
+	return false;
+};
+/* Used for right key.
+	Will open the menuPopUp of the selected menuItem and select the
+	first menuItem in that menuPopUp.
+*/
+btl.menuPopUp.goRight = function(oMenuPopUp) {
+	var oSelectedMenuItem = oMenuPopUp.getProperty('selectedMenuItem');
+
+	if (oSelectedMenuItem) {
+		var oNewMenuPopUp = oSelectedMenuItem.getProperty('menuPopUp');
+		if (oNewMenuPopUp) {
+			oNewMenuPopUp.open(oSelectedMenuItem, 'end-before');
+			btl.menuPopUp.goDown(oNewMenuPopUp);
+			return true;
+		}
+	}
+	return false;
+};
+/* Used for left key.
+	Will close the menuPopUp that the selected menu item is in. Navigation
+	will continue in the ancestor menuPopUp.
+*/
+btl.menuPopUp.goLeft = function(oMenuPopUp) {
+	var oParent = oMenuPopUp.getProperty('parentNode');
+	if (oParent.instanceOf('http://www.backbase.com/2006/btl', 'menuPopUpItem')) {
+		oMenuPopUp.close();
+		return true;
+	}
+	return false;
+};
+/* Used for escape key.
+	Closes the menuPopUp
+*/
+btl.menuPopUp.escape = function(oMenuPopUp) {
+	oMenuPopUp.close();
+	return true;
+};
+/* Used for home key.
+	Selects the first menu item in a menuPopUp.
+*/
+btl.menuPopUp.goHome = function(oMenuPopUp) {
+	var aMenuItems = oMenuPopUp.getProperty('menuItems');
+	if (aMenuItems.length) {
+		aMenuItems[0].setProperty('selected', true);
+		return true;
+	}
+	return false;
+};
+/* Used for end key.
+	Selects the last menu item in a menuPopUp.
+*/
+btl.menuPopUp.goEnd = function(oMenuPopUp) {
+	var aMenuItems = oMenuPopUp.getProperty('menuItems');
+	if (aMenuItems.length) {
+		aMenuItems[aMenuItems.length - 1].setProperty('selected', true);
+		return true;
+	}
+	return false;
+};]]></d:resource>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-menuBar btl-bevel-top-bottom">
+					<table cellspacing="0" cellpadding="0" border="0">
+						<tr><d:content/></tr>
+					</table>
+				</div>
+			</d:template>
+
+			<d:property name="active">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					value = Boolean(value);
+					var bActive = this.getProperty('active');
+					if (value != bActive) {
+						if (value) {
+							// set active menuBar to this
+							btl.menuBar.activeMenuBar = this;
+							// add handlers to deactivate menuBar when mouse is pressed outside the menuBar
+							bb.document.addEventListener('mousedown', btl.menuBar.handleMouseDown, true);
+							// add handlers for keyboard navigation
+							// capture phase is used in both cases to ensure execution
+							bb.document.addEventListener('keydown', btl.menuBar.handleKeyDown, true);
+
+							// when set to active, the first available menu item should be selected if none is selected yet.
+							var oSelectedMenuItem = this.getProperty('selectedMenuItem');
+							if (!oSelectedMenuItem) {
+								var aMenuItems = this.getProperty('menuItems');
+								var oNew = null;
+								var oNext = aMenuItems[0];
+
+								/* While no new element that could be selected is found and while there still is a next element available,
+								\* a new element should be looked for. */
+								while (!oNew && oNext) {
+									/* When the element is a menuBarItem and it is not disabled, it can be selected. */
+									if (oNext.instanceOf('http://www.backbase.com/2006/btl', 'menuBarItem') && !oNext.getProperty('disabled')) {
+										oNew = oNext;
+										break;
+									}
+
+									/* A selectable menuBarItem has not been found; keep looking */
+									oNext = oNext.getProperty('nextSibling');
+								}
+
+								/* Deal with selection when the new element is not already selected. */
+								if (oNew) {
+									oNew.setProperty('selected', true);
+								}
+							}
+						} else {
+							// close any open menuPopUp and deselect the selected menu item
+							var oSelectedMenuItem = this.getProperty('selectedMenuItem');
+							if (oSelectedMenuItem) {
+								var oMenuPopUp = oSelectedMenuItem.getProperty('menuPopUp');
+
+								if (oMenuPopUp) {
+									oMenuPopUp.close();
+								}
+								oSelectedMenuItem.setProperty('selected', false);
+							}
+							// clean up
+							btl.menuBar.activeMenuBar = null;
+							bb.document.removeEventListener('mousedown', btl.menuBar.handleMouseDown, true);
+							bb.document.removeEventListener('keydown', btl.menuBar.handleKeyDown, true);
+						}
+					}
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					return this == btl.menuBar.activeMenuBar;
+				]]></d:getter>
+			</d:property>
+
+			<!-- Handler to set selection on mouseover. Will only be executed
+			when the menuBar is active. -->
+			<d:handler event="mouseover" type="text/javascript"><![CDATA[
+				if (this.getProperty('active')) {
+					var oTarget = event.target;
+					if (oTarget != this && oTarget.getProperty('parentNode') == this &&
+							oTarget.instanceOf('http://www.backbase.com/2006/btl', 'menuBarItem') &&
+							!oTarget.getProperty('disabled')) {
+
+						oTarget.setProperty('selected', true);
+						var oMenuPopUp = oTarget.getProperty('menuPopUp');
+						if (oMenuPopUp) {
+							oMenuPopUp.open(oTarget);
+						}
+					}
+				}
+			]]></d:handler>
+
+			<!-- Handler to remove selection on mouseout. -->
+			<d:handler event="mouseout" type="text/javascript"><![CDATA[
+				var oTarget = event.target;
+				var oCurrentTarget = event.currentTarget;
+				var oRelatedTarget = event.relatedTarget;
+
+				if (oTarget != oCurrentTarget && oTarget.getProperty('parentNode') == oCurrentTarget &&
+						oTarget.instanceOf('http://www.backbase.com/2006/btl', 'menuBarItem')) {
+
+					if (btl.menuBar.activeMenuBar != oCurrentTarget) {
+						// only deselect when the related target is not inside the target (mouse as to go out of the element
+						if (!btl.controller.containsElement(oTarget, oRelatedTarget)) {
+							oTarget.setProperty('selected', false);
+						}
+					}
+				}
+			]]></d:handler>
+
+			<!-- Handler to activate the menuBar on mousedown (when it happens on a menuBarItem). -->
+			<d:handler event="mousedown" type="text/javascript"><![CDATA[
+				if (btl.menuBar.activeMenuBar != this) {
+					var oTarget = event.target;
+					var oCurrentTarget = event.currentTarget;
+
+					var oMenuItem = null;
+
+					while (oTarget != this && !oTarget.instanceOf('http://www.backbase.com/2006/btl', 'menuPopUp')) {
+						if (oTarget.instanceOf('http://www.backbase.com/2006/btl', 'menuBarItem')) {
+							oMenuItem = oTarget;
+							break;
+						}
+						oTarget = oTarget.getProperty('parentNode');
+					}
+
+					if (oMenuItem && !oMenuItem.getProperty('disabled')) {
+						this.setProperty('active', true);
+						/* set flag that the menuBar has just been activated to avoid that the menu
+						\* is deactivated immediately on mouseup. */
+						this._.__isJustActivated = true;
+
+						oMenuItem.setProperty('selected', true);
+
+						var oMenuPopUp = oMenuItem.getProperty('menuPopUp');
+						if (oMenuPopUp) {
+							oMenuPopUp.open(oMenuItem);
+						}
+					}
+				}
+			]]></d:handler>
+
+			<!-- Handler for dispatching DOMActivate event when a menu item gets mouseup.
+			In case a menuBarItem gets mouseup, the menuBar is deactivated. -->
+			<d:handler event="mouseup" type="text/javascript"><![CDATA[
+				if (btl.menuBar.activeMenuBar == this) {
+					var oTarget = event.target;
+					var oMenuPopUpItem = null;
+					var oMenuBarItem = null;
+					while (oTarget != this) {
+						if (oTarget.instanceOf('http://www.backbase.com/2006/btl', 'menuPopUpItem')) {
+							oMenuPopUpItem = oTarget;
+							break;
+						} else if (oTarget.instanceOf('http://www.backbase.com/2006/btl', 'menuBarItem')) {
+							oMenuBarItem = oTarget;
+							break;
+						}
+
+						oTarget = oTarget.getProperty('parentNode');
+					}
+					if (oMenuPopUpItem && !oMenuPopUpItem.getProperty('disabled') && !oMenuPopUpItem.getProperty('menuPopUp')) {
+						var oEvent = bb.document.createEvent('UIEvent');
+						oEvent.initEvent('DOMActivate', true, true);
+						oMenuPopUpItem.dispatchEvent(oEvent);
+
+					// should only be deactivated when a menuBarItem received the event and if the flag for activation is not set
+					} else if (!oMenuPopUpItem && oMenuBarItem && !this._.__isJustActivated) {
+						this.setProperty('active', false);
+					}
+				}
+				// reset activation flag
+				this._.__isJustActivated = false;
+			]]></d:handler>
+
+			<d:handler event="contextmenu" type="text/javascript"><![CDATA[
+				event.preventDefault();
+			]]></d:handler>
+
+			<d:handler event="DOMActivate" type="text/javascript"><![CDATA[
+				this.setProperty('active', false);
+			]]></d:handler>
+
+			<d:handler event="DOMNodeRemovedFromDocument" type="text/javascript"><![CDATA[
+				if (btl.menuBar.activeMenuBar == this) {
+					this.setProperty('active', false);
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="menuBarItem" extends="b:menuItemBase">
+			
+
+			<!-- if the d:content is in the label, there are some rendering issues in IE -->
+			<d:template type="application/xhtml+xml">
+				<td class="btl-menuBarItem">
+					<div class="btl-label"> </div>
+					<d:content/>
+				</td>
+			</d:template>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				bb.html.disableUserSelect(this.viewNode);
+			]]></d:constructor>
+
+			<d:handler event="mouseenter" type="text/javascript"><![CDATA[
+				var oParent = this.getProperty('parentNode');
+				if (!oParent.getProperty('active')) {
+					bb.html.addClass(this.viewNode, ['btl-menuBarItem-hover', 'btl-ridge-inner']);
+				}
+				this._.__over = true;
+			]]></d:handler>
+
+			<d:handler event="mouseleave" type="text/javascript"><![CDATA[
+				bb.html.removeClass(this.viewNode, ['btl-menuBarItem-hover', 'btl-ridge-inner']);
+				this._.__over = false;
+			]]></d:handler>
+
+			<d:handler event="select" type="text/javascript"><![CDATA[
+				if (event.target == this) {
+					bb.html.removeClass(this.viewNode, ['btl-menuBarItem-hover', 'btl-ridge-inner']);
+					bb.html.addClass(this.viewNode, ['btl-menuBarItem-active', 'btl-groove']);
+				}
+			]]></d:handler>
+
+			<d:handler event="deselect" type="text/javascript"><![CDATA[
+				if (event.target == this) {
+					bb.html.removeClass(this.viewNode, ['btl-menuBarItem-active', 'btl-groove']);
+					if (this._.__over) {
+						bb.html.addClass(this.viewNode, ['btl-menuBarItem-hover', 'btl-ridge-inner']);
+					}
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="menuBarSeparator" extends="b:menuSeparatorBase">
+			
+
+			<d:template type="application/xhtml+xml">
+				<td class="btl-menuBarSeparator btl-bevel-left-right">
+					<div class="btl-menuBarSeparator-div"><d:content/></div>
+				</td>
+			</d:template>
+		</d:element>
+
+		<d:element name="menuPopUp" extends="b:menuPopUpBase">
+			
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-menuPopUp">
+					<div class="btl-bevel">
+						<table border="0" cellspacing="0" cellpadding="0">
+							<tbody><d:content/></tbody>
+						</table>
+					</div>
+				</div>
+			</d:template>
+
+			<d:method name="open">
+				<d:argument name="destination"/>
+				<d:argument name="mode"/>
+				<d:argument name="left"/>
+				<d:argument name="top"/>
+				<d:body type="text/javascript"><![CDATA[
+					/* handlers should only be added if the popUpMenu functions as a contextMenu.
+					** In the current setup, the only way to find out, is to check if the menuPopUp
+					\* is in neither a menuBar nor another menuPopUp. */
+					var bTopLevel = true;
+					var oParent = this.getProperty('parentNode');
+					while (oParent) {
+						if (oParent.instanceOf('http://www.backbase.com/2006/btl', 'menuPopUp') ||
+								oParent.instanceOf('http://www.backbase.com/2006/btl', 'menuBar')) {
+
+							bTopLevel = false;
+							break;
+						}
+						oParent = oParent.getProperty('parentNode');
+					}
+
+					if (bTopLevel) {
+						/* similar as to active property of menuBar */
+						btl.contextMenu.activeContextMenu = this;
+						bb.document.addEventListener('mousedown', btl.contextMenu.handleMouseDown, true);
+						bb.document.addEventListener('keydown', btl.contextMenu.handleKeyDown, true);
+					}
+
+					this.callSuper('open', [destination, mode, left, top]);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="close">
+				<d:body type="text/javascript"><![CDATA[
+					this.viewNode.style.top = '';
+					this.viewNode.style.left = '';
+
+					/* Clean up */
+					if (btl.contextMenu.activeContextMenu == this) {
+						btl.contextMenu.activeContextMenu = null;
+						bb.document.removeEventListener('mousedown', btl.contextMenu.handleMouseDown, true);
+						bb.document.removeEventListener('keydown', btl.contextMenu.handleKeyDown, true);
+					}
+
+					this.callSuper('close');
+				]]></d:body>
+			</d:method>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				bb.html.disableUserSelect(this.viewNode);
+			]]></d:constructor>
+
+			<d:destructor type="text/javascript"><![CDATA[
+				if(this.viewNode.parentNode)
+					this.viewNode.parentNode.removeChild(this.viewNode);
+			]]></d:destructor>
+
+			<!-- Handle selection on mouseover -->
+			<d:handler event="mouseover" type="text/javascript"><![CDATA[
+				var oTarget = event.target;
+				if (oTarget != this && oTarget.getProperty('parentNode') == this &&
+						oTarget.instanceOf('http://www.backbase.com/2006/btl', 'menuPopUpItem') &&
+						!oTarget.getProperty('disabled')) {
+
+					oTarget.setProperty('selected', true);
+					var oMenuPopUp = oTarget.getProperty('menuPopUp');
+
+					if (oMenuPopUp) {
+						oMenuPopUp.open(oTarget, 'end-before');
+					}
+				}
+			]]></d:handler>
+
+			<!-- Handle deselection on mouseout -->
+			<d:handler event="mouseout" type="text/javascript"><![CDATA[
+				var oTarget = event.target;
+				if (oTarget != this && oTarget.getProperty('parentNode') == this && oTarget.instanceOf('http://www.backbase.com/2006/btl', 'menuPopUpItem')) {
+					var oRelatedTarget = event.relatedTarget;
+					if (!btl.controller.containsElement(oTarget, oRelatedTarget)) {
+						oTarget.setProperty('selected', false);
+					}
+				}
+			]]></d:handler>
+
+			<d:handler event="contextmenu" type="text/javascript"><![CDATA[
+				if (btl.contextMenu.activeContextMenu == this) {
+					event.preventDefault();
+				}
+			]]></d:handler>
+
+			<!-- Handler for dispatching DOMActivate event when a menu item gets mouseup. -->
+			<d:handler event="mouseup" type="text/javascript"><![CDATA[
+				if (btl.contextMenu.activeContextMenu == this) {
+					var oTarget = event.target;
+					var oMenuItem = null;
+					while (oTarget != this) {
+						if (oTarget.instanceOf('http://www.backbase.com/2006/btl', 'menuPopUpItem') &&
+								!oTarget.getProperty('menuPopUp')) {
+							oMenuItem = oTarget;
+							break;
+						}
+						oTarget = oTarget.getProperty('parentNode');
+					}
+					if (oMenuItem && !oMenuItem.getProperty('disabled')) {
+						var oEvent = bb.document.createEvent('UIEvent');
+						oEvent.initEvent('DOMActivate', true, true);
+						oMenuItem.dispatchEvent(oEvent);
+					}
+				}
+			]]></d:handler>
+
+			<d:handler event="DOMActivate" type="text/javascript"><![CDATA[
+				if (btl.contextMenu.activeContextMenu == this) {
+					this.close();
+				}
+			]]></d:handler>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				document.body.appendChild(this.viewNode);
+			]]></d:handler>
+
+			<d:handler event="DOMNodeRemovedFromDocument" type="text/javascript"><![CDATA[
+				if (btl.contextMenu.activeContextMenu == this) {
+					this.close();
+				}
+				var oParentView = this.viewNode.parentNode;
+				if (oParentView) {
+					oParentView.removeChild(this.viewNode);
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="menuPopUpItem" extends="b:menuItemBase">
+			
+
+			
+
+			<d:template type="application/xhtml+xml">
+				<tr class="btl-menuPopUpItem">
+					<td class="btl-menuPopUpItem-label btl-label btl-icon"> </td>
+					<td class="btl-menuPopUpItem-shortkey"/>
+					<td class="btl-menuPopUpItem-arrow"><d:content/></td>
+				</tr>
+			</d:template>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				if (this.getProperty('menuPopUp'))
+					bb.html.addClass(this.viewNode, 'btl-menuPopUpItem-expand');
+			]]></d:handler>
+
+			<d:handler event="select" type="text/javascript"><![CDATA[
+				if (event.target == this) {
+					bb.html.addClass(this.viewNode, 'btl-menuPopUpItem-hover');
+				}
+			]]></d:handler>
+
+			<d:handler event="deselect" type="text/javascript"><![CDATA[
+				if (event.target == this) {
+					bb.html.removeClass(this.viewNode, 'btl-menuPopUpItem-hover');
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="menuPopUpSeparator" extends="b:menuSeparatorBase">
+			
+			<d:template type="application/xhtml+xml">
+				<tr>
+					<td class="btl-menuPopUpSeparator" colspan="3">
+						<div class="btl-menuPopUpSeparator-div btl-groove-top-bottom"><d:content/></div>
+					</td>
+				</tr>
+			</d:template>
+		</d:element>
+	</d:namespace>
+</d:tdl>

@@ -1,0 +1,511 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+		<d:uses element="positionElement dimensionElement containerElement" src="../visualElement/visualElement.xml"/>
+
+		<d:element name="fieldEditor" extends="b:positionElement b:dimensionElement b:containerElement">
+			
+
+			
+
+			
+			<d:resource type="text/css"><![CDATA[
+				.btl-editor {
+					display: none;
+					overflow:hidden;
+				}
+				.btl-editor, .btl-editor * {
+					box-sizing: border-box;
+					-moz-box-sizing: border-box;
+					-khtml-box-sizing: border-box;
+				}
+			]]></d:resource>
+			<d:resource type="text/javascript"><![CDATA[
+				btl.fieldEditor = {};
+
+				// hash of default editors for certain data types
+				btl.fieldEditor.DEFAULT_EDITORS = {};
+
+				//------------------- HTML Editors -------------------------
+				btl.fieldEditor.DEFAULT_EDITORS["application/xhtml+xml"] = {};
+
+				btl.fieldEditor.DEFAULT_EDITORS["application/xhtml+xml"]["string"] =
+				btl.fieldEditor.DEFAULT_EDITORS["application/xhtml+xml"]["number"] =
+				btl.fieldEditor.DEFAULT_EDITORS["application/xhtml+xml"]["date"] = function(oDoc) {
+					return btl.fieldEditor.initEditor(oDoc.createElement("input"), "application/xhtml+xml");
+				};
+
+				//------------------- HTML/BTL Editors -------------------------
+				btl.fieldEditor.DEFAULT_EDITORS["application/xml"] = {};
+
+				btl.fieldEditor.DEFAULT_EDITORS["application/xml"]["string"] = function(oDoc) {
+					return btl.fieldEditor.initEditor(oDoc.createElementNS("http://www.w3.org/1999/xhtml", "input"), "application/xml");
+				};
+
+				btl.fieldEditor.DEFAULT_EDITORS["application/xml"]["number"] = function(oDoc) {
+					return btl.fieldEditor.initEditor(oDoc.createElementNS(btl.namespaceURI, "spinner"), "application/xml");
+				};
+
+				btl.fieldEditor.DEFAULT_EDITORS["application/xml"]["currency"] = function(oDoc) {
+					var oEditor = btl.fieldEditor.initEditor(oDoc.createElementNS(btl.namespaceURI, "spinner"), "application/xml");
+					oEditor.setAttribute('decimals', '2');
+					return oEditor;
+				};
+
+				btl.fieldEditor.DEFAULT_EDITORS["application/xml"]["date"] = function(oDoc) {
+					return btl.fieldEditor.initEditor(oDoc.createElementNS(btl.namespaceURI, "calendar"), "application/xml");
+				};
+
+				/**
+				 * Initializes editor. All editors
+				 * will be enhanced with width 100%.
+				 * @param oEditor {object} - editor to initialize.
+				 * @param sType {string} - type of the editor: "application/xhtml+xml" or "application/xml".
+				 * @return {object} returns editor itself for conveniency.
+				 */
+				btl.fieldEditor.initEditor = function(oEditor, sType) {
+					if (sType == "application/xhtml+xml") {
+						if (oEditor.type != "checkbox") {
+							oEditor.setAttribute('style', 'width:100%');
+						}
+					} else if (sType == "application/xml") {
+						if (bb.instanceOf(oEditor, btl.namespaceURI, "dimensionElement")) {
+							oEditor.setAttribute("width", "100%");
+						} else if (bb.instanceOf(oEditor, "http://www.w3.org/1999/xhtml", "input") &&
+										oEditor.getProperty("type") != "checkbox") {
+								oEditor.setAttribute('style', 'width:100%');
+						}
+					}
+					return oEditor;
+				};
+				/**
+				 * Creates default editor.
+				 * @param sType {String} - data type of editor to create.
+				 * @return {object} - default editor object.
+				 */
+				btl.fieldEditor.createDefaultEditor = function btl_fieldEditor_createDefaultEditor(sType) {
+					var oFieldEditor = null;
+					var oDoc = bb.document;
+					var oEditors = btl.fieldEditor.DEFAULT_EDITORS["application/xml"];
+					var oEditor = oEditors[sType] ? oEditors[sType](oDoc) : oEditors['string'](oDoc);
+
+					// to capture events oEditor needs to be in the bb.document and the most
+					if (oEditor) {
+						// need to create fieldEditor element
+						oFieldEditor = bb.document.createElementNS(btl.namespaceURI, "fieldEditor");
+						// appending editor element to it
+						oFieldEditor.appendChild(oEditor);
+						// filling the "editor"
+						oFieldEditor._._editor = oEditor;
+					}
+					return oFieldEditor;
+				};
+				/**
+				 * Find the editor.
+				 * @param oController {controller object} - oController - fieldEditor to find edit control.
+				 * @return {object} - editor object.
+				 */
+				btl.fieldEditor.findEditor = function btl_fieldEditor_findEditor(oController) {
+					//find the first acceptable
+					var aChildren = oController.getElementsByTagName('*');
+					var oEditor = null;
+					for (var i = 0, iMax = aChildren.length; iMax > i; i++) {
+						// BTL form element
+						if (bb.instanceOf(aChildren[i], btl.namespaceURI, "formField")) {
+							oEditor = aChildren[i];
+							break;
+						}
+						// XHTML (controller) form element
+						if (bb.instanceOf(aChildren[i], "http://www.w3.org/1999/xhtml", "xhtmlControlElement")) {
+							if (aChildren[i].getProperty("type") == "radio" && aChildren[i].getProperty("name").length) {
+								//collect the rest radio buttons shared the same name
+								var aRadio = [aChildren[i]];
+
+								var sName = aChildren[i].getProperty("name");
+								for (i = i+1; i < iMax; i++) {
+									if (bb.instanceOf(aChildren[i], "http://www.w3.org/1999/xhtml", "xhtmlControlElement") &&
+										aChildren[i].getProperty("type") == "radio" && aChildren[i].getProperty("name") == sName)
+										aRadio.push(aChildren[i]);
+								}
+								oEditor = aRadio.length > 1 ? aRadio : aRadio[0];
+							}
+							else
+								oEditor = aChildren[i];
+							break;
+						}
+						if (bb.instanceOf(aChildren[i], btl.namespaceURI, "xhtml")) {//started pure xhtml
+							var aXChildren = aChildren[i].viewNode.getElementsByTagName('*');
+							for (var j = 0, jMax = aXChildren.length; jMax > j; j++) {
+								if (aXChildren[j].nodeType == 1) {
+									switch ((aXChildren[j].localName || aXChildren[j].tagName).toLowerCase()) {
+										case 'input':
+											if (aXChildren[j].type.toLowerCase() == "radio" && aXChildren[j].name.length) {//radio
+												//collect the rest radio buttons shared the same name
+												var aRadio = [aXChildren[j]];
+												var sName = aXChildren[j].name;
+												for (j = j+1; j < jMax; j++) {
+													if ((aXChildren[j].localName || aXChildren[j].tagName).toLowerCase() == 'input' &&
+															aXChildren[j].type == "radio" && aXChildren[j].name == sName)
+														aRadio.push(aXChildren[j]);
+												}
+												oEditor = aRadio.length > 1 ? aRadio : aRadio[0];
+												break;
+											}
+										case 'select':
+										case 'textarea':
+											oEditor = aXChildren[j];
+											j = jMax;
+											break;
+									}//switch
+								}//if
+							}
+							if (oEditor)
+								break;
+						}//if pure xhtml fragment
+					}//for i
+					return oEditor;
+				};
+				/**
+				 * Sets the value of the editor.
+				 * @param oEditor {object} - editor object.
+				 * @param vValue {mixed} - value to set.
+				 * @return {boolean} - true or false depending on operation success.
+				 */
+				btl.fieldEditor.setValue = function(oEditor, vValue) {
+					if (!oEditor) {
+						return null;
+					}
+					if (oEditor instanceof Array) {//radio
+						var bFound = false;
+						if (oEditor[0]._) {
+							for (var i = 0; i < oEditor.length; i++) {
+								if (oEditor[i].getProperty('value') == vValue) {
+									bFound = true;
+									oEditor[i].setProperty('checked', true);
+									oEditor[i].setAttribute("checked", "checked");
+								} else
+									oEditor[i].removeAttribute("checked");
+							}
+						} else {
+							for (var i = 0; i < oEditor.length; i++) {
+								if (oEditor[i].value == vValue) {
+									bFound = true;
+									oEditor[i].checked = true;
+									oEditor[i].setAttribute("checked", "checked");
+								} else
+									oEditor[i].removeAttribute("checked");
+							}
+						}
+						return bFound ? vValue : '';
+					}
+					if (oEditor._) {
+						// XHTML (controller) form element
+						if (oEditor.modelNode.getAttribute('tabindex') == null)
+							oEditor.setAttribute('tabindex', '1');//required for 'blur' method
+						if (bb.instanceOf(oEditor, "http://www.w3.org/1999/xhtml", "xhtmlControlElement")) {
+							// checkbox is a special case
+							sType = oEditor.getProperty("type");
+							if (sType == "checkbox") {
+								var bValue = oEditor.getProperty("value") == vValue ? true : false;
+								oEditor.setProperty("checked", bValue);
+								if (bValue)
+									oEditor.setAttribute("checked", "checked");
+								else
+									oEditor.removeAttribute("checked");
+								return bValue;
+							} else if (sType == "text") {
+								oEditor.setProperty("value", vValue);
+								return vValue;
+							}
+						}//if
+						else if( bb.instanceOf(oEditor, btl.namespaceURI, 'spinner') || bb.instanceOf(oEditor, btl.namespaceURI, 'slider'))
+							//reset a control - bug 5972
+							oEditor.setProperty('value', oEditor.getProperty('defaultValue'));
+
+						return oEditor.setProperty("value", vValue);
+					}
+					// XHTML (view) form element
+					if (oEditor.nodeType == 1) {
+						var sTagName = (oEditor.localName || oEditor.tagName).toLowerCase();
+						if (sTagName == "input" || sTagName == "textarea" || sTagName == "select") {
+							if (oEditor.getAttribute('tabindex') == null)
+								oEditor.setAttribute('tabindex', '1');//required for 'blur' method
+							// checkbox is a special case
+							if (oEditor.type == "checkbox") {
+								var bValue = (oEditor.value == vValue) ? true : false;
+								oEditor.checked = bValue;
+								return bValue;
+							} else if (sTagName == "select" && bb.browser.ie) {//IE fix
+								for(var i = 0; i < oEditor.options.length; i++)
+									if ((oEditor.options[i].value || oEditor.options[i].text) == vValue) {
+										oEditor.selectedIndex = i;
+										return vValue;
+									}
+							}
+							return (oEditor.value = vValue);
+						}
+					}
+					// editor not recognized
+					return null;
+				};
+				/**
+				 * Gets the value of the editor element.
+				 * @param oEditor {object} - editor object.
+				 * @return {mixed} - value of the editor.
+				 */
+				btl.fieldEditor.getValue = function(oEditor) {
+					if (!oEditor) {
+						return null;
+					}
+					if (oEditor instanceof Array) {//radio
+						if (oEditor[0]._) {
+							for (var i = 0; i < oEditor.length; i++) {
+								if (oEditor[i].getProperty('checked'))
+									return oEditor[i].getProperty('value');
+							}
+						} else {
+							for (var i = 0; i < oEditor.length; i++) {
+								if (oEditor[i].checked)
+									return oEditor[i].value;
+							}
+						}
+					}
+					if (oEditor._) {
+						// XHTML (controller) form element
+						if (bb.instanceOf(oEditor, "http://www.w3.org/1999/xhtml", "xhtmlControlElement")) {
+							// checkbox is a special case
+							if (oEditor.getProperty("type") == "checkbox") {
+								return oEditor.getProperty("checked") ? oEditor.getProperty("value") : "";
+							}
+						}
+						//BTL Element
+						return oEditor.getProperty("value");
+					}
+					// XHTML (view) form element
+					if (oEditor.nodeType == 1) {
+						var sTagName = (oEditor.localName || oEditor.tagName).toLowerCase();
+
+						if (sTagName == "input" || sTagName == "textarea" || sTagName == "select") {
+							//checkbox is a special case
+							if (oEditor.type == "checkbox") {
+								return oEditor.checked ? oEditor.value : "";
+							} else if (sTagName == "select" && oEditor.value === '') {//IE fix
+								return oEditor.options[oEditor.selectedIndex].text;
+							}
+							return oEditor.value;
+						}
+					}
+					// editor not recognized
+					return null;
+				};
+
+				btl.fieldEditor.getFocusableObject = function(oEditor) {
+					if (!oEditor) {
+						return null;
+					}
+					var e = null;
+					if (oEditor instanceof Array) {//radio
+						if (oEditor[0]._) {
+							for (var i = 0; i < oEditor.length; i++) {
+								if (oEditor[i].getProperty('checked')) {
+									e = oEditor[i];
+									break;
+								}
+							}
+						} else {
+							for (var i = 0; i < oEditor.length; i++) {
+								if (oEditor[i].checked) {
+									e = oEditor[i];
+									break;
+								}
+							}
+						}
+					} else if (oEditor._) {
+						// XHTML (controller) form element
+						if (bb.instanceOf(oEditor, "http://www.w3.org/1999/xhtml", "xhtmlControlElement") && oEditor.getProperty("type") != 'hidden') {
+							e = oEditor;
+						} else if (bb.instanceOf(oEditor, btl.namespaceURI, "focusableElement")) {
+							e = oEditor;
+						}//if
+					} else if ((oEditor.nodeType == 1) &&  	// XHTML (view) form element
+									((oEditor.localName || oEditor.tagName).toLowerCase() != "input" || oEditor.type != 'hidden')) {
+						e = oEditor;
+					}
+					return e;
+				}
+				/**
+				 * Sets focus to the editor.
+				 * @param oEditor {object} - editor object.
+				 */
+				btl.fieldEditor.focus = function(oEditor) {
+					var e = btl.fieldEditor.getFocusableObject(oEditor);
+					if (e) {
+						e.focus();
+					}
+					return e;
+				};
+				/**
+				 * Removes the focus.
+				 * @param oEditor {object} - editor object.
+				 */
+				btl.fieldEditor.blur = function(oEditor) {
+					var e = btl.fieldEditor.getFocusableObject(oEditor);
+					if (e)
+						e.blur();
+					return e;
+				};
+				/**
+				 * Moves editor's caret.
+				 * @param oEditor {object} - editor object.
+				 * @param bSelect {boolean} - select the value or move the caret to the end.
+				 */
+				btl.fieldEditor.setCaret = function(oEditor, bSelect) {
+					if (!oEditor) return;
+					//------- set caret position
+					var oInput = null;
+					//find input element
+					if ( oEditor._){
+						// XHTML (controller) form element
+						if (bb.instanceOf(oEditor, "http://www.w3.org/1999/xhtml", "xhtmlControlElement") && oEditor.getProperty("type") == 'text') {
+							oInput = oEditor.viewNode;
+						} else if (bb.instanceOf(oEditor, btl.namespaceURI, "focusableElement")) {
+							var arr = bb.selector.queryAll( oEditor.viewNode, 'input');
+							for( i = 0; i < arr.length; i++)
+								if (arr[i].type == 'text') {
+									oInput = arr[i];
+									break;
+								}
+						};
+					} else if ((oEditor.nodeType == 1) &&  	// XHTML (view) form element
+								((oEditor.localName || oEditor.tagName).toLowerCase() == "input" && oEditor.type == 'text')) {
+						oInput = oEditor;
+					}
+					if (oInput) {
+						if(oInput.createTextRange) {
+							var range = oInput.createTextRange();
+							if (!bSelect)
+								range.move("character", oInput.value.length);
+							range.select();
+						} else if( oInput.selectionStart) {
+							oInput.setSelectionRange(bSelect ? 0 : oInput.value.length, oInput.value.length);
+						}
+					}
+				};
+
+			]]></d:resource>
+
+			<d:attribute name="display" default="none"/>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-editor"><d:content/></div>
+			</d:template>
+
+			<d:property name="editor">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					if (this._._editor) {
+						return this._._editor;
+					} else
+						this._._editor = btl.fieldEditor.findEditor(this);
+					return this._._editor;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="value">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					var oEditor = this.getProperty('editor');
+					return oEditor ? btl.fieldEditor.getValue(oEditor) : this._._value;
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					var oEditor = this.getProperty('editor');
+					return oEditor ? btl.fieldEditor.setValue(oEditor, value) : (this._._value = value);
+				]]></d:setter>
+			</d:property>
+
+			<d:method name="editStart">
+				
+				<d:argument name="value">
+					
+				</d:argument>
+				<d:argument name="focus">
+					
+				</d:argument>
+				<d:argument name="noSelect">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					var editor = this.getProperty('editor');
+
+					if (value !== undefined) {
+						this.setProperty('value', value);
+					}
+
+					this.viewNode.style.display = 'block';
+					bb.ui.reflow(editor, true);
+
+					var bNotPrevented = !bb.command.fireEvent( this, 'editStart', true, true).defaultPrevented;
+					if (bNotPrevented) {// focus the editor
+						if (focus) {
+							if (editor) {
+								setTimeout( function(){
+									try { // try to set focus on editor and move a caret to the end of text
+										var oEditor = btl.fieldEditor.focus(editor);
+										btl.fieldEditor.setCaret(oEditor, !noSelect);
+									} catch(e) {
+									}
+								}, 10);
+							}//if editor
+						}//if focus
+					}//if not prevented
+					else
+						this.viewNode.style.display = '';
+
+					return bNotPrevented;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="editFinish">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var bNotPrevented = !bb.command.fireEvent( this, 'editFinish', true, true).defaultPrevented;
+					if( bNotPrevented){
+						//special calendar handling
+						var oEditor = this.getProperty('editor');
+						if (oEditor)
+							if (oEditor._)
+								if (bb.instanceOf(oEditor, btl.namespaceURI, "calendar"))
+									oEditor.close();
+						this.blur(); //switch focus off the editor if it is focused
+						this.viewNode.style.display = '';
+					}
+					return bNotPrevented;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="focus">
+				
+				<d:body type="text/javascript"><![CDATA[
+					btl.fieldEditor.focus(this.getProperty('editor'));
+				]]></d:body>
+			</d:method>
+
+			<d:method name="blur">
+				
+				<d:body type="text/javascript"><![CDATA[
+					btl.fieldEditor.blur(this.getProperty('editor'));
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="application/javascript"><![CDATA[
+				var aChildren = this.getProperty('childNodes');
+				if (aChildren.length == 1 && aChildren[0].modelNode.nodeType == 1) {//set to 100%
+					var sWidth = aChildren[0].modelNode.getAttribute('width');
+					if (sWidth == null || sWidth == ''){
+						btl.fieldEditor.initEditor( aChildren[0], "application/xml");
+					}
+				}
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

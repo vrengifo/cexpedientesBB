@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="positionElement dimensionElement" src="../visualElement/visualElement.xml"/>
+		<d:uses element="element" src="../element/element.xml"/>
+		<d:uses element="disableElement" src="../disableElement/disableElement.xml"/>
+		<d:uses element="iconElement" src="../iconElement/iconElement.xml"/>
+
+		<d:element name="toolBarBase" extends="b:positionElement b:dimensionElement b:disableElement" abstract="true">
+			
+		</d:element>
+
+		<d:element name="toolBarItemBase" extends="b:dimensionElement" abstract="true">
+			
+		</d:element>
+
+		<d:element name="toolBarButtonBase" extends="b:dimensionElement b:iconElement b:disableElement" abstract="true">
+			
+		</d:element>
+
+		<d:element name="toolBarSwitchBase" extends="b:dimensionElement b:iconElement b:disableElement" abstract="true">
+			
+
+			
+			
+
+			<d:attribute name="active">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					bb.command.fireEvent(this, this.getProperty('active') ? 'active' : 'inactive', false, false);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:property name="active">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					if(value == true)
+						this.setAttribute('active', 'true');
+					else
+						this.removeAttribute('active');
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					return btl.isTrueValue('active', this.getAttribute('active'));
+				]]></d:getter>
+			</d:property>
+
+			<d:handler event="click" type="text/javascript"><![CDATA[
+				if(this.getProperty('active'))
+					this.setProperty('active', false)
+				else
+					this.setProperty('active', true)
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="toolBarSeparatorBase" extends="b:element" abstract="true">
+			
+		</d:element>
+	</d:namespace>
+</d:tdl>

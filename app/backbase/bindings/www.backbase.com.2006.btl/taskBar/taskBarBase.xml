@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="windowManager" src="../windowManager/windowManager.xml"/>
+		<d:uses element="element" src="../element/element.xml"/>
+
+		<d:element name="taskBarBase" extends="b:windowManager" abstract="true">
+			
+
+			<d:attribute name="orientation" default="bottom">
+				
+			</d:attribute>
+
+			<d:property name="items">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					var oChild = this.getProperty('firstChild');
+					var aItems = [];
+					while(oChild){
+						if(bb.instanceOf(oChild, btl.namespaceURI, 'taskBarItemBase')){
+							aItems[aItems.length] = oChild;
+						}
+						oChild = oChild.getProperty('nextSibling');
+					}
+					return aItems;
+				]]></d:getter>
+			</d:property>
+		</d:element>
+
+		<d:element name="taskBarItemBase" extends="b:element" abstract="true">
+			
+
+			<d:property name="name">
+				
+			</d:property>
+
+			<d:property name="active" onset="this.setActive(value)">
+				
+			</d:property>
+
+			<d:property name="previousActive">
+				
+			</d:property>
+
+			<d:property name="nextActive">
+				
+			</d:property>
+
+			<d:property name="window">
+				
+			</d:property>
+
+			<d:property name="index">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					var oParent = this.getProperty('parentNode');
+					var iIndex = -1;
+					for(var i = oParent.__items.length - 1; i >= 0; i--)
+						if( oParent.__items[i] == this)
+							iIndex = i;
+					return iIndex;
+				]]></d:getter>
+			</d:property>
+
+			<d:method name="updateWindow">
+				
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:method name="setActive">
+				
+				<d:argument name="bActive" type="boolean"/>
+				<d:body type="text/javascript"><![CDATA[
+					if( bActive == this._['_active'] || this._['_removed']) return;
+
+					var oParent = this.getProperty('parentNode');
+					if( oParent && bActive && !this._['_active']){
+						var oPrevious = oParent._._activeItem;
+						if( oPrevious){
+							if( !oPrevious._._window.getProperty('minimized')){
+								oPrevious._._nextActive = this;
+								this._['_previousActive'] = this != oPrevious ? oPrevious : null;
+							} else {
+								oPrevious._._nextActive = null;
+								oPrevious._._previousActive = null;
+							}
+							this._['_nextActive'] = null;
+
+							oPrevious.setProperty('active', false);
+						}
+						this._['_active'] = bActive;
+
+						var oWindowArea = oParent.getProperty('windowArea');
+						if(oWindowArea) oWindowArea.activate( this._['_window']);
+						oParent._._activeItem = this;
+					} else
+						this._['_active'] = bActive;
+				]]></d:body>
+			</d:method>
+		</d:element>
+	</d:namespace>
+</d:tdl>

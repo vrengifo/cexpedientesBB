@@ -1,0 +1,161 @@
+<?xml version="1.0"?>
+<messages xmlns="http://www.backbase.com/ns/exceptions">
+
+	<!-- [000 - 009] API -->
+	<msg id="001">API: Absent or wrong argument type in function call "%%" (passed "%%")</msg>
+	<msg id="002">API: Missing required argument "%%" in call to method "%%"</msg>
+	<msg id="003">API: Invalid argument type in call to API function "%%", argument %%: expected "%%", but was "%%"</msg>
+
+	<!-- [010 - 079] Generic -->
+	<msg id="010">GENERIC: Unknown element: "%%"</msg>
+	<msg id="011">GENERIC: "%%" not implemented</msg>
+	<msg id="012">GENERIC: Javascript error: "%%"</msg>
+	<msg id="013">GENERIC: Attribute "%%" expected in element "%%"</msg>
+	<msg id="014">GENERIC: Unknown element "%%#%%". Using "null:element" as fallback</msg>
+	<msg id="015">GENERIC: Mime-type "%%" not implemented</msg>
+	<msg id="016">GENERIC: Unknown mime-type: "%%"</msg>
+	<msg id="017">GENERIC: Module not included: "%%"</msg>
+	<msg id="018">GENERIC: %%</msg>
+	<msg id="019">GENERIC: Illegal value "%%" of the attribute "%%" in element "%%"</msg>
+	<msg id="020">GENERIC: "%%" functionality has been deprecated you can use "%%" instead</msg>
+
+	<!-- [080 - 099] Css -->
+	<msg id="080">CSS: Setting box-sizing is not supported in IE. Use the doctype switch</msg>
+	<msg id="081">CSS: Invalid rule "%%" declaration</msg>
+	<msg id="082">CSS: Error setting style property "%%" with value "%%"</msg>
+
+	<!-- [100 - 149] DOM-Core -->
+	<msg id="100">DOM-Core: HIERARCHY_REQUEST_ERR, An attempt was made to insert a node where it is not permitted.</msg>
+	<msg id="101">DOM-Core: INDEX_SIZE_ERR, Index size error (invalid parameters)</msg>
+	<msg id="102">DOM-Core: WRONG_DOCUMENT_ERR, A node is used in a different document than the one that created it</msg>
+
+	<!-- [150 - 199] DOM-Events -->
+	<msg id="150">DOM-Events: Unknown Event group "%%"</msg>
+
+	<!-- [200 - 249] Framework: Execution -->
+	<msg id="200">Execution: Missing required argument "%%" in call to method "%%"</msg>
+	<msg id="201">Execution: Function "%%" not defined</msg>
+	<msg id="202">Execution: Method "%%" not defined</msg>
+	<msg id="203">Execution: Property "%%" not defined</msg>
+	<msg id="204">Execution: Invalid argument type in function "%%", argument with name "%%": expected "%%", but was "%%"</msg>
+	<msg id="205">Execution: Invalid property type, property with name "%%": expected "%%", but was "%%"</msg>
+	<msg id="206">Execution: Invalid method context, method "%%" was called on a node which has been destroyed.</msg>
+
+	<!-- [250 - 299] Framework: Build -->
+	<msg id="250">Build: Element "%%" can not be a child of "%%"</msg>
+	<msg id="251">Build: Renderer code not present: "%%"</msg>
+	<msg id="252">Build: Unknown behavior "%%"</msg>
+	<msg id="253">Build: Abstract "%%#%%" is used in markup</msg>
+	<msg id="254">Build: Behavior "%%#%%" is used in markup</msg>
+	<msg id="255">Build: Multiple ID occurrence: "%%"</msg>
+
+
+	<!-- [300 - 349] XEL -->
+	<msg id="300">XEL: Can't have both "method" and "function" attribute</msg>
+	<msg id="301">XEL: Need "method" or "function" attribute</msg>
+	<msg id="302">XEL: Execution element "%%" is unknown or not allowed in this context</msg>
+	<msg id="303">XEL: Child nodes ignored - "value" attribute used instead</msg>
+	<msg id="304">XEL: Unexpected "%%" element</msg>
+	<msg id="305">XEL: Unexpected "%%" element in "%%"</msg>
+	<msg id="306">XEL: Expected "%%" element after "%%"</msg>
+	<msg id="307">XEL: Expected "%%" element before "%%"</msg>
+	<msg id="308">XEL: "name" attribute missing in "function" element</msg>
+	<msg id="309">XEL: Invalid content of executable</msg>
+	<msg id="310">XEL: Overwriting function "%%"</msg>
+	<msg id="311">XEL: Error executing "%%"</msg>
+	<msg id="312">XEL: Empty execution body. Possible wrong mime-type in "%%"</msg>
+	<msg id="313">XEL: throw encountered</msg>
+	<msg id="314">XEL: Method %% is not defined on any of inherited classes</msg>
+	<msg id="315">XEL: Invalid context object</msg>
+
+	<!-- [350 - 400] TDL -->
+	<msg id="350">TDL: Unknown "%%" extender provided on "%%#%%" element definition</msg>
+	<msg id="351">TDL: Error loading resource: "%%"</msg>
+	<msg id="352">TDL: Template element "%%" mime-type is deprecated. Use "application/xhtml+xml" instead</msg>
+	<msg id="353">TDL: Error while mapping "%%" attribute, value "%%". %%</msg>
+	<msg id="354">TDL: No read access to property "%%"</msg>
+	<msg id="355">TDL: No write access to property "%%"</msg>
+	<msg id="356">TDL: Element "%%#%%" misses "%%" %%, member declared in "%%#%%" interface</msg>
+	<msg id="357">TDL: Unknown extender '%%' provided on '%%#%%' interface declaration</msg>
+	<msg id="358">TDL: Unknown interface '%%' specified in the implementation of '%%#%%' element</msg>
+	<msg id="359">TDL: Argument mismatch in "%%" method of element "%%#%%", method declared in "%%#%%" interface</msg>
+	<msg id="360">TDL: Element "%%#%%" misses handler "%%", handler declared in "%%#%%" interface</msg>
+	<msg id="361">TDL: Behavior '%%' was not found</msg>
+	<msg id="362">TDL: "application/xhtml+xml" template elements are not in "http://www.w3.org/1999/xhtml" namespace</msg>
+	<msg id="363">TDL: Only one direct child element allowed in the "application/xhtml+xml" template</msg>
+	<msg id="364">TDL: Resource '%%' was not found</msg>
+
+	<!-- [400 - 449] SMIL -->
+	<msg id="400">SMIL: Invalid "Clock-value"</msg>
+	<msg id="401">SMIL: Invalid attribute value for "%%"</msg>
+	<msg id="402">SMIL: Missing attribute "%%"</msg>
+	<msg id="403">SMIL: Cannot specify "type" when "href" not present</msg>
+	<msg id="404">SMIL: Cannot use "from/to/by" when "values" are present</msg>
+	<msg id="405">SMIL: Cannot specify both "by" and "to"</msg>
+	<msg id="406">SMIL: Need to specify "by" or "to"</msg>
+	<msg id="407">SMIL: "from", "to" and "by" ignored when "values" present</msg>
+	<msg id="408">SMIL: Animation metrics not consequent</msg>
+	<msg id="409">SMIL: Invalid color value ("%%")</msg>
+	<msg id="410">SMIL: Units mismatch error</msg>
+	<msg id="411">SMIL: The sum value of "accelerate" and "decelerate" attributes cannot exceed 1.0</msg>
+
+	<!-- [450 - 499] XInclude -->
+	<msg id="450">XInclude: Only one fallback child is allowed</msg>
+	<msg id="451">XInclude: Failed loading resource from "%%"</msg>
+
+	<!-- [500 - 549] XML Commands -->
+	<msg id="500">XML Command: Command '%%' cannot be executed in the specified context</msg>
+	<msg id="501">XML Command: Command '%%' is not available</msg>
+	<msg id="502">XML Command: Unknown mode '%%' specified in create routine</msg>
+
+	<!-- [550 - 599] XPath -->
+	<msg id="550">XPATH: resolving error in "%%"</msg>
+	<msg id="551">XPATH: parsing error in "%%"</msg>
+	<msg id="552">XPATH: expecting XPath expression</msg>
+	<msg id="553">XPATH: could not lookup namespace for prefix "%%"</msg>
+	<msg id="554">XPATH: invalid arguments</msg>
+	<msg id="555">XPATH: unexpected 'kind' test</msg>
+	<msg id="556">XPATH: unexpected axis</msg>
+	<msg id="557">XPATH: syntax error</msg>
+	<msg id="558">XPATH: unexpected end of expression</msg>
+	<msg id="559">XPATH: expression expected</msg>
+	<msg id="560">XPATH: unclosed comment</msg>
+	<msg id="561">XPATH: no context (datasource)</msg>
+	<msg id="562">XPATH: unknown variable: "%%"</msg>
+	<msg id="563">XPATH: error in executing user defined function "%%"</msg>
+	<msg id="564">XPATH: unknown operator</msg>
+	<msg id="565">XPATH: sequence contains more then one item (%% found)</msg>
+	<msg id="566">XPATH: invalid regular expression: "%%"</msg>
+	<msg id="567">XPATH: invalid number of arguments</msg>
+	<msg id="568">XPATH: cannot compare sequences of different lengths</msg>
+	<msg id="569">XPATH: "%%"" not implemented</msg>
+	<msg id="570">XPATH: sequence is expected to contain zero or one item (%% found)</msg>
+	<msg id="571">XPATH: sequence is expected to contain one item (%% found)</msg>
+	<msg id="572">XPATH: sequence is expected to contain one or more items</msg>
+	<msg id="573">XPATH: Error while executing user defined NS-resolver function</msg>
+	<msg id="574">XPATH: Error caused by error(%%) function</msg>
+	<msg id="575">XPATH: Trace %%</msg>
+	<msg id="576">XPATH: "namespace" axis is deprecated in XPath 2.0</msg>
+	<msg id="577">XPATH: Cannot convert sequence to "view" space</msg>
+	<msg id="578">XPATH: Cannot convert sequence to "model" space</msg>
+	<msg id="579">XPATH: Error while getting property "%%"</msg>
+
+	<!-- [600 - 649] History and Bookmarking -->
+	<msg id="600">History: An element with id "%%" was found in document. Using it as bookmark name causes problems in Internet Explorer, please use another name.</msg>
+
+	<!-- [650 - 699] XML Schema -->
+	<msg id="650">XML Schema: Expected SimpleType object</msg>
+	<msg id="651">XML Schema: Referred SimpleType "%%" definition was not found</msg>
+	<msg id="652">XML Schema: SimpleType "%%" could not be properly validated, a context node missing</msg>
+
+	<!-- [700 - 719] Browser Specific -->
+	<msg id="700">Browser: IE does not support "application/javascript" as type of "script" tags, please use "text/javascript" when defining script inside of HTML-space.</msg>
+
+	<!-- [720 - 739] CSSSelectors -->
+	<msg id="720">CSS Selectors: Unable to parse selector: %%</msg>
+	<msg id="721">CSS Selectors: Illegal universal selector position: %%</msg>
+	<msg id="722">CSS Selectors: Unknown pseudo-class: %%</msg>
+	<msg id="723">CSS Selectors: Illegal combinator position: %%</msg>
+	<msg id="724">CSS Selectors: Illegal type selector position: %%</msg>
+	<msg id="725">CSS Selectors: Unquoted string: %%</msg>
+</messages>

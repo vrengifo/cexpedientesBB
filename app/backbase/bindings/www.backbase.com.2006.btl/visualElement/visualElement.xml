@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="element" src="../element/element.xml"/>
+
+		<d:element name="visualElement" extends="b:element" abstract="true">
+			
+
+			<d:resource type="text/javascript"><![CDATA[
+				btl.appendViewToParent = function btl_appendViewToParent(oController, oViewNode){
+					var oParent = oController.getProperty('parentNode')
+
+					if(oParent.viewGate){
+						var bHasNextSibling = false;
+						var oNext = oController.getProperty('nextSibling')
+						while (oNext && !bHasNextSibling){
+							if(oNext.viewNode)
+								bHasNextSibling = true;
+							else
+								oNext = oNext.getProperty('nextSibling');
+						}
+
+						if(bHasNextSibling)
+							oParent.viewGate.insertBefore(oViewNode, oNext.viewNode)
+						else
+							oParent.viewGate.appendChild(oViewNode);
+					}
+				};
+			]]></d:resource>
+
+			<d:attribute name="title" onmap="this.viewNode.title = value">
+				
+			</d:attribute>
+
+			<!-- t:attribute name="tooltiptext" -->
+
+			<d:attribute name="display">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					if(btl.isTrueValue(name, value) || value == ''){
+						this.viewNode.style.display = '';
+					} else if (value == 'false') {
+						this.viewNode.style.display = 'none';
+					} else {
+						this.viewNode.style.display = value;
+					}
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="id" onmap="this.viewNode.setAttribute(name, value)">
+				
+			</d:attribute>
+
+			<!--
+				Doing += value because it would remove all property values that have been set like oElm.style.paddingTop.
+				The result however is that the styling is not completely updated according to the current value of the style
+				attribute (it would add only rather than removing styling set by the previous style attribute value).
+			-->
+			<d:attribute name="style" onmap="this.viewNode.style.cssText += ';' + value">
+				
+			</d:attribute>
+
+			<d:attribute name="opacity">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					bb.html.setStyle(this.viewNode, name, value);
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="visibility" onmap="this.viewNode.style.visibility = value">
+				
+			</d:attribute>
+
+			<d:attribute name="class">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					if(this.__aCurrentClasses)
+						bb.html.removeClass(this.viewNode, this.__aCurrentClasses);
+
+					this.__aCurrentClasses = value.split(' ');
+					bb.html.addClass(this.viewNode, this.__aCurrentClasses);
+				]]></d:mapper>
+			</d:attribute>
+		</d:element>
+
+		<d:element name="positionElement" extends="b:visualElement" abstract="true">
+			
+
+			<d:attribute name="bottom" onmap="this.viewNode.style.bottom = value">
+				
+			</d:attribute>
+
+			<d:attribute name="left" onmap="this.viewNode.style.left = value">
+				
+			</d:attribute>
+
+			<d:attribute name="margin">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					var aValues = value.split(' ');
+
+					if(aValues.length){
+						var iLength = aValues.length;
+						switch(iLength){
+							case 1:
+								this.viewNode.style.marginTop = aValues[0];
+								this.viewNode.style.marginRight = aValues[0];
+								this.viewNode.style.marginBottom = aValues[0];
+								this.viewNode.style.marginLeft = aValues[0];
+								break;
+							case 2:
+								this.viewNode.style.marginTop = aValues[0];
+								this.viewNode.style.marginRight = aValues[1];
+								this.viewNode.style.marginBottom = aValues[0];
+								this.viewNode.style.marginLeft = aValues[1];
+								break;
+							case 3:
+								this.viewNode.style.marginTop = aValues[0];
+								this.viewNode.style.marginRight = aValues[1];
+								this.viewNode.style.marginBottom = aValues[2];
+								this.viewNode.style.marginLeft = aValues[1];
+								break;
+							default:
+								this.viewNode.style.marginTop = aValues[0];
+								this.viewNode.style.marginRight = aValues[1];
+								this.viewNode.style.marginBottom = aValues[2];
+								this.viewNode.style.marginLeft = aValues[3];
+								break;
+						}
+					} else {
+						this.viewNode.style.marginTop = '';
+						this.viewNode.style.marginRight = '';
+						this.viewNode.style.marginBottom = '';
+						this.viewNode.style.marginLeft = '';
+					}
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="position" onmap="this.viewNode.style.position = value">
+				
+			</d:attribute>
+
+			<d:attribute name="right" onmap="this.viewNode.style.right = value">
+				
+			</d:attribute>
+
+			<d:attribute name="top" onmap="this.viewNode.style.top = value">
+				
+			</d:attribute>
+
+			<d:attribute name="zIndex" onmap="this.viewNode.style.zIndex = value">
+				
+			</d:attribute>
+		</d:element>
+
+		<d:element name="dimensionElement" extends="b:visualElement" abstract="true">
+			
+
+			<d:attribute name="width" onmap="this.setProperty(name, value)">
+				
+			</d:attribute>
+
+			<d:attribute name="height" onmap="this.setProperty(name, value)">
+				
+			</d:attribute>
+
+			<d:property name="width">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					this.viewNode.style.width = value;
+					this._._width = value;
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="height">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					this.viewNode.style.height = value;
+					this._._height = value;
+				]]></d:setter>
+			</d:property>
+		</d:element>
+
+		<d:element name="containerElement" extends="b:visualElement" abstract="true">
+			
+
+			<d:attribute name="backgroundColor" onmap="this.viewGate.style.backgroundColor = value">
+				
+			</d:attribute>
+
+			<d:attribute name="overflow">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					if(value == 'true')
+						value = 'auto';
+					else if(value == 'false')
+						value = 'hidden';
+
+					this.viewGate.style.overflow = value;
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="padding">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					var aValues = value.split(' ');
+					if(aValues.length){
+						var iLength = aValues.length;
+						switch(iLength){
+							case 1:
+								this.viewGate.style.paddingTop = aValues[0];
+								this.viewGate.style.paddingRight = aValues[0];
+								this.viewGate.style.paddingBottom = aValues[0];
+								this.viewGate.style.paddingLeft = aValues[0];
+								break;
+							case 2:
+								this.viewGate.style.paddingTop = aValues[0];
+								this.viewGate.style.paddingRight = aValues[1];
+								this.viewGate.style.paddingBottom = aValues[0];
+								this.viewGate.style.paddingLeft = aValues[1];
+								break;
+							case 3:
+								this.viewGate.style.paddingTop = aValues[0];
+								this.viewGate.style.paddingRight = aValues[1];
+								this.viewGate.style.paddingBottom = aValues[2];
+								this.viewGate.style.paddingLeft = aValues[1];
+								break;
+							default:
+								this.viewGate.style.paddingTop = aValues[0];
+								this.viewGate.style.paddingRight = aValues[1];
+								this.viewGate.style.paddingBottom = aValues[2];
+								this.viewGate.style.paddingLeft = aValues[3];
+								break;
+						}
+					} else {
+						this.viewGate.style.paddingTop = '';
+						this.viewGate.style.paddingRight = '';
+						this.viewGate.style.paddingBottom = '';
+						this.viewGate.style.paddingLeft = '';
+					}
+				]]></d:mapper>
+			</d:attribute>
+		</d:element>
+	</d:namespace>
+</d:tdl>

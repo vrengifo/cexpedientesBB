@@ -1,0 +1,185 @@
+<d:namespace
+		xmlns:b="http://www.backbase.com/2006/btl"
+		xmlns:t="http://www.backbase.com/2007/debugger"
+		xmlns:e="http://www.backbase.com/2006/xel"
+		xmlns="http://www.w3.org/1999/xhtml"
+		xmlns:d="http://www.backbase.com/2006/tdl"
+		name="http://www.backbase.com/2007/debugger">
+
+		<d:element name="console">
+			<d:template type="application/xhtml+xml">
+				<ul class="bb-debugger-console"><d:content /></ul>
+			</d:template>
+
+			<d:method name="clear">
+				<d:body type="text/javascript"><![CDATA[
+					this._['consoleNode'] = null;
+					bb.console._countHolder = [];
+					var oParent = this.getProperty('consoleNode'), oChild;
+					while( oChild = oParent.firstChild)
+						oParent.removeChild(oChild);
+				]]></d:body>
+			</d:method>
+
+			<d:property name="consoleNode" onget="return this._[name] || this.viewNode;" />
+
+			<d:handler event="click" type="text/javascript"><![CDATA[
+				var oElm = event.viewTarget;
+
+				//Clicked on an icon, open close item!
+				if(oElm.className.indexOf('bb-console-group-icon') != -1){
+					var oLi = oElm.parentNode;
+					if (bb.html.hasClass(oElm, 'bb-console-group-icon-closed')){
+						bb.html.removeClass(oElm, 'bb-console-group-icon-closed');
+						oLi.nextSibling.style.display = '';
+					} else {
+						oLi.nextSibling.style.display = 'none';
+						bb.html.addClass(oElm, 'bb-console-group-icon-closed');
+					}
+				}
+			]]></d:handler>
+
+			<d:handler event="construct" type="text/javascript">
+				bb.tooling.console = this;
+			</d:handler>
+
+		</d:element>
+
+		<d:element name="consoleEdit">
+			<d:template type="application/xhtml+xml">
+				<div class="bb-debugger-console-edit">
+					<div style="padding-left: 32px;"><span style="position:absolute;top:1px;left:4px;">&gt;&gt;&gt;</span><input type="text" /></div>
+					<div style="display:none"><textarea rows="5"/></div>
+				</div>
+			</d:template>
+
+			<d:handler event="keydown" type="text/javascript"><![CDATA[
+
+				var bReturn = true;
+				switch (event.keyIdentifier) {
+					case 'Enter':
+					case 'Up':
+					case 'Down':
+						if (this.getProperty('multiline') && !event.getModifierState("Control"))
+							return;
+
+						var iCurrent = this.getProperty('currentIndex');
+						if(typeof iCurrent != 'number') iCurrent = -1;
+						var aHistory = this.getProperty('history') || [];
+						var oInput = this.getProperty('inputNode');
+
+				}
+
+				switch (event.keyIdentifier) {
+					case 'Enter':
+						if(oInput.value != ''){
+							//save in history
+							if ( (iCurrent >= 0 && oInput.value != aHistory[iCurrent]) || !aHistory.length) {
+								aHistory.push( oInput.value );
+								if (aHistory.length > 100) //remove oldest command
+									aHistory.shift();
+								iCurrent = aHistory.length - 1;
+							}
+							this.evaluate(oInput.value);
+							oInput.value = '';
+						}
+
+						bReturn = false;
+						break;
+					case 'Up': //previous js history item
+						if (iCurrent >= 0 && aHistory.length) {
+							oInput.value = aHistory[iCurrent];
+							if(iCurrent != 0) iCurrent--;
+						}
+						bReturn = false;
+						break;
+					case 'Down': //next js history item
+						if ((iCurrent + 1) < aHistory.length) {
+							iCurrent++;
+							oInput.value = aHistory[iCurrent];
+						} else
+							oInput.value = '';
+						bReturn = false;
+						break;
+				}
+
+				switch (event.keyIdentifier) {
+					case 'Enter':
+					case 'Up':
+					case 'Down':
+						this.setProperty('currentIndex', iCurrent);
+						this.setProperty('history', aHistory);
+				}
+				return bReturn;
+			]]></d:handler>
+
+			<d:property name="inputNode">
+				<d:getter type="text/javascript">
+					return this.viewNode.getElementsByTagName(this.getProperty('multiline') ? 'textarea' : 'input')[0];
+				</d:getter>
+			</d:property>
+			<d:property name="multiline">
+				<d:setter type="text/javascript">
+					this.viewNode.getElementsByTagName("textarea")[0].parentNode.style.display	= value ? '' : 'none';
+					this.viewNode.getElementsByTagName("input")[0].parentNode.style.display		= value ? 'none' : '';
+					// save value firmly
+					this._['_' + name]	= value;
+					// reflow parent
+					bb.ui.reflow(this.getProperty('parentNode'), true);
+				</d:setter>
+			</d:property>
+
+			<d:property name="currentIndex" />
+			<d:property name="history" />
+
+			<d:method name="evaluate">
+				<d:argument name="code" />
+				<d:body type="text/javascript"><![CDATA[
+					var context = bb.tooling.currentContext ? bb.tooling.currentContext : (bb.tooling.window.bb ? bb.tooling.window.bb.document : bb.tooling.window || window);
+
+					bb.tooling.switchTo('console');
+
+					bb.console._log(['>>> '+code], 'command');
+
+					try {
+						var oResult;
+						if (code.match(/^\s*</)) {
+							code	= bb.xml.parse(code);
+							if (code != null)
+								oReturn = bb.execute(context, code);
+						}
+						else {
+							var clear = function(){ bb.tooling.console.clear() };
+							oResult = Function('bb', 'clear', 'dir', 'dirxml', 'return ' + code).call(context, bb.tooling.window.bb || bb, clear, bb.console.dir, bb.console.dirxml);
+						}
+
+						if(oResult !== undefined)
+							bb.console._log( [ oResult ], '');
+					} catch (e) {
+						if (typeof e == 'string')
+							bb.console._log([e], 'error');
+						else if(e && e.message)
+							bb.console._log([e.message], 'error');
+					}
+
+			]]></d:body>
+			</d:method>
+
+			<d:method name="clear">
+				<d:body type="text/javascript"><![CDATA[
+					this.getProperty('inputNode').value	= '';
+				]]></d:body>
+			</d:method>
+
+			<d:method name="run">
+				<d:body type="text/javascript"><![CDATA[
+					var oInput	= this.getProperty('inputNode');
+					if (oInput.value != '')
+						this.evaluate(oInput.value);
+					this.clear();
+				]]></d:body>
+			</d:method>
+
+		</d:element>
+</d:namespace>
+

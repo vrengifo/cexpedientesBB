@@ -1,0 +1,832 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<!--bda:documentation>
+				<bda:summary>
+					<p>
+						The dragAndDrop module provides the ability to drag elements
+						from one part of the application to another part. Draggable elements
+						can be dropped into another part of the model/view tree, or simply
+						repositioned via CSS. Control developers should use the dragAndDrop
+						elements, while application developers will add the drag behavior
+						and its related attributes to existing markup elements.
+					</p>
+					<p>
+						This module also provides custom events that represent each
+						phase of the drag-and-drop process. Developers can hook into
+						these events to create more powerful functionality and override
+						default behaviors to meet their needs.
+					</p>
+				</bda:summary>
+
+		 </bda:documentation-->
+
+
+		 <d:resource type="text/css"><![CDATA[
+		 	.btl-drag-outlineElement {
+				position: absolute;
+				top: -10000px;
+				left: -10000px;
+				width: 100px;
+				height: 100px;
+				z-index: 9999;
+
+				border-width: 1px;
+				border-style: solid;
+				background-color: #DFE0E1;
+				border-color: #8B8D91;
+			}
+
+		 ]]></d:resource>
+
+		<d:resource type="text/javascript"><![CDATA[/**
+* BTL drag section
+* @publish
+*/
+btl.drag = {};
+
+btl.drag.droppables = {};
+
+
+/**
+ * The manager for drag-and-drop operations, which allows for flexible move / copy operations from one place to another.
+ * //@example behavior:behavior_resize_custom_table
+ * @publish
+ */
+btl.drag.dragManager = {
+
+	/**
+	 * @property
+	 * Boolean value indicating if a drag is in progress.
+	 * @publish
+	 * @type Boolean
+	 */
+	isDragging: false,
+
+	//private
+	constraint: null,
+	currentTop: null,
+	currentLeft: null,
+	offsetTop: null,
+	offsetLeft: null,
+	symbol: null,
+	target: null,
+
+	/**
+	 * If this method is called, it allows the <code>dragManager</code> to fire the <code>dragDrop</code> event on the accepting target. If the target should be rejected (not be accepted) any more, it can simply be called with <code>null</code> to reset the accepting target.
+	 * @param {controller} target The target accepting the drag-and-drop operation.
+	 * @example behavior:behavior_dnd_dragAdvancedTable
+	 * @publish
+	 */
+	acceptDragDrop: function dragManager_acceptDragDrop( target ) {
+		var oldAcceptTarget = this.acceptTarget;
+		this.acceptTarget = target;
+		if(this.symbol) {
+			if(target && target.modelNode) {
+				bb.html.addClass( this.symbol, 'btl-drag-target');
+				bb.html.addClass( target.viewNode, 'btl-drag-target');
+			}
+			else {
+				bb.html.removeClass( this.symbol, 'btl-drag-target');
+				if(oldAcceptTarget && oldAcceptTarget.modelNode)
+					bb.html.removeClass( oldAcceptTarget.viewNode, 'btl-drag-target');
+			}
+
+		}
+	},
+
+	/**
+	 * This method starts a drag-and-drop operation. If it is not called from the <code>dragStart</code> event handler, no drag-and-drop operation is started.
+	 * @param {controller} The starting node that is the <code>event.dragInitiator</code> in the drag events.
+	 * @param {object} data The data object containing data that is the <code>event.dragSource</code> in the drag events.
+	 * @param {integer} startX The starting point x of the drag. Typically, this is <code>event.startX</code> of the <code>dragStart</code> event.
+	 * @param {integer} startY The starting point y of the drag. Typically, this is <code>event.startY</code> of the <code>dragStart</code> event.
+	 * @param {viewNode} symbol The html section that must be the symbol while dragging. This element should be positioned absolute in order to drag it correctly.
+	 * @param {integer} offsetLeft The offset of the symbol compared with the mouse. This can either be a positive value (symbol is more to the right of the mouse) or a negative value (symbol is more to the left of the mouse).
+	 * @param {integer} offsetTop The offset of the symbol compared with the mouse. This can either be a positive value (symbol is more to the bottom of the mouse) or a negative value (symbol is more to the top of the mouse).
+	 * @param {float} symbolAlpha Specifies the alpha applied to the symbol.
+	 * @param {boolean} allowMove Specifies if the drag might be moved around. This is partially required for a window that does not have a drop-zone, but just moves around.
+	 * @param {array} droppables The array with view elements that specify the different drop-zones for the drag-and-drop operation.
+	 * @param {viewNode} constraint (optional) Constraint to which the drag is limited. For example, this can be the window area of a window.
+	 * @example behavior:behavior_dnd_dragAdvancedTable
+	 * @publish
+	 */
+	doDrag: function dragManager_doDrag(controller, source, startX, startY, symbol, offsetLeft, offsetTop, alpha, allowMove, droppables, constraint) {
+
+
+		var manager = btl.drag.dragManager;
+		if (!manager.isDragging) {
+			//Should be manager.controller
+			manager.controller = controller;
+
+			manager.target = null;
+
+			manager.acceptTarget = null;
+
+			manager.source = source;
+
+			manager.constraint = constraint;
+			manager.symbol = symbol;
+
+			manager.offsetTop 	= offsetTop
+			manager.offsetLeft 	= offsetLeft;
+
+			manager.currentTop	= startY;
+			manager.currentLeft	= startX;
+
+			manager.droppables = droppables && droppables.length ? droppables : null;
+
+			manager.allowMove = allowMove;
+
+			if (alpha < 1.0) {
+				symbol._originalOpacity = bb.html.getStyle(symbol, 'opacity');
+				bb.html.setStyle(symbol, 'opacity', alpha);
+			}
+			//Initial symbol position
+			var newX = manager.currentLeft + offsetLeft;
+			var newY = manager.currentTop + offsetTop;
+			if (symbol.offsetParent && symbol.offsetParent != document.body) {
+				var oCoord = bb.html.getBoxObject(symbol.offsetParent, bb.html.getStyle(symbol, 'position') == 'absolute' ? 'padding' : 'content');
+				newX -= oCoord.left;
+				newY -= oCoord.top;
+			}
+
+			symbol.style.left 	= newX+'px';
+			symbol.style.top 	= newY+'px';
+
+			bb.html.disableUserSelect(document.body);
+			bb.document.addEventListener('keydown',  	btl.drag.handleKeyDown,  false);
+			bb.document.addEventListener('mouseup', 	btl.drag.handleMouseUp,  false);
+			bb.document.addEventListener('mousemove', 	btl.drag.handleMouseMove,  false);
+			manager.isDragging = true;
+		}
+
+	}
+
+};
+
+
+// Handler for keydown.
+btl.drag.handleKeyDown = function drag_handleKeyDown(event){
+	// If escape is pressed, cancel the drag action.
+	if( event.keyIdentifier && event.keyIdentifier.toLowerCase() == 'u+001b' && btl.drag.dragManager.isDragging){
+		event.preventDefault();
+		btl.drag.dragManager.acceptDragDrop();
+		btl.drag.stopDrag();
+	}
+};
+// Handler for mouseup
+btl.drag.handleMouseUp = function drag_handleMouseUp( event ) {
+	if( event.button == 0)
+		btl.drag.stopDrag();
+};
+
+/**
+* Contains the x / y position and controller when the drag is started
+*/
+btl.drag.startPoint = null;
+/*
+ * btl.drag.handleMouseMoveBeforeStart
+ */
+btl.drag.handleMouseMoveBeforeStart = function drag_handleMouseMoveBeforeStart( event ) {
+
+	var manager = btl.drag.dragManager;
+
+	if (btl.drag.startPoint != null){
+
+		var iMargin = 6;
+
+		var startX = btl.drag.startPoint.startX;
+		var startY = btl.drag.startPoint.startY;
+
+		var nowX = event.pageX;
+		var nowY = event.pageY;
+
+		if(startX - nowX > iMargin || startX - nowX < -iMargin || startY - nowY > iMargin || startY - nowY < -iMargin ) {
+			btl.drag.startDrag(event);
+		}
+	}
+};
+
+btl.drag.startDrag = function drag_startDrag(event){
+	if(btl.drag.startPoint && (!btl.resize || !btl.resize.isResizing)) {
+		// drag started, so clear actions awaiting of the start
+
+		bb.document.removeEventListener('mousemove',  btl.drag.handleMouseMoveBeforeStart,  false);
+		bb.document.removeEventListener('mouseup',  btl.drag.handleMouseUpBeforeStart,  false);
+
+		var startX 		= btl.drag.startPoint.startX;
+		var startY 		= btl.drag.startPoint.startY;
+		var controller 	= btl.drag.startPoint.controller;
+
+		var dragEvent = bb.document.createEvent('MouseEvents');
+		dragEvent.initMouseEvent('dragStart', true, true, event.view, event.detail, event.screenX, event.screenY, event.clientX, event.clientY, event.ctrlKey, event.altKey, event.shiftKey, event.metaKey, event.button, event.relatedTarget)
+
+		dragEvent.startX = startX;
+		dragEvent.startY = startY;
+		dragEvent.viewTarget = btl.drag.startPoint.viewNode;
+		dragEvent.dragManager = btl.drag.dragManager;
+		controller.dispatchEvent(dragEvent);
+	}
+	btl.drag.startPoint = null;
+};
+/*
+ *  btl.drag.handleMouseUpBeforeStart
+ *
+ *  dragging was not started, so clear all prestarted data
+ */
+btl.drag.handleMouseUpBeforeStart = function drag_handleMouseUpBeforeStart( event) {
+	if(btl.drag.startPoint != null){
+		clearTimeout(btl.drag.dragTimeout);
+		btl.drag.startPoint = null;
+		bb.document.removeEventListener('mousemove',  btl.drag.handleMouseMoveBeforeStart,  false);
+		bb.document.removeEventListener('mouseup',  btl.drag.handleMouseUpBeforeStart,  false);
+		bb.html.enableUserSelect(document.body);
+	}
+};
+
+/**
+* Internal function gets called during a drag action on mouse move, ACTUAL DRAGGING
+*/
+btl.drag.handleMouseMove = function drag_handleMove( event) {
+	var manager = btl.drag.dragManager;
+	if(manager.isDragging){
+
+		var newX = event.pageX + manager.offsetLeft; //So this would be the new x for the symbol / item
+		var newY = event.pageY + manager.offsetTop; //So this would be the new y for the symbol / item
+
+		if ( manager.constraint ){ //check constraint
+				var oCoord = bb.html.getBoxObject(manager.constraint == document.body ? bb.viewport : manager.constraint, bb.html.getStyle(manager.controller.viewNode, 'position') == 'absolute' ? 'padding' : 'content');
+				var oSymbolCoord = bb.html.getBoxObject(manager.symbol);
+				if ( newX < oCoord.left || oSymbolCoord.width > oCoord.width)
+					newX = oCoord.left;
+				else {
+					 var iRight = oCoord.left + oCoord.width - oSymbolCoord.width;
+					 if ( newX > iRight) newX = iRight;
+				}
+				manager.currentLeft = newX - manager.offsetLeft;
+
+				if ( newY < oCoord.top || oSymbolCoord.height > oCoord.height)
+					newY = oCoord.top;
+				else {
+					 var iTop = oCoord.top + oCoord.height - oSymbolCoord.height;
+					 if ( newY > iTop) newY = iTop;
+				}
+				manager.currentTop = newY - manager.offsetTop;
+		} else {
+				manager.currentLeft = event.pageX;
+				manager.currentTop = event.pageY;
+		}
+
+		var dragEvent;
+		var symbol = manager.symbol;
+
+		var oElm = event.viewTarget, bIsSymbol = false;
+		while(oElm.parentNode) {
+			if(oElm == symbol) {
+				bIsSymbol = true;
+				break;
+			}
+			oElm = oElm.parentNode;
+		}
+
+		//There might be possible a change!
+		if (!bIsSymbol || manager.droppables) {
+			var	newTarget,
+				oldTarget = manager.target,
+				dragEvent;
+
+			if(!bIsSymbol)
+				newTarget = event.viewTarget;
+			else {
+				var	iX = manager.currentLeft,
+					iY = manager.currentTop,
+
+					iCurrentX = 0,
+					iCurrentY = 0,
+					iCurrentW = Infinity,
+					iCurrentH = Infinity,
+
+					droppables = manager.droppables;
+
+				for(var i = 0; i < droppables.length; i++) {
+					var drop = droppables[i];
+					if( drop.offsetHeight ) {
+						var dropCoord = bb.html.getBoxObject(drop);
+						if ( iX >= dropCoord.x && iX <= dropCoord.x + dropCoord.w && iY >= dropCoord.y && iY <= dropCoord.y + dropCoord.h) {
+							if (dropCoord.x >= iCurrentX && dropCoord.y >= iCurrentY && dropCoord.w + dropCoord.x <= iCurrentW && dropCoord.h + dropCoord.y <= iCurrentH ) {
+								iCurrentX = dropCoord.x;
+								iCurrentY = dropCoord.y;
+								iCurrentW = dropCoord.x + dropCoord.w;
+								iCurrentH = dropCoord.y + dropCoord.h
+								newTarget = drop;
+							}
+						}
+					}
+				}
+			}
+
+			manager.target = newTarget;
+
+			if(newTarget != oldTarget){ // changed target - check for dragEnter / dragLeave
+
+				if (oldTarget) {
+
+					dragEvent = bb.document.createEvent('Events');
+					dragEvent.initEvent('dragLeave', false, true);
+					dragEvent.dragInitiator = manager.controller;
+					dragEvent.dragSource = manager.source;
+					dragEvent.viewTarget	= event.viewTarget;
+					dragEvent.dragTarget = newTarget ? bb.getControllerFromView(newTarget) : null;
+					dragEvent.dragViewTarget = newTarget;
+
+					bb.getControllerFromView(oldTarget).dispatchEvent(dragEvent);
+					//console.log('dragLeave', oldTarget);
+
+					if( dragEvent.defaultPrevented ) {
+						//manager.target = oldTarget;
+					} else {
+						manager.acceptDragDrop();
+					}
+				}
+
+				if ( manager.isDragging && newTarget ){ //dragEnter
+
+					dragEvent = bb.document.createEvent('Events');
+					dragEvent.initEvent('dragEnter', false, true);
+					dragEvent.dragInitiator = manager.controller;
+					dragEvent.dragSource = manager.source;
+					dragEvent.viewTarget	= event.viewTarget;
+					dragEvent.dragTarget = newTarget ? bb.getControllerFromView(newTarget) : null;
+					dragEvent.dragViewTarget = newTarget;
+
+					bb.getControllerFromView(newTarget).dispatchEvent(dragEvent);
+
+					if( manager.isDragging ){
+
+						dragEvent = bb.document.createEvent('Events');
+						dragEvent.initEvent('dragOver', true, true);
+						dragEvent.dragInitiator = manager.controller;
+						dragEvent.dragSource = manager.source;
+						dragEvent.viewTarget	= event.viewTarget;
+						dragEvent.dragTarget = newTarget ? bb.getControllerFromView(newTarget) : null;
+						dragEvent.dragViewTarget = newTarget;
+
+						bb.getControllerFromView(newTarget).dispatchEvent(dragEvent);
+					}
+				}
+			}
+		}
+
+		dragEvent = bb.document.createEvent('MouseEvents');
+		dragEvent.initMouseEvent('drag', false, true, event.view, event.detail, event.screenX, event.screenY, event.clientX, event.clientY, event.ctrlKey, event.altKey, event.shiftKey, event.metaKey, event.button, event.relatedTarget)
+
+		dragEvent.viewTarget	= event.viewTarget;
+		dragEvent.pageX			= event.pageX;
+		dragEvent.pageY			= event.pageY;
+
+		dragEvent.dragInitiator	= manager.controller;
+		dragEvent.dragSource 	= manager.source;
+
+		dragEvent.dragTarget 	= newTarget ? bb.getControllerFromView(newTarget) : null;
+		dragEvent.dragViewTarget = newTarget;
+
+		manager.controller.dispatchEvent(dragEvent);
+
+		if (!dragEvent.defaultPrevented && manager.symbol ) {
+			if (manager.symbol.offsetParent && manager.symbol.offsetParent != document.body) {
+				var oCoord = bb.html.getBoxObject(manager.symbol.offsetParent, bb.html.getStyle(manager.symbol, 'position') == 'absolute' ? 'padding' : 'content');
+				newX -= oCoord.left;
+				newY -= oCoord.top;
+			}
+			symbol.style.left = newX + 'px';
+			symbol.style.top =  newY + 'px';
+		}
+	}
+};
+
+/**
+* Internal function gets called during a mouseup cleans up the dragmanager
+*/
+btl.drag.stopDrag = function drag_stopDrag() {
+
+	var manager = btl.drag.dragManager;
+	if(manager.isDragging){
+
+		if( manager.allowMove || manager.acceptTarget) {
+
+			if(manager.symbol)
+				bb.html.removeClass( manager.symbol, 'btl-drag-target');
+
+			if( manager.acceptTarget ) {
+
+				bb.html.removeClass( manager.acceptTarget.viewNode, 'btl-drag-target');
+
+				var dragEvent = bb.document.createEvent('Events');
+				dragEvent.initEvent('dragDrop', false, true);
+				dragEvent.dragInitiator	= manager.controller;
+				dragEvent.dragSource = manager.source;
+
+				manager.acceptTarget.dispatchEvent(dragEvent);
+			}
+
+			if ((!dragEvent || !dragEvent.defaultPrevented) && manager.allowMove) {
+
+				var iTargetX = manager.currentLeft + manager.offsetLeft;
+				var iTargetY = manager.currentTop + manager.offsetTop;
+
+				var sPosition = manager.controller.viewNode.bPosition ? manager.controller.viewNode.sPosition : bb.html.getStyle(manager.controller.viewNode, 'position');
+				if (sPosition != 'absolute' && sPosition != 'fixed' ) {
+					sPosition = manager.controller.viewNode.style.position = 'absolute';
+					manager.controller.viewNode.bPosition = false;
+				}
+				if (sPosition == 'absolute' || sPosition == 'relative') {
+					var oParent = manager.controller.viewNode.offsetParent;
+					if (oParent && oParent != document.body) {
+						var oCoord = bb.html.getBoxObject(oParent, sPosition == 'absolute' ? 'padding' : 'content');
+						iTargetX -= oCoord.x;
+						iTargetY -= oCoord.y;
+					}
+				}
+				//Just move it around
+				manager.controller.viewNode.style.left 	= iTargetX+'px';
+				manager.controller.viewNode.style.top 	= iTargetY+'px';
+			}
+		}
+
+		bb.html.enableUserSelect(document.body);
+
+		bb.document.removeEventListener('keydown',  	btl.drag.handleKeyDown,  false);
+		bb.document.removeEventListener('mouseup',  	btl.drag.handleMouseUp,  false);
+		bb.document.removeEventListener('mousemove',  	btl.drag.handleMouseMove,  false);
+
+		dragEvent = bb.document.createEvent('Events');
+		dragEvent.initEvent('dragEnd', false, false);
+		dragEvent.dragInitiator	= manager.controller;
+		dragEvent.dragSource = manager.source;
+
+		manager.controller.dispatchEvent(dragEvent);
+
+		manager.isDragging = false;
+	}
+}
+]]></d:resource>
+
+		<d:attribute name="dragReceive">
+			
+			<d:mapper type="text/javascript"><![CDATA[
+				//Cleanup
+				var aTarget = this._.oldDragReceive;
+				if (aTarget) {
+					for (var i = 0; i < aTarget.length; i++){
+						var aDrops = btl.drag.droppables[aTarget[i]];
+						if (aDrops)
+							bb.array.removeObject(aDrops, this);
+					}
+				}
+
+				//Add new values
+				aTarget = this._.oldDragReceive = value.split(' ');
+				for (var i = 0; i < aTarget.length; i++){
+					if (!btl.drag.droppables[aTarget[i]])
+						btl.drag.droppables[aTarget[i]] = [];
+
+					btl.drag.droppables[aTarget[i]].push(this);
+				}
+
+				if (value) {
+					if (!this.instanceOf(btl.namespaceURI, 'dragTarget'))
+						bb.addBehavior(this, btl.namespaceURI, 'dragTarget');
+				} else {
+					bb.removeBehavior(this, btl.namespaceURI, 'dragTarget');
+				}
+
+			]]></d:mapper>
+		</d:attribute>
+
+
+		<d:behavior name="dragTarget">
+			
+			<d:handler event="destruct" type="application/javascript"><![CDATA[
+				this.setAttributeNS('http://www.backbase.com/2006/btl', 'dragReceive', '');
+			]]></d:handler>
+			<d:handler event="dragEnter" type="application/javascript"><![CDATA[
+				if( event.dragSource && event.dragSource.modelNode && event.dragSource.instanceOf('http://www.backbase.com/2006/btl', 'drag') ) {
+					var aGroups = ['*'];
+					var sGroup = event.dragSource.getAttribute('dragGroup');
+					if ( sGroup ) {
+						aGroups.push(sGroup.split(' '));
+					}
+						sGroup = event.dragSource.getAttribute('dragItem');
+					if ( sGroup ) {
+						aGroups.push(sGroup.split(' '));
+					}
+					var aDroppables = [];
+					for(var i = 0; i < aGroups.length; i++){
+						var aItems = btl.drag.droppables[aGroups[i]];
+						if (aItems) {
+							for(var j = 0; j < aItems.length; j++) {
+								if (this == aItems[j]) {
+									btl.drag.dragManager.acceptDragDrop(this);
+									break;
+								}
+							}
+						}
+					}
+				}
+			]]></d:handler>
+			<d:handler event="dragDrop" type="application/javascript"><![CDATA[
+				if (!event.defaultPrevented && event.dragSource.getAttribute('dropMode') != 'none'){
+					//Do appending
+					var oSource = event.dragSource.modelNode;
+					var bCantAppend = false; // check if dragTarget equals to oSource or dragTarget is a child of oSource
+					for(var oCurrent = this.modelNode; oCurrent && !bCantAppend && (oCurrent.nodeType == 1); oCurrent = oCurrent.parentNode){
+						bCantAppend = (oCurrent == oSource);
+					}
+					if (!bCantAppend) {
+						this.appendChild(event.dragSource);
+					}
+				}
+			]]></d:handler>
+		</d:behavior>
+
+
+		<d:behavior name="dragBase">
+			
+
+			
+
+			
+
+			
+
+			
+
+			
+
+			
+
+			
+
+			<d:handler event="mousedown" type="text/javascript"><![CDATA[
+				if (event.button == 0 && btl.drag.dragManager.isDragging)
+					btl.drag.stopDrag();
+
+				if (event.button == 0 && btl.drag.dragStartPoint == null) {
+
+					var controller = event.target;
+
+					btl.drag.startPoint = {
+						startX: event.pageX,
+						startY: event.pageY,
+						controller: controller,
+						viewNode: event.viewTarget //fix to start dragging
+					};
+
+					bb.document.addEventListener('mousemove',  	btl.drag.handleMouseMoveBeforeStart,  false);
+					bb.document.addEventListener('mouseup',  	btl.drag.handleMouseUpBeforeStart,  false);
+					btl.drag.dragTimeout = setTimeout(
+						function(){
+							btl.drag.startDrag(event);
+						}, 500);
+
+				}
+			]]></d:handler>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				if(this.viewNode && this.viewNode.tagName == 'IMG')
+					bb.html.disableUserSelect(this.viewNode);
+			]]></d:handler>
+
+		</d:behavior>
+
+		<d:behavior name="drag" extends="b:dragBase">
+			
+
+			<d:attribute name="dragGroup">
+				
+			</d:attribute>
+			<d:attribute name="dragItem">
+				
+			</d:attribute>
+			<d:attribute name="dragConstraint">
+				
+			</d:attribute>
+			<d:attribute name="dragMode" default="outline">
+				
+			</d:attribute>
+			<d:attribute name="dragSymbol">
+				
+			</d:attribute>
+			<d:attribute name="dropMode" default="move">
+				
+			</d:attribute>
+			<d:attribute name="dragBehavior" default="drop">
+				
+			</d:attribute>
+			<d:attribute name="useDragRole" default="false">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					if (value != "false")
+						bb.command.trace(this, 'The useDragRole attribute is deprecated, use useDragClass instead.', 2);
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="useDragClass" default="false">
+				
+			</d:attribute>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				if(!btl.isTrueValue('useDragRole', this.getAttribute("useDragRole")) &&
+						!btl.isTrueValue('useDragClass', this.getAttribute("useDragClass")))
+					bb.html.disableUserSelect(this.viewNode);
+			]]></d:handler>
+
+			<d:handler event="dragStart" type="text/javascript"><![CDATA[
+				if (event.defaultPrevented || btl.drag.dragManager.isDragging)
+					return;
+
+				// checks if oElement can start dragging and return an element to drag
+				// find element to drag:
+				// - it is a parent of event.target or event.target itself
+				// - it contains "drag" behavior
+				//  - does not contain dragGroup
+				//    or it contains dragGroup which have target's dragItem inside
+				var oElement 	= event.target;       //clicked element
+				var oGroup 		= this;  //element with drag behavior
+				var sGroup 		= null;
+
+				//check for dragGroup / dragItem
+				var sDragGroup = this.getAttribute('dragGroup');
+				if( sDragGroup && sDragGroup.length) {
+					if( oElement != this) {
+						sDragGroup = ' ' + sDragGroup + ' ';
+						if( -1 == sDragGroup.indexOf(' * ')) { // there is no * which accept any value
+							for( var oController = oElement; oController && (oController.modelNode.nodeType == 1);
+									 oController = oController.getProperty('parentNode')) {
+								 var sDragItem = oController.getAttribute('dragItem');
+								 if( -1 != sDragGroup.indexOf( ' ' + sDragItem + ' '))
+									break; // found!!
+							}
+							if( !oController || (oController.modelNode.nodeType != 1))
+								return false; // dragItem does not correspond to dragGroup
+							oElement = oController;
+						}
+					} else { // if element has dragGroup so it can be dragged only from dragItem
+						var sDragItem = this.getAttribute('dragItem');
+						if( !sDragItem || !sDragItem.length)
+							return false;
+					}
+				}
+
+				var bMoveMode = oElement.getAttribute('dragBehavior') == 'move' ||
+						this.getAttribute('dragBehavior') == 'move';
+
+				if (btl.isTrueValue('useDragClass', this.getAttribute('useDragClass'))) {
+					if (bb.selector.queryAncestor(event.viewTarget, '.btl-dragMove', event.target.viewNode))
+						bMoveMode = true;
+					else if (bb.selector.queryAncestor(event.viewTarget, '.btl-dragDrop', event.target.viewNode))
+						bMoveMode = false;
+					else if (!bb.selector.queryAncestor(event.viewTarget, '.btl-dragItem', event.target.viewNode))
+						return;
+
+				} else if (btl.isTrueValue('useDragRole', this.getAttribute('useDragRole'))) {
+					if (bb.selector.queryAncestor(event.viewTarget, '[role~=dragMove]', event.target.viewNode))
+						bMoveMode = true;
+					else if (bb.selector.queryAncestor(event.viewTarget, '[role~=dragDrop]', event.target.viewNode))
+						bMoveMode = false;
+					else if (!bb.selector.queryAncestor(event.viewTarget, '[role~=dragItem]', event.target.viewNode))
+						return;
+				}
+
+				var aGroups = ['*'];
+				var sGroup = this.getAttribute('dragGroup');
+				if ( sGroup ) {
+					aGroups.push(sGroup.split(' '));
+				}
+					sGroup = this.getAttribute('dragItem');
+				if ( sGroup ) {
+					aGroups.push(sGroup.split(' '));
+				}
+
+				var aDroppables = [];
+				for(var i = 0; i < aGroups.length; i++){
+					var aItems = btl.drag.droppables[aGroups[i]];
+					if (aItems) {
+						for(var j = 0; j < aItems.length; j++) {
+							if (bb.array.indexOf(aDroppables, aItems[j].viewNode) == -1) {
+								aDroppables.push(aItems[j].viewNode);
+							}
+						}
+					}
+				}
+
+				var sXpath = this.getAttribute('dragConstraint'),
+				constraint;
+
+				if(sXpath && (sXpath != '')) {
+					constraint = bb.evaluateSmart(sXpath, this, this);
+					if (constraint)
+						constraint = constraint.viewGate;
+				}
+
+				var symbol;
+				var alpha = 0.5;
+				var oCoord = bb.html.getBoxObject( this.viewNode, 'border');
+
+				switch( this.getAttribute('dragMode') ) {
+					case 'real':
+						symbol = this.viewNode;
+						//alpha = 1.0;
+
+						var sPosition = bb.html.getStyle(this.viewNode, 'position');
+						if (sPosition != 'absolute' && sPosition != 'fixed' ){
+							this.viewNode.bPosition = true;
+							this.viewNode.sPosition = this.viewNode.style.position;
+							this.viewNode.style.position = 'absolute';
+						}
+						xOffset = oCoord.left - event.startX;
+						yOffset = oCoord.top - event.startY;
+						break;
+					case 'symbol':
+						var oResult = bb.evaluateSmart(this.getAttribute('dragSymbol'), this, this);
+						if (oResult) {
+							if (typeof oResult == 'string')
+								oResult = bb.html.createElementFromString(oResult);
+							else {
+								if(oResult.viewNode)
+									oResult = oResult.viewNode;
+								//Clone the view
+								if ('cloneNode' in oResult)
+									oResult = oResult.cloneNode(true);
+							}
+							alpha = 1.0;
+							btl.drag.dragSymbol = symbol = oResult;
+							btl.drag.dragSymbol.style.position = 'absolute';
+							document.body.appendChild(btl.drag.dragSymbol);
+							xOffset = 10;
+							yOffset = 10;
+						} else {
+							bb.command.trace(this, 'dragSymbol attribute is missing or incorrect, set it to an XPath value which should be the symbol!')
+							return;
+						}
+						break;
+					case 'outline':
+					default:
+
+						if(!btl.drag.outlineElement) {
+							btl.drag.outlineElement = document.createElement('div');
+							btl.drag.outlineElement.className = 'btl-drag-outlineElement';
+							document.body.appendChild(btl.drag.outlineElement);
+						}
+
+						symbol = btl.drag.outlineElement;
+						symbol.style.width   = oCoord.width + 'px';
+						symbol.style.height  = oCoord.height + 'px';
+						xOffset = oCoord.left - event.startX;
+						yOffset = oCoord.top - event.startY;
+						break;
+				}
+
+				if( !bMoveMode ) {
+					if( !btl.drag._savedStyle )
+						btl.drag._savedStyle = bb.html.addStyleSheet('html * { cursor: not-allowed !important;} .btl-drag-target, .btl-drag-target * { cursor: default !important;}');
+					else
+						document.head.appendChild(btl.drag._savedStyle);
+				}
+				btl.drag.dragManager.doDrag( this, this, event.startX, event.startY, symbol, xOffset, yOffset, alpha, bMoveMode, aDroppables, constraint);
+			]]></d:handler>
+
+			<d:handler event="dragEnd" type="text/javascript"><![CDATA[
+				//reset the real item
+				if (this.viewNode.bPosition) {
+					this.viewNode.bPosition = false;
+					this.viewNode.style.position = this.viewNode.sPosition;
+					this.viewNode.style.left  = '';
+					this.viewNode.style.top = '';
+				}
+				if(btl.drag._savedStyle && btl.drag._savedStyle.parentNode == document.head) {
+					document.head.removeChild( btl.drag._savedStyle );
+				}
+
+				//reset the symbol
+				if (this.viewNode._originalOpacity != null) {
+					bb.html.setStyle(this.viewNode, 'opacity', this.viewNode._originalOpacity);
+					this.viewNode._originalOpacity = null;
+				}
+
+				if(btl.drag.outlineElement) {
+					btl.drag.outlineElement.style.left = '';
+					btl.drag.outlineElement.style.top = '';
+				}
+
+				if(btl.drag.dragSymbol) {
+					document.body.removeChild(btl.drag.dragSymbol);
+					btl.drag.dragSymbol = null;
+				}
+
+			]]></d:handler>
+		</d:behavior>
+	</d:namespace>
+</d:tdl>

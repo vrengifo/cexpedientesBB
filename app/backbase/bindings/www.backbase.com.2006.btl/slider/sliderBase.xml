@@ -1,0 +1,1325 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="rangeFormField" src="../rangeFormField/rangeFormField.xml"/>
+		<d:uses element="formList formListOption" src="../formList/formList.xml"/>
+		<d:uses element="positionElement dimensionElement" src="../visualElement/visualElement.xml"/>
+		<d:uses element="focusableElement" src="../focus/focus.xml"/>
+
+		<d:element name="sliderBase" extends="b:formList b:rangeFormField b:positionElement b:dimensionElement b:focusableElement" abstract="true">
+			
+
+			
+
+			
+
+			<d:resource type="text/javascript"><![CDATA[// Slider utility object, general for both horizontal and vertical orientations of slider.
+// Is used only as a base for verticalSlider and horizontalSlider objects.
+btl.slider = {};
+
+/**
+ * Handles mouse down event, which means assigns the handlers to the document
+ * and triggers the first mouse move.
+ * @param oSlider {controller object} slider to handle.
+ * @param eEvent {event object} mouse event object.
+ */
+btl.slider.handleMouseDown = function btl_slider_handleMouseDown(oSlider, eEvent){
+	var self = this;
+	var oGrippy = oSlider.getProperty("activeGrippy");
+	// saving old value
+	oGrippy._.__oldValue = oGrippy.getProperty("value");
+
+	// FIXME:
+	// another way of solving this is splitting it between horizontalSlider and verticalSlider
+	// objects, but it needs to be explored.
+
+	// if there are already some listeners assigned we need to remove them for safety
+	if (btl.slider._mouseMove || btl.slider._mouseUp) {
+		this.handleMouseUp(oSlider, oGrippy, eEvent);
+	}
+	// we need closures to handle this case correctly, as otherwise we can not
+	// rely on "this" in handlers, which is no good as I'm implementing state
+	// dependent behavior which requires horizontalSlider or verticalSlider
+	// objects and not btl.slider shared object.
+	btl.slider._mouseMove = function(event) {
+		self.handleMouseMove(oSlider, oGrippy, event);
+	}
+	btl.slider._mouseUp = function(event) {
+		self.handleMouseUp(oSlider, oGrippy, event);
+	}
+	// adding document event listeners to imitate the slide action
+	bb.document.addEventListener('mousemove', btl.slider._mouseMove, false);
+	bb.document.addEventListener('mouseup',   btl.slider._mouseUp,   false);
+
+	// FIXME: Refactor considering location
+	// indicating that slider came to active state
+	bb.html.addClass(oSlider.viewNode.getElementsByTagName("div")[1], 'btl-slider-active');
+	// handling the new position
+	this.handleMouseMove(oSlider, oGrippy, eEvent);
+};
+
+/**
+ * Handles mouse up event, which means removes the handlers from the document.
+ * @param oSlider {controller object} slider to handle.
+ * @param oGrippy {controller object} grippy to handle, done to speed up the solution.
+ * @param eEvent {event object} mouse event object.
+ */
+btl.slider.handleMouseUp = function btl_slider_handleMouseUp(oSlider, oGrippy, eEvent){
+	// removing event listeners that imitate the slide action
+	bb.document.removeEventListener('mousemove', btl.slider._mouseMove, false);
+	bb.document.removeEventListener('mouseup',   btl.slider._mouseUp,   false);
+	// I'm clearing the referneces to the handler functions, so the scope
+	// should be released too (unless someone is using the refernce to these functions)
+	btl.slider._mouseUp = btl.slider._mouseMove = null;
+	// FIXME: Refactor considering location
+	// handling grippy change event
+	if (oGrippy.getProperty("value") != oGrippy._.__oldValue) {
+		this.fireEvents(oGrippy, false, true);
+	}
+	// FIXME: Refactor considering location
+	// removing the class indicating that slider is active
+	bb.html.removeClass(oSlider.viewNode.getElementsByTagName("div")[1], 'btl-slider-active');
+};
+
+/**
+ * Handles mouse move event, which means repositions grippy acording to muse move.
+ * @param oSlider {controller object} slider to handle.
+ * @param oGrippy {controller object} grippy to position, done to speed up the solution.
+ * @param eEvent {event object} mouse event object.
+ */
+btl.slider.handleMouseMove = function btl_slider_handleMouseMove(oSlider, oGrippy, eEvent){
+	// just positioning the grippy
+	oGrippy.setPosition(this.getMousePosition(oSlider, oGrippy, eEvent), true);
+};
+
+/**
+ * Increments the value of the slider.
+ * @param oSlider {controller object} slider to work with.
+ * @param oGrippy {controller object} grippy to increment position of.
+ * @return {boolean} true if success, otherwise false.
+ */
+btl.slider.incrementValue = function btl_slider_incrementValue(oSlider, oGrippy) {
+	// used for backward compatibility as I think someone may use this method
+	oGrippy = oGrippy || oSlider.getFirstGrippy();
+	var sValue = oGrippy.getProperty('value');
+	var bIncremented = false;
+	var aOptions = oSlider.getProperty('options');
+	if(aOptions.length){	// if there are slideroptions
+		for( var i = aOptions.length - 1; i >= 0; i-- ){
+			if ( sValue == aOptions[i].getProperty('value') ) {
+				break;
+			}
+		}
+
+		if ( i >= 0 && i + 1 < aOptions.length ){
+			sValue = aOptions[i + 1].getProperty('value');
+			bIncremented = true;
+		}
+	}else{	// if there are no slideroptions
+		var iStep = Number(oSlider.getAttribute('step'));
+		var iMaxValue = Number(oSlider.getAttribute('max'));
+		var iValue = Number(sValue) + iStep;
+
+		if(iValue > iMaxValue)
+			iValue = iMaxValue;
+		else
+			bIncremented = true;
+
+		sValue = iValue;
+	}
+	if(bIncremented)
+		oGrippy.setProperty('value', sValue);
+
+	return bIncremented;
+}
+
+/**
+ * Decrements the value of the slider.
+ * @param oSlider {controller object} slider to work with.
+ * @param oGrippy {controller object} grippy to decrement position of.
+ * @return {boolean} true if success, otherwise false.
+ */
+btl.slider.decrementValue = function btl_slider_decrementValue(oSlider, oGrippy) {
+	// used for backward compatibility as I think someone may use this method
+	oGrippy = oGrippy || oSlider.getFirstGrippy();
+	var sValue = oGrippy.getProperty('value');
+	var bDecremented = false;
+	var aOptions = oSlider.getProperty('options');
+	if(aOptions.length){	// if there are slideroptions
+		for( var i = aOptions.length - 1; i >= 0; i-- ){
+			if (sValue == aOptions[i].getProperty('value')) {
+				break;
+			}
+		}
+
+		if ( i >= 1 ){
+			sValue = aOptions[i-1].getProperty('value');
+			bDecremented = true;
+		}
+
+	}else{	// if there are no slideroptions
+		var iStep = Number(oSlider.getAttribute('step'));
+		var iMinValue = Number(oSlider.getAttribute('min'));
+		var iValue = Number(sValue) - iStep;
+
+		if(iValue < iMinValue)
+			iValue = iMinValue;
+		else
+			bDecremented = true;
+
+		sValue = iValue;
+	}
+	if(bDecremented)
+		oGrippy.setProperty('value', sValue);
+
+	return bDecremented;
+}
+
+/**
+ * Fires the slider events.
+ * @param oGrippy {controller object} grippy to fire events of.
+ * @param bSlideEvent {boolean} if we fire slide event.
+ * @param bChangeEvent {boolean} if we fire change event.
+ */
+btl.slider.fireEvents = function btl_slider_fireEvents(oGrippy, bSlideEvent, bChangeEvent) {
+	var oEvent = null;
+	if (bSlideEvent) {
+		oEvent = bb.document.createEvent("Events");
+		oEvent.initEvent("slide", false, false);
+		oGrippy.dispatchEvent(oEvent);
+	}
+	if (bChangeEvent) {
+		oEvent = bb.document.createEvent("Events");
+		oEvent.initEvent("change", false, false);
+		oGrippy.dispatchEvent(oEvent);
+	}
+};
+
+/**
+ * Utility function that calculates the precision of string containing number.
+ * This is used to avoid problems with arithmetical problems with numbers like
+ * 0.1, 0.01, etc.
+ * @param sNumber {string} - string containing number to get precision of.
+ * @return {number} precision of the number.
+ */
+btl.slider.getPrecision = function btl_slider_getPrecision(sNumber) {
+	return sNumber.length - ((sNumber.indexOf(".") + 1) || sNumber.length);
+};
+
+/**
+ * Formats the numeric value according to the passed precision number.
+ * @param iValue {number} - value to format.
+ * @param sPrecision {string} - pattern representing the precision, like "0.1", "0.04", etc.
+ * @return {string} string with formatted number.
+ */
+btl.slider.formatNumber = function btl_slider_formatNumber(iValue, sPrecision) {
+	var iPrecision = this.getPrecision(sPrecision);
+	return iPrecision ? iValue.toFixed(iPrecision) : String(iValue);
+};
+
+/**
+ * Turns on or off the fill area rendering.
+ * @param oSlider {controller object} - slider to work with.
+ * @param bFill {boolean} - whether to turn on or off fill area.
+ */
+btl.slider.setFillState = function btl_slider_setFillState(oSlider, bFill) {
+	// getting grippies elements
+	var aGrippies = oSlider.getProperty("grippies");
+	// setting the proper updater for the fill area (default one is no action)
+	oSlider._.__updateFillArea = btl_slider_noAction;
+	// checking if we need some particular updater
+	if (aGrippies.length < 3 && bFill) {
+		oSlider._.__fillArea.style.display = "";
+		oSlider._.__updateFillArea = btl.slider.fillAreaUpdaters[String(aGrippies.length)];
+	} else {
+		oSlider._.__fillArea.style.display = "none";
+	}
+};
+
+// This is the set of updaters for the fill area, they update size and position of it.
+// The update of the fill area depends on the amount of grippies in the slider, so
+// they are splitted here into different functions to have no condition statements
+// inside. The one used in the particular slider will be chosen on the stage of slider construction.
+// The key of the hash is number of grippies
+btl.slider.fillAreaUpdaters = {};
+
+// one grippy slider fill area updater
+btl.slider.fillAreaUpdaters["1"] = function(oSlider) {
+	// utility object for this slider
+	var oUtility = oSlider.getUtilityObject();
+	// fill area element
+	var oFillArea = oSlider._.__fillArea;
+	// position is always zero
+	oUtility.setPosition(oFillArea, 0);
+	// size is the position of the first grippy
+	oUtility.setLength(oFillArea, oSlider._.__firstGrippy.getPosition());
+};
+
+// two grippies slider fill area updater
+btl.slider.fillAreaUpdaters["2"] = function(oSlider) {
+	// utility object for this slider
+	var oUtility = oSlider.getUtilityObject();
+	// fill area element
+	var oFillArea = oSlider._.__fillArea;
+	// the position of the first grippy (used in further calculations)
+	var iFirstGrippyPos = oSlider._.__firstGrippy.getPosition();
+	// position is position of the first grippy
+	oUtility.setPosition(oFillArea, iFirstGrippyPos);
+	oUtility.setLength(oFillArea, oSlider._.__secondGrippy.getPosition() - iFirstGrippyPos);
+};
+
+// This is the list of functions that are redefined in vertical and horizontal slider objects.
+// They are listed here only for the reasons of describing the object API and all call FALSE function.
+// FIXME: possibly as this is internal functionality this should be avoided.
+
+// FALSE function
+function btl_slider_noAction() { return false; };
+
+/*
+ * Calculates the position of the mouse relatively to the slider scale.
+ * @param oSlider {controller object} - slider to calculate relatively to.
+ * @param oGrippy {controller object} - grippy to calculate for.
+ * @param eEvent {event object} - mouse event object.
+ * @return {number} position of the mouse.
+ */
+btl.slider.getMousePosition = btl_slider_noAction;
+/*
+ * Positions the element.
+ * @param oElement {HTML element} element to position.
+ * @param iCoord {number} integer coordinate to position by.
+ */
+btl.slider.setPosition = btl_slider_noAction;
+/*
+ * Gets the length of any element. Functionality dependent
+ * on orientation.
+ * @param oElement {HTML element} element to get length of.
+ * @return {number} element length
+ */
+btl.slider.getLength = btl_slider_noAction;
+/**
+ * Returns the position of the grippy in the vertical slider.
+ * @param oElement {controller object} - element to get position of.
+ * @return {number} coordinate of the grippy.
+ */
+btl.slider.getPosition = btl_slider_noAction;
+// keys constants description
+btl.slider.INC_KEY = btl.slider.DEC_KEY = "";
+
+// function to be used for connecting btl.slider object as a prototype
+btl.slider.inherit = function() {
+	var inheritant = function() {};
+	inheritant.prototype = this;
+	return new inheritant();
+};
+
+//-------------------------------------------  HORIZONTAL SLIDER ----------------------------------------------------
+/*
+ * Horizontal slider object which incapsulates behavior specific for
+ * the horizontal one.
+ */
+btl.horizontalSlider = btl.slider.inherit();
+
+// controlling keys
+btl.horizontalSlider.INC_KEY = "Right";
+btl.horizontalSlider.DEC_KEY = "Left";
+
+/*
+ * Calculates the position of the mouse relatively to the slider scale.
+ * @param oSlider {controller object} - slider to calculate relatively to.
+ * @param oGrippy {controller object} - grippy to calculate for.
+ * @param eEvent {event object} - mouse event object.
+ * @return {number} position of the mouse.
+ */
+btl.horizontalSlider.getMousePosition = function btl_horizontalSlider_getMousePosition(oSlider, oGrippy, eEvent){
+	var oContainerSize = bb.html.getBoxObject(oSlider._.__sliderScale);
+	var oGrippySize = bb.html.getBoxObject(oGrippy.viewNode);
+	var iPosition = eEvent.clientX + bb.viewport.scrollLeft - oContainerSize.left;
+	// add correction to mouse position so the grippy will be placed directly under the mouse (centered)
+	iPosition -= Math.round(0.5 * oGrippySize.width);
+	return iPosition;
+};
+
+/*
+ * Gets the length of any element. Functionality dependent
+ * on orientation.
+ * @param oElement {HTML element} element to get length of.
+ * @return {number} element length
+ */
+btl.horizontalSlider.getLength = function btl_horizontalSlider_getLength(oElement) {
+	return bb.html.getBoxObject(oElement).width;
+};
+
+/*
+ * Sets the length of any element. Functionality dependent
+ * on orientation.
+ * @param oElement {HTML element} element to set length of.
+ * @param iLength {number} new element length.
+ * @return {boolean} true or false, depending on operation success.
+ */
+btl.horizontalSlider.setLength = function btl_horizontalSlider_setLength(oElement, iLength) {
+	oElement.style.width = iLength + "px";
+	return true;
+};
+
+/*
+ * Sets the position of any element. Functionality dependent
+ * on orientation.
+ * @param oElement {HTML element} - element to position.
+ * @param iCoord {number} - coordinate to set.
+ * @return {boolean} true or false, depending on operation success.
+ */
+btl.horizontalSlider.setPosition = function btl_horizontalSlider_setPosition(oElement, iCoord) {
+	oElement.style.left = iCoord + "px";
+	return true;
+};
+
+/**
+ * Returns the position of the grippy in the horizontal slider.
+ * @param oElement {controller object} - element to get position of.
+ * @return {number} coordinate of the grippy.
+ */
+btl.horizontalSlider.getPosition = function btl_horizontalSlider_getPosition(oElement) {
+	return parseInt(oElement.style.left, 10) || 0;
+};
+
+//-------------------------------------------  VERTICAL SLIDER ----------------------------------------------------
+/*
+ * Vertical slider object which incapsulates behavior specific for
+ * the vertical one.
+ */
+btl.verticalSlider = btl.slider.inherit();
+
+btl.verticalSlider.INC_KEY = "Up";
+btl.verticalSlider.DEC_KEY = "Down";
+
+/*
+ * Calculates the position of the mouse relatively to the slider scale.
+ * @param oSlider {controller object} - slider to calculate relatively to.
+ * @param oGrippy {controller object} - grippy to calculate for.
+ * @param eEvent {event object} - mouse event object.
+ * @return {number} position of the mouse.
+ */
+btl.verticalSlider.getMousePosition = function btl_verticalSlider_getMousePosition(oSlider, oGrippy, eEvent){
+	var oContainerSize = bb.html.getBoxObject(oSlider._.__sliderScale);
+	var oGrippySize = bb.html.getBoxObject(oGrippy.viewNode);
+	var iPosition = oContainerSize.height - (eEvent.clientY + bb.viewport.scrollTop - oContainerSize.top);
+	// add correction to mouse position so the grippy will be placed directly under the mouse (centered)
+	iPosition -= Math.round(0.5 * oGrippySize.height);
+	// reverting position
+	return iPosition;
+};
+
+/*
+ * Gets the length of any element. Functionality dependent
+ * on orientation.
+ * @param oElement {HTML element} element to get length of.
+ * @return {number} element length
+ */
+btl.verticalSlider.getLength = function btl_verticalSlider_getLength(oElement) {
+	return bb.html.getBoxObject(oElement).height;
+};
+
+/*
+ * Sets the length of any element. Functionality dependent
+ * on orientation.
+ * @param oElement {HTML element} element to set length of.
+ * @param iLength {number} new element length.
+ * @return {boolean} true or false, depending on operation success.
+ */
+btl.verticalSlider.setLength = function btl_verticalSlider_setLength(oElement, iLength) {
+	oElement.style.height = iLength + "px";
+	return true;
+};
+
+/*
+ * Sets the position of any element. Functionality dependent
+ * on orientation.
+ * @param oElement {HTML element} - element to position.
+ * @param iCoord {number} - coordinate to set.
+ * @return {boolean} true or false, depending on operation success.
+ */
+btl.verticalSlider.setPosition = function btl_verticalSlider_setPosition(oElement, iCoord) {
+	oElement.style.bottom = iCoord + "px";
+	return true;
+};
+
+/**
+ * Returns the position of the grippy in the vertical slider.
+ * @param oElement {controller object} - element to get position of.
+ * @return {number} coordinate of the grippy.
+ */
+btl.verticalSlider.getPosition = function btl_verticalSlider_getPosition(oElement) {
+	return parseInt(oElement.style.bottom, 10) || 0;
+};
+]]></d:resource>
+
+			<d:attribute name="orientation" default="horizontal">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					// NOTE: this mapper was moved out of skins and put into the base as it was equivalent in both
+					// of the skins; from the other side this implementation does nothing dependent on skin, as these
+					// both classes (btl-slider-vertical and btl-slider-horizontal) are not skin specific and should be
+					// used as indicators of the slider state more than pointing the look.
+
+					// FIXME: possibly this can be made more elegant in case if there will appear skin specific behavior
+					// on this attribute mapping.
+
+					// remove classes that could have been set before
+					bb.html.removeClass(this.viewNode, ['btl-slider-vertical', 'btl-slider-horizontal']);
+					// add new class
+					bb.html.addClass(this.viewNode, 'btl-slider-' + (value == 'vertical' ? 'vertical' : 'horizontal') );
+
+					// assigning the reference to the proper util object
+					if (value == 'vertical') {
+						this._.__sliderObj = btl.verticalSlider;
+					} else {
+						this._.__sliderObj = btl.horizontalSlider;
+					}
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="fill" default="false">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					btl.slider.setFillState(this, btl.isTrueValue(name, value));
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="min" default="0">
+				
+			</d:attribute>
+
+			<d:attribute name="max" default="100">
+				
+			</d:attribute>
+
+			<d:attribute name="showLabels" default="true">
+				
+			</d:attribute>
+
+			<d:attribute name="showToolTip" default="true">
+				
+			</d:attribute>
+
+			<d:attribute name="step" default="1">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					this.reflow();
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="snap" default="true">
+				
+				<d:changer type="text/javascript"><![CDATA[
+					this.reflow();
+				]]></d:changer>
+			</d:attribute>
+
+			<d:attribute name="value" onchange="this.setProperty('defaultValue', value)">
+				
+			</d:attribute>
+
+			<d:property name="activeGrippy">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					// checking if this is valid grippy
+					if (!bb.instanceOf(value, btl.namespaceURI, "sliderGrippy")) {
+						return false;
+					}
+					// deactivating old grippy
+					var oldGrippy = this._["_activeGrippy"];
+					if (oldGrippy) {
+						oldGrippy.deactivate();
+					}
+					// activating new one
+					value.activate();
+					// saving reference
+					this._["_activeGrippy"] = value;
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="defaultValue">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					this.getFirstGrippy().setProperty(name, value);
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					return this.getFirstGrippy().getProperty(name);
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="label">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					this.getFirstGrippy().setProperty(name, value);
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					return this.getFirstGrippy().getProperty(name);
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="options">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					var aChildren = this.getProperty('childNodes');
+					var aReturn = [];
+					for ( var i = 0, iMax = aChildren.length ; iMax > i ; i++ ){
+						if (bb.instanceOf(aChildren[i], btl.namespaceURI, 'formListOption'))
+							aReturn[aReturn.length] = aChildren[i];
+					}
+					return aReturn;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="grippies">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					var aChildren = this.getProperty('childNodes');
+					var aReturn = [];
+					for (var iOption = 0, iMax = aChildren.length; iMax > iOption; iOption++ ){
+						if (bb.instanceOf(aChildren[iOption], btl.namespaceURI, 'sliderGrippy')) {
+							//saving index in grippy
+							aChildren[iOption]._.__index = aReturn.length;
+							// adding it to result
+							aReturn[aReturn.length] = aChildren[iOption];
+						}
+					}
+					return aReturn;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="value">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					this.getFirstGrippy().setProperty(name, value);
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					return this.getFirstGrippy().getProperty(name);
+				]]></d:getter>
+			</d:property>
+
+			<d:method name="getUtilityObject">
+				
+				<d:body type="text/javascript"><![CDATA[
+					// returning correct utility object
+					return this._.__sliderObj;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getFirstGrippy">
+				
+				<d:body type="text/javascript"><![CDATA[
+					return this._.__firstGrippy;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getInitialValue">
+				
+				<d:argument name="grippy"/>
+				<d:body type="text/javascript"><![CDATA[
+					var sVal = "";
+					var aOptions = null;
+					var iOption = null;
+					if (grippy) {
+						sVal = grippy.getAttribute("value");
+					}
+					if (sVal === "" && grippy == this.getFirstGrippy()) {
+						sVal = this.getAttribute("value");
+					}
+					if (sVal === "") {
+						// if there are options we need to take selected one
+						// or first one, otherwise we take "min" attribute
+						aOptions = this.getProperty("options");
+						if (aOptions.length) {
+							iOption = aOptions.length - 1;
+							while (iOption >= 0) {
+								if (aOptions[iOption].getAttribute("selected")) {
+									sVal = aOptions[iOption].getProperty("value");
+								}
+								--iOption;
+							}
+							if (!sVal && sVal !== 0) {
+								sVal = aOptions[0].getProperty("value");
+							}
+						} else {
+							sVal = this.getAttribute("min");
+						}
+					}
+					// returning result
+					return sVal;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="addGrippy">
+				
+				<d:argument name="grippy" required="true"/>
+				<d:body type="text/javascript"><![CDATA[
+					var oSlider = this;
+					var oForSlider = grippy.getProperty("forSlider");
+					if (oForSlider != this) {
+						// firing own slide event as a reaction on grippy slide event
+						grippy.addEventListener("slide", function(event) {
+							var oEvent = bb.document.createEvent("Events");
+							oEvent.initEvent("slide", false, false);
+							return oSlider.dispatchEvent(oEvent);
+						}, false);
+						// re restriction happens on "change" event
+						grippy.addEventListener("change", function(event) {
+							var aGrippies = oSlider.getProperty("grippies");
+							var iIndex = this._.__index || 0;
+							var iPos = this.getPosition();
+							var oPrevGrippy = aGrippies[iIndex - 1];
+							var oNextGrippy = aGrippies[iIndex + 1];
+							if (oPrevGrippy) {
+								oPrevGrippy.restrictPosition(null, iPos);
+							}
+							if (oNextGrippy) {
+								oNextGrippy.restrictPosition(iPos, null);
+							}
+							// firing slider change event
+							var oEvent = bb.document.createEvent("Events");
+							oEvent.initEvent("change", true, false);
+							return oSlider.dispatchEvent(oEvent);
+						}, false);
+						// attaching the grippy to this slider
+						grippy.setProperty("forSlider", this);
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getLength">
+				
+				<d:body type="text/javascript"><![CDATA[
+					if (typeof this._.__length != "number") {
+						this._.__length = this._.__sliderObj.getLength(this._.__sliderScale);
+					}
+					return this._.__length;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="correctToValue">
+				
+				<d:argument name="coord" type="number"/>
+				<d:body type="text/javascript"><![CDATA[
+					if (!btl.isTrueValue('snap', this.getAttribute('snap'))) {
+						return coord;
+					}
+					var iValsCount = this.getProperty("options").length;
+					if (!iValsCount) {
+						iValsCount = ((this.getAttribute("max") - this.getAttribute("min")) / this.getAttribute("step")) || 0;
+					} else {--iValsCount;}
+					var iMinDistance = (this.getLength() - this.getFirstGrippy().getLength()) / iValsCount;
+					if (iValsCount && iMinDistance) {
+						coord = Math.round(Math.round(coord / iMinDistance) * iMinDistance);
+					}
+					return coord;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="translateValueToPosition">
+				
+				<d:argument name="value"/>
+				<d:body type="text/javascript"><![CDATA[
+					// getting the physical length of slider scale
+					var sDisplay = this.viewNode.style.display;
+					if(sDisplay == "none" && bb.browser.ie) {
+						// workaround for bug 9806
+						this.viewNode.style.display = "block";
+					}
+					var iScaleLength = this.getLength() - this.getFirstGrippy().getLength();
+					if(sDisplay == "none" && bb.browser.ie) {
+						// workaround for bug 9806
+						this.viewNode.style.display = sDisplay;
+					}
+					// getting options
+					var aOptions = this.getProperty('options');
+
+					var iPosition = false, iValuesLength = aOptions.length - 1, iOption = iValuesLength;
+					var iMaxValue = 0, iMinValue = 0;
+
+					// if there are options we search the value among them
+					if(aOptions.length){
+						while (iOption >= 0) {
+							if (value == aOptions[iOption].getProperty('value')) {
+								iPosition = iOption;
+								break;
+							}
+							iOption--;
+						}
+						// calculating position only if the value was found
+						if (iPosition !== false) {
+							// Coordinate should always be integer
+							iPosition = Math.round((iScaleLength / iValuesLength) * iPosition);
+						}
+					} else {
+						// if value is not a number we can't calculate the position
+						value = value !== "" ? Number(value) : NaN;
+						if (!isNaN(value)) {
+							// calculating the position based on the numeric value
+							iMinValue = Number(this.getAttribute('min'));
+							iMaxValue = Number(this.getAttribute('max'));
+							iValuesLength = iMaxValue - iMinValue;
+							// Coordinate should always be integer
+							iPosition = Math.round((value - iMinValue) / iValuesLength * iScaleLength);
+						}
+					}
+					// returning result
+					return iPosition;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getValueFromPosition">
+				
+				<d:argument name="position">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					var mValue = false;
+
+					var iMaxDistance = this.getLength() - this.getFirstGrippy().getLength();
+					var aOptions = this.getProperty('options');
+
+					// if there are slideroptions
+					if(aOptions.length){
+						var iIndex = Math.round((position / iMaxDistance) * (aOptions.length - 1));
+						if (iIndex < 0) iIndex = 0;
+						else if (iIndex >= aOptions.length) iIndex = aOptions.length - 1;
+						mValue = aOptions[iIndex].getProperty('value');
+
+					// if there are no slideroptions
+					} else {
+						var iMinValue = Number(this.getAttribute('min'));
+						var iMaxValue = Number(this.getAttribute('max'));
+						var sStep = this.getAttribute('step');
+						var iStep = Number(sStep);
+						var iMaxSteps = Math.ceil((iMaxValue - iMinValue) / iStep);
+
+						mValue = Math.round((position / iMaxDistance) * iMaxSteps);
+						mValue = mValue * iStep + iMinValue;
+
+						mValue = Number(mValue);
+						if(mValue < iMinValue)
+							mValue = iMinValue;
+						if(mValue > iMaxValue)
+							mValue = iMaxValue;
+						mValue = this._.__sliderObj.formatNumber(mValue, sStep);
+					}
+
+					return mValue;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getScaleElement">
+				
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:method name="reflow">
+				
+				<d:body type="text/javascript"><![CDATA[
+					// resetting state
+					this._.__length = null;
+
+					var aGrippies = this.getProperty("grippies");
+					var oGrippy = null;
+					// reflowing all grippies first
+					for(var iGrippy = 0; aGrippies.length > iGrippy; ++iGrippy) {
+						oGrippy = aGrippies[iGrippy];
+						oGrippy.reflow();
+					}
+
+					var iMin = 0, iMax = 0, oPrevGrippy = null, oNextGrippy = null;
+					var iScaleLength = this.getLength() - this.getFirstGrippy().getLength();
+					// assigning restrictions for each grippy
+					for(var iGrippy = 0; iGrippy < aGrippies.length; ++iGrippy) {
+						iMin = 0; iMax = iScaleLength;
+						oGrippy = aGrippies[iGrippy];
+						oPrevGrippy = aGrippies[iGrippy - 1];
+						oNextGrippy = aGrippies[iGrippy + 1];
+						// if this first grippy then lower boundary will be 0
+						iMin = oPrevGrippy ? oPrevGrippy.getPosition() : 0;
+						// if this is last grippy then upper boundary will be scale element size
+						if (oNextGrippy) {
+							iMax = oNextGrippy.getPosition();
+							iMax = (iMax < oGrippy.getPosition()) ? oGrippy.getPosition() : iMax;
+							iMax = (iMax > iScaleLength) ? iScaleLength : iMax;
+						}
+						// restricting grippy
+						oGrippy.restrictPosition(iMin, iMax);
+					}
+					// update fill area size and position
+					this._.__updateFillArea(this);
+				]]></d:body>
+			</d:method>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				bb.html.disableUserSelect(this.viewNode);
+
+				// saving the reference to the fill area element
+				this._.__fillArea = bb.selector.query(this.viewNode, ".btl-slider-fillArea");
+				// saving the reference to the scale element
+				this._.__sliderScale = this.getScaleElement();
+
+				// this is a function to update the size and position of the fill area
+				// if such is turned on by the "fill" attribute; this function depends
+				// on amount of grippies so is different for one, two or more grippies
+				// slider; it is filled in with appropriate function inside the
+				// btl.slider.setFillState method;
+				this._.__updateFillArea = btl_slider_noAction;
+
+				var oSlider = this, aGrippies = this.getProperty("grippies");
+				// trying to get first grippy
+				var oGrippy = aGrippies[0];
+				// checking if found one, cause if not we need to create one
+				if (!oGrippy) {
+					oGrippy = bb.document.createElementNS(btl.namespaceURI, "sliderGrippy");
+					this.appendChild(oGrippy);
+					// building our own grippies array (there is no sense in getting the
+					// grippies property again, it can result in performance problems, and
+					// from the other side we can be sure that this will be array with only
+					// one grippy and we already have a reference to it)
+					aGrippies = [oGrippy];
+				}
+
+				// saving reference to first grippy
+				this._.__firstGrippy = oGrippy;
+				// saving reference to the second grippy
+				this._.__secondGrippy = aGrippies[1];
+
+				for(var iGrippy = 0; iGrippy < aGrippies.length; ++iGrippy) {
+					// this is a little bit ugly but I need to do this here to avoid
+					// furstraiting bug in IE, when adding tooltip while slider is visible
+					// results in growth of scale length
+					this.addGrippy(aGrippies[iGrippy]);
+				}
+
+				// first grippy is responsible for updating input element each time value changes
+				oGrippy.addEventListener("change", function(event) {
+					oSlider.getProperty("focusElement").value = this.getProperty("value");
+				}, false);
+
+				// filling initial value of input field
+				this.getProperty("focusElement").value = this.getInitialValue(oGrippy);
+				// first grippy is also active one
+				this.setProperty("activeGrippy", oGrippy);
+
+				btl.slider.setFillState(this, btl.isTrueValue("fill", this.getAttribute("fill")));
+			]]></d:constructor>
+
+			<d:handler event="slide" type="text/javascript"><![CDATA[
+				this._.__updateFillArea(this);
+			]]></d:handler>
+
+			<d:handler event="construct" type="text/javascript"><![CDATA[
+				this.setProperty('defaultValue', this.hasAttribute('value') ? this.getAttribute('value') : this.getInitialValue());
+				bb.ui.reflow.add(this);
+			]]></d:handler>
+
+			<d:handler event="reflow" type="text/javascript"><![CDATA[
+				this.reflow();
+			]]></d:handler>
+
+			<d:handler event="keydown" type="text/javascript"><![CDATA[
+				var oGrippy = this.getProperty("activeGrippy");
+				if (event.keyIdentifier == this._.__sliderObj.INC_KEY){
+					this._.__sliderObj.incrementValue(this, oGrippy);
+					event.preventDefault();
+				}else if (event.keyIdentifier == this._.__sliderObj.DEC_KEY){
+					this._.__sliderObj.decrementValue(this, oGrippy);
+					event.preventDefault();
+				}
+			]]></d:handler>
+
+			<d:handler event="mousedown" type="text/javascript"><![CDATA[
+				this.focus();
+				var oElm = event.viewTarget;
+				while ( oElm != this.viewNode ) {
+					if (bb.html.hasClass(oElm, 'btl-slider-container')){
+						this._.__sliderObj.handleMouseDown(this, event);
+						break;
+					} else {
+						oElm = oElm.parentNode;
+					}
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="sliderGrippyBase" abstract="true">
+			
+
+			
+
+			
+
+			<d:attribute name="name">
+				
+			</d:attribute>
+
+			<d:attribute name="value">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					this.setProperty("defaultValue", value);
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:property name="label" type="string">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					this.getLabelElement().innerHTML = value;
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					return this.getLabelElement().innerHTML;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="forSlider">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					if (value && bb.instanceOf(value, btl.namespaceURI, "slider")) {
+						// saving reference
+						this._["_forSlider"] = value;
+						// adding a label element
+						value.getScaleElement().appendChild(this.getToolTipElement());
+					}
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="defaultValue" onset="this._['_defaultValue'] = value;">
+				
+			</d:property>
+
+			<d:property name="value">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					// getting sider object
+					var oSlider = this._["_forSlider"];
+					// getting utility object
+					var oUtility = oSlider.getUtilityObject();
+					// translating the value to position
+					var iPos = oSlider.translateValueToPosition(value);
+					// saving old value
+					var oldValue = this._["_value"];
+
+					// new corrected position
+					var iNewPos = iPos;
+					// saving old value
+					// setting new position
+					if (iPos !== false) {
+						// NOTE: although it's not very nice but I need to duplicate part of the
+						// setPosition method code here to avoid two things:
+						//  * translating value into position and then inside the method there will be
+						//    translation back
+						//  * impossibility to set some values that are not represented by theposition
+						//    on the slider scale
+
+						// correcting coordinate
+						iNewPos = this.correctCoordinate(iPos);
+						// positioning grippy
+						oUtility.setPosition(this.viewNode, iNewPos);
+						// checking if position didn't changed
+						if (iNewPos != iPos) {
+							oldValue = value;
+							value = oSlider.getValueFromPosition(iNewPos);
+						} else if (!oSlider.getProperty("options").length) {
+							value = oUtility.formatNumber(Number(value), oSlider.getAttribute("step"));
+						}
+						// updating the property value
+						this._["_value"] = value;
+						// set selected property to true in newly selected option
+						var aOptions = oSlider.getProperty("options");
+						var iOptionIndex;
+						for(var i=0,j=aOptions.length;i<j;i++) {
+							if(aOptions[i].getProperty("value") == value) {
+								aOptions[i].setProperty("selected", true);
+								iOptionIndex = i;
+								break;
+							}
+						}
+						// set selected property to false in previously selected option
+						if(aOptions.length) {
+							var deselectOldOption = true;
+							var aGrippies = oSlider.getProperty("grippies");
+							for(var i=0,j=aGrippies.length;i<j;i++) {
+								if(aGrippies[i].getProperty("value") == oldValue) {
+									deselectOldOption = false;
+								}
+							}
+							if(deselectOldOption) {
+								for(var i=0,j=aOptions.length;i<j;i++) {
+									if(aOptions[i].getProperty("value") == oldValue) {
+										aOptions[i].setProperty("selected", false);
+										break;
+									}
+								}
+							}
+						}
+						// updating tooltip text
+						if(aOptions.length && aOptions[iOptionIndex].getProperty("text")) {
+							this.setProperty("label", aOptions[iOptionIndex].getProperty("text"));
+						}
+						else {
+							this.setProperty("label", value + "");
+						}
+						// centering the label
+						this.centerLabel();
+						// firing events
+						if (typeof oldValue != "undefined" && oldValue !== value) {
+							// firing needed events
+							oUtility.fireEvents(this, true, true);
+						}
+						// pointing that grippy inited
+						this._.__inited = true;
+					}
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					if (typeof this._["_value"] == "undefined") {
+						return this._["_forSlider"].getInitialValue(this);
+					}
+					return this._["_value"];
+				]]></d:getter>
+			</d:property>
+
+			<d:method name="centerLabel">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var iCoord = this.getPosition();
+					var oSlider = this._["_forSlider"];
+					var oUtility = oSlider.getUtilityObject();
+					var oToolTip = this.getToolTipElement();
+					// getting needed size
+					var iSliderScaleLength = oSlider.getLength();
+					var iGrippyLength = this.getLength();
+					var iLabelLength = oUtility.getLength(oToolTip);
+					// calculating tooltip position
+					iCoord = parseInt(iCoord, 10) - Math.round((iLabelLength - iGrippyLength) / 2);
+					// correcting the position
+					if (iCoord < 0) {
+						iCoord = 0;
+					} else if (iCoord + iLabelLength > iSliderScaleLength) {
+						iCoord = iSliderScaleLength - iLabelLength;
+					}
+					// assigning the coordinate
+					oUtility.setPosition(oToolTip, iCoord);
+					// returning success
+					return true;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getLength">
+				
+				<d:body type="text/javascript"><![CDATA[
+					if (typeof this._.__length != "number") {
+						this._.__length = this._["_forSlider"].getUtilityObject().getLength(this.viewNode);
+					}
+					return this._.__length;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="restrictPosition">
+				
+				<d:argument name="min"/>
+				<d:argument name="max"/>
+				<d:body type="text/javascript"><![CDATA[
+					// parsing numbers
+					min = parseInt(min, 10);
+					max = parseInt(max, 10);
+					// creating object if there is no still
+					if (!this._.__moveConstraints) {
+						this._.__moveConstraints = {};
+					}
+					this._.__moveConstraints.min = isNaN(min) ? this._.__moveConstraints.min : min;
+					this._.__moveConstraints.max = isNaN(max) ? this._.__moveConstraints.max : max;
+					// getting previos position
+					var iPos = this.getPosition();
+					// correcting the current coordinate if needed
+					if (iPos > this._.__moveConstraints.max || iPos < this._.__moveConstraints.min) {
+						this.setPosition(iPos);
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="correctCoordinate">
+				
+				<d:argument name="coord" type="number"/>
+				<d:body type="text/javascript"><![CDATA[
+					var oSlider = this._["_forSlider"];
+					var sDisplay = oSlider.viewNode.style.display;
+					if(sDisplay == "none" && bb.browser.ie) {
+						// workaround for bug 9806
+						oSlider.viewNode.style.display = "block";
+					}
+					var oConstr = this._.__moveConstraints || {min: -10000, max: 10000};
+					if(sDisplay == "none" && bb.browser.ie) {
+						// workaround for bug 9806
+						oSlider.viewNode.style.display = "none";
+					}
+					// parsing coordinate
+					var iCoord = parseInt(coord, 10);
+					// proceeding snapping if needed
+					iCoord = oSlider.correctToValue(iCoord);
+					// checking over the lower boundary if required
+					if (iCoord < oConstr.min) {
+						iCoord = oConstr.min;
+					}
+					// checking over the upper boundary
+					if (iCoord > oConstr.max) {
+						iCoord = oConstr.max;
+					}
+					// returning correct coordinate
+					return iCoord;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="setPosition">
+				
+				<d:argument name="position" type="number">
+					
+				</d:argument>
+				<d:argument name="noChangeEvent">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					var oSlider = this._["_forSlider"];
+					// saving old value
+					var oldValue = this._["_value"];
+					// if you are going to change the this method implementation you should also
+					// update 'value' property setter appropriately
+
+					// getting utility object
+					var oUtility = oSlider.getUtilityObject();
+					// correcting coordinate
+					position = this.correctCoordinate(position);
+					// positioning grippy
+					oUtility.setPosition(this.viewNode, position);
+					// calculating the value from position and updating grippy with it
+					var sValue = oSlider.getValueFromPosition(position);
+					// updating the property value
+					this._["_value"] = sValue;
+					// set selected property to true in newly selected option
+					var aOptions = oSlider.getProperty("options");
+					var iOptionIndex;
+					for(var i=0,j=aOptions.length;i<j;i++) {
+						if(aOptions[i].getProperty("value") == sValue) {
+							aOptions[i].setProperty("selected", true);
+							iOptionIndex = i;
+							break;
+						}
+					}
+					// set selected property to false in previously selected option
+					if(aOptions.length) {
+						var deselectOldOption = true;
+						var aGrippies = oSlider.getProperty("grippies");
+						for(var i=0,j=aGrippies.length;i<j;i++) {
+							if(aGrippies[i].getProperty("value") == oldValue) {
+								deselectOldOption = false;
+							}
+						}
+						if(deselectOldOption) {
+							for(var i=0,j=aOptions.length;i<j;i++) {
+								if(aOptions[i].getProperty("value") == oldValue) {
+									aOptions[i].setProperty("selected", false);
+									break;
+								}
+							}
+						}
+					}
+					// updating tooltip text
+					if(aOptions.length && aOptions[iOptionIndex].getProperty("text")) {
+						this.setProperty("label", aOptions[iOptionIndex].getProperty("text"));
+					}
+					else {
+						this.setProperty("label", sValue + "");
+					}
+					// centering the label
+					this.centerLabel();
+					// firing events
+					if (typeof oldValue != "undefined" && oldValue !== sValue) {
+						// firing needed events
+						oUtility.fireEvents(this, true, !noChangeEvent);
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getPosition">
+				
+				<d:body type="text/javascript"><![CDATA[
+					return this._["_forSlider"].getUtilityObject().getPosition(this.viewNode);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getToolTipElement">
+				
+				<d:body type="text/javascript"><![CDATA[
+					// basically we need a tooltip to be a separate element
+					// that's why it is described in the resource and created in runtime
+					var oGrippy = this;
+					if (!this._.__toolTip) {
+						this._.__toolTip = bb.getResource(this, "tooltip").cloneNode(true);
+						bb.html.addEventListener(this._.__toolTip, "mousedown", function(event) {
+							oGrippy._["_forSlider"].setProperty("activeGrippy", oGrippy);
+						}, false);
+					}
+					return this._.__toolTip;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getLabelElement">
+				
+				<d:body type="text/javascript"><![CDATA[
+				]]></d:body>
+			</d:method>
+
+			<d:method name="activate">
+				
+				<d:body type="text/javascript"><![CDATA[
+					bb.html.addClass(this.viewNode, ["btl-slider-activeGrippy"]);
+					bb.html.addClass(this.getToolTipElement(), ["btl-slider-activeCurrent"]);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="deactivate">
+				
+				<d:body type="text/javascript"><![CDATA[
+					bb.html.removeClass(this.viewNode, ["btl-slider-activeGrippy"]);
+					bb.html.removeClass(this.getToolTipElement(), ["btl-slider-activeCurrent"]);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="reflow">
+				
+				<d:body type="text/javascript"><![CDATA[
+					// reseting state
+					this._.__moveConstraints = null;
+					this._.__length = null;
+
+					var oSlider = this._["_forSlider"];
+					var iPos = 0;
+					if (!this._.__inited) {
+						// setting initial value
+						this.setProperty("value", oSlider.getInitialValue(this));
+						// pointing that element was inited
+						this._.__inited = true;
+					} else {
+						this.setProperty("value", this.getProperty('value'));
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="mousedown" type="text/javascript"><![CDATA[
+				this._["_forSlider"].setProperty("activeGrippy", this);
+			]]></d:handler>
+
+			<d:handler event="DOMNodeRemovedFromDocument" type="text/javascript"><![CDATA[
+				var oTT = this.getToolTipElement();
+				if (oTT) {
+					oTT.parentNode.removeChild(oTT);
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="sliderOption" extends="b:formListOption">
+			
+		</d:element>
+	</d:namespace>
+</d:tdl>

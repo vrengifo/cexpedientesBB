@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="element" src="../element/element.xml"/>
+		<d:uses element="visualElement" src="../visualElement/visualElement.xml"/>
+
+		<d:element name="label" extends="b:visualElement">
+			
+
+			<d:template type="application/xhtml+xml">
+				<label><d:content/></label>
+			</d:template>
+		</d:element>
+
+		<d:element name="labelImplementor" extends="b:element" abstract="true">
+			
+
+			<d:attribute name="label">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					var oLabel = this.getProperty('labelGate');
+					if (oLabel) {
+						oLabel.innerHTML = value ? value : ' ';
+					}
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:property name="label">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					return this.getAttribute('label') ||
+							this.getProperty('labelElement') && this.getProperty('labelElement').getProperty('textContent') ||
+							'';
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					value ? this.setAttribute('label', value) : this.removeAttribute('label');
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="labelGate">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					if (this.viewNode) {
+						var oLabel = bb.selector.query(this.viewNode, '.btl-label, label');
+						if (oLabel)
+							return oLabel;
+						else
+							bb.command.trace(this, this.getProperty('localName') + ' does not implement the labelGate property properly.', 2);
+					}
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="labelElement">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					var aChildNodes = this.getProperty('childNodes');
+					this._._labelElement = null;
+					for (var i = 0, iMax = aChildNodes.length; i < iMax; i++) {
+						var oChild = aChildNodes[i];
+						if (oChild.instanceOf('http://www.backbase.com/2006/btl', 'label')) {
+							this._._labelElement = oChild;
+							break;
+						}
+					}
+					return this._._labelElement;
+				]]></d:getter>
+			</d:property>
+
+			<d:method name="__attach">
+				
+				<d:argument name="name"/>
+				<d:argument name="node"/>
+				<d:argument name="refNode"/>
+				<d:body type="text/javascript"><![CDATA[
+					/* name and node are mandatory */
+					if (name && node) {
+						var bNodeIsLabel = node.instanceOf('http://www.backbase.com/2006/btl', 'label');
+						var bRefNodeIsLabel = refNode ? refNode.instanceOf('http://www.backbase.com/2006/btl', 'label') : false;
+
+						// When either node that is attached is a label, we need to do something special.
+						if (bNodeIsLabel || bRefNodeIsLabel) {
+
+							// Since the label attribute is leading, we do not need to update the label if it is defined
+							if (!this.hasAttribute('label')) {
+								/* Since there is no label attribute, we need to set the correct label.
+								\* The correct label is returned by the labelElement property. */
+
+								var oLabel = this.getProperty('labelElement');
+								var oLabelGate = this.getProperty('labelGate');
+								var oLabelGateContent = oLabelGate.firstChild;
+
+								// If there is a label, the label will be added to the view
+								if (oLabel) {
+									// There is no need to update the view if the label remains the same.
+									if (oLabelGateContent !== oLabel.viewNode) {
+										if (oLabelGateContent)
+											oLabelGate.replaceChild(oLabel.viewNode, oLabelGateContent);
+										else
+											oLabelGate.appendChild(oLabel.viewNode);
+									}
+
+								/* If no label was found, the view should be emptied.
+								** The label is emptied using a textNode with a space to make sure
+								\* that the label has a height still. Otherwise, label containers could collapse. */
+
+								} else {
+									var oText = document.createTextNode('\u00a0');
+									if (oLabelGateContent)
+										oLabelGate.replaceChild(oText, oLabelGateContent);
+									else
+										oLabelGate.appendChild(oText);
+								}
+							}
+
+							/* Now appendChild and removeChild are completely handled.
+							** At this point, the correct label is visible and only non label elements need
+							** to be dealt with still (for replaceChild and insertBefore).
+							** There is only need to do something if a refNode is provided and either the node
+							** or the refNode is a label. There is no need to do something when both are a label
+							\* since the correct label is already visible. */
+
+							if (refNode && !(bNodeIsLabel && bRefNodeIsLabel)) {
+								if (bNodeIsLabel) {
+									/* When a label is replacing another element, the old element should be removed.
+									** If the label would be inserted before another element, this is already dealt
+									\* with by having the correct label being made visible. */
+
+									if (name == 'replaceChild') {
+										this.viewGate.removeChild(refNode.viewNode);
+									}
+								} else {
+									/* When an element is replacing or is inserted before a label, the new element
+									** needs to be attached in the proper location; before a sibling element of the
+									** label that has its viewNode in the viewGate of the labelImplementor. If there is
+									** no sibling or no sibling has a viewNode in the viewGate of the labelImplementor,
+									** the new element should just be appended (done by setting the second argument
+									\* of insertBefore to null). */
+
+									if (name == 'replaceChild' || name == 'insertBefore') {
+										var oNextSibling = refNode.getProperty('nextSibling');
+										while (oNextSibling && oNextSibling.viewNode.parentNode != this.viewGate) {
+											oNextSibling = oNextSibling.getProperty('nextSibling');
+										}
+										this.viewGate.insertBefore(node.viewNode, oNextSibling ? oNextSibling.viewNode : null);
+									}
+								}
+							}
+
+						// Neither node is a label, so attach as usual
+						} else {
+							this.callSuper('__attach', [name, node, refNode]);
+						}
+					}
+				]]></d:body>
+			</d:method>
+		</d:element>
+	</d:namespace>
+</d:tdl>

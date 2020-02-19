@@ -1,0 +1,730 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:interface name="UIControl">
+			
+
+			<d:method name="execUICommand">
+				
+				<d:argument name="command" type="string"/>
+				<d:argument name="args" type="array"/>
+			</d:method>
+
+			<d:method name="execUIQuery">
+				
+				<d:argument name="query" type="string"/>
+				<d:argument name="args" type="array"/>
+			</d:method>
+		</d:interface>
+
+		<d:element name="itemsSelectControl" abstract="true">
+			
+
+			<d:resource type="text/javascript"><![CDATA[
+				btl.itemsSelectControl = {};
+
+				/**
+				 * Creates the array of indexes from one index, array of indexes or range of indexes.
+				 * @param oController {controller object} - element to work with.
+				 * @param vStart {variant} - starting item or array of items.
+				 * @param vEnd {variant} - ending item.
+				 * @return {array} - returns array in any case.
+				 */
+				btl.itemsSelectControl.createItemsArray = function btl_itemsSelectControl_createItemsArray(oGrid, vStart, vEnd) {
+					var aIndexes = null;
+					// if this is range, trying to gather all needed items, otherwise forming an array
+					if (vEnd && !(vStart instanceof Array)) {
+						aIndexes = oGrid.getItemsFromRange(vStart, vEnd);
+					} else {
+						aIndexes = (vStart instanceof Array) ? vStart.slice(0) : [vStart];
+					}
+					// returning result
+					return aIndexes || [];
+				};
+			]]></d:resource>
+
+			<d:attribute name="selectType" default="single">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					if (value != "single" && value != "singleRequired" && value != "multiple") {
+						bb.command.trace(this, "Wrong selectType attribute value was assigned, changing to default!", 2);
+						// FIXME: not flexible to redefine default in descendants
+						this.modelNode.setAttribute("selectType", "single");
+					}
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:property name="selectedItems">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					return this._["_selectedItems"] || [];
+				]]></d:getter>
+			</d:property>
+
+			<d:method name="getItemsFromRange">
+				
+				<d:argument name="rangeStart" required="true"/>
+				<d:argument name="rangeEnd" required="true"/>
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:method name="selectItem">
+				
+				<d:argument name="item" required="true"/>
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:method name="deselectItem">
+				
+				<d:argument name="item" required="true"/>
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:method name="addToSelection">
+				
+				<d:argument name="item" required="true"/>
+				<d:argument name="toItem"/>
+				<d:body type="text/javascript"><![CDATA[
+					var sSelType = this.getAttribute("selectType");
+					var iAffected = 0;
+					// single or singleRequired type of selection should just call setSelection
+					if (sSelType == "singleRequired" || sSelType == "single") {
+						return this.setSelection(item, toItem);
+					}
+
+					// getting indexes
+					var aItems = btl.itemsSelectControl.createItemsArray(this, item, toItem);
+					// selecting all items
+					for (var iItem = 0; iItem < aItems.length; ++iItem) {
+						if (!this.isSelected(aItems[iItem])) {
+							this.selectItem(aItems[iItem]);
+							++iAffected;
+						}
+					}
+					// returning amount of affected items
+					return iAffected;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="removeFromSelection">
+				
+				<d:argument name="item" required="true"/>
+				<d:argument name="toItem"/>
+				<d:body type="text/javascript"><![CDATA[
+					var sSelType = this.getAttribute("selectType");
+
+					// singleRequired type of selection should ignore this case
+					if (sSelType == "singleRequired" && this.getProperty("selectedItems").length < 2) {
+						return 0;
+					}
+
+					// getting indexes
+					var aItems = btl.itemsSelectControl.createItemsArray(this, item, toItem);
+					// deselecting all items
+					for (var iItem = 0; iItem < aItems.length; ++iItem) {
+						if (this.isSelected(aItems[iItem])) {
+							this.deselectItem(aItems[iItem]);
+						}
+					}
+					// returning amount of affected items
+					return aItems.length;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="setSelection">
+				
+				<d:argument name="item" required="true"/>
+				<d:argument name="toItem"/>
+				<d:body type="text/javascript"><![CDATA[
+					var sSelType = this.getAttribute("selectType");
+					// IMPORTANT: I need a copy of array cause otherwise the loop will not work correctly.
+					var aSelItems = this.getProperty("selectedItems").slice(0);
+
+					// getting indexes
+					var aItems = btl.itemsSelectControl.createItemsArray(this, item, toItem);
+					// for single or singleRequired selection only last item should be proceeded
+					if (sSelType == "single" || sSelType == "singleRequired") {
+						aItems = [aItems[aItems.length - 1]];
+					}
+					// deselecting current selection
+					for (var iItem = 0; iItem < aSelItems.length; ++iItem) {
+						if (bb.array.indexOf(aItems, aSelItems[iItem]) == -1) {
+							this.deselectItem(aSelItems[iItem]);
+						} else {
+							bb.array.removeObject(aItems, aSelItems[iItem]);
+						}
+					}
+					// selecting all items
+					for (var iItem = 0; iItem < aItems.length; ++iItem) {
+						this.selectItem(aItems[iItem]);
+					}
+					// returning amount of affected items
+					return aItems.length;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="toggleSelection">
+				
+				<d:argument name="item" required="true"/>
+				<d:body type="text/javascript"><![CDATA[
+					var sSelType = this.getAttribute("selectType");
+					// checking the item state
+					var bSelected = this.isSelected(item);
+					// singleRequired selection behavior should only call setSelection for the passed item
+					// if item not selected and this is  single selection behavior agian should call setSelection
+					if ((sSelType == "singleRequired") || (sSelType == "single" && !bSelected)) {
+						return Boolean(this.setSelection(item));
+					}
+					// selecting or deselecting item depending on its state
+					if (bSelected) {
+						return Boolean(this.removeFromSelection(item));
+					} else {
+						return Boolean(this.addToSelection(item));
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="clearSelection">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var sSelType = this.getAttribute("selectType");
+					// IMPORTANT: we need a copy of array cause I'm affecting it later.
+					var aSelItems = this.getProperty("selectedItems").slice(0);
+					// removing last item from items to be deselected if this is singleRequired selection type
+					if (sSelType == "singleRequired") {
+						aSelItems = (aSelItems.length == 1) ? [] : aSelItems.slice(0, aSelItems.length - 1);
+					}
+					// removing all items from selection
+					this.removeFromSelection(aSelItems);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="isSelected">
+				
+				<d:argument name="item" required="true"/>
+				<d:body type="text/javascript"><![CDATA[
+					return (bb.array.indexOf(this.getProperty("selectedItems"), item) != -1);
+				]]></d:body>
+			</d:method>
+		</d:element>
+
+		<d:element name="itemsEditor" abstract="true">
+			<d:resource type="text/javascript"><![CDATA[
+				btl.itemsEditor = {};
+
+				// TODO:  This is kind of stupid and not flexible at all,
+				// but this is the only simple and fast solution for now.
+
+				/**
+				 * Gets the value of the editor element.
+				 * @param oEditor {object} - editor object.
+				 * @return {mixed} - value of the editor.
+				 */
+				btl.itemsEditor.getValue = function(oEditor) {
+					if (oEditor === null) {
+						return null;
+					}
+					if (oEditor._) {
+						// BTL form element
+						if (bb.instanceOf(oEditor, btl.namespaceURI, "formField")) {
+							return oEditor.getProperty("value");
+						}
+						// XHTML (controller) form element
+						if (bb.instanceOf(oEditor, "http://www.w3.org/1999/xhtml", "xhtmlControlElement")) {
+							// checkbox is a special case
+							if (oEditor.getProperty("type") == "checkbox") {
+								return oEditor.getProperty("checked") ? oEditor.getProperty("value") : "";
+							}
+
+							return oEditor.getProperty("value");
+						}
+					}
+					// XHTML (view) form element
+					if (
+						oEditor.tagName &&
+						(oEditor.tagName.toLowerCase() == "input" ||
+						 oEditor.tagName.toLowerCase() == "textarea" ||
+						 oEditor.tagName.toLowerCase() == "select")
+					) {
+						// again checkbox is a special case
+						if (oEditor.type == "checkbox") {
+							return oEditor.checked ? oEditor.value : "";
+						}
+
+						return oEditor.value;
+					}
+					// editor not recognized
+					return null;
+				};
+
+				/**
+				 * Sets the value of the editor.
+				 * @param oEditor {object} - editor object.
+				 * @param mValue {mixed} - value to set.
+				 * @return {boolean} - true or false depending on operation success.
+				 */
+				btl.itemsEditor.setValue = function(oEditor, mValue) {
+					if (oEditor === null) {
+						return false;
+					}
+					if (oEditor._) {
+						// BTL form element
+						if (bb.instanceOf(oEditor, btl.namespaceURI, "formField")) {
+							oEditor.setProperty("value", mValue);
+							return true;
+						}
+						// XHTML (controller) form element
+						if (bb.instanceOf(oEditor, "http://www.w3.org/1999/xhtml", "xhtmlControlElement")) {
+							// checkbox is a special case
+							if (oEditor.getProperty("type") == "checkbox") {
+								(oEditor.getProperty("value") == mValue) ? oEditor.setProperty("checked", true)
+													 : oEditor.setProperty("checked", false);
+								return true;
+							}
+
+							oEditor.setProperty("value", mValue);
+							return true;
+						}
+					}
+					// XHTML (view) form element
+					if (
+						oEditor.tagName &&
+						(oEditor.tagName.toLowerCase() == "input" ||
+						 oEditor.tagName.toLowerCase() == "textarea" ||
+						 oEditor.tagName.toLowerCase() == "select")
+					) {
+						// again checkbox is a special case
+						if (oEditor.type == "checkbox") {
+							(oEditor.value == mValue) ? (oEditor.checked = true) : oEditor.checked = false;
+							return true;
+						}
+
+						oEditor.value = mValue;
+						return true;
+					}
+					// editor not recognized
+					return false;
+				};
+
+				/**
+				 * Internal function used to gather common actions for stopping edit.
+				 * @param oController {controller object} - element to stop editing.
+				 * @param bSave {boolean} - flag if changes are to be saved.
+				 */
+				btl.itemsEditor._stopEdit = function(oController, bSave) {
+					if (!oController.isEdited()) {
+						return false;
+					}
+					var aEditInfo = oController._._itemEditInfo, oInfo = null;
+					if( bSave){
+						for (var iInfoItem = 0; iInfoItem < aEditInfo.length; ++iInfoItem) {
+							oInfo = aEditInfo[iInfoItem];
+							var value = btl.itemsEditor.getValue(oInfo.editor)
+							if( oInfo.value != value)
+								aEditInfo[iInfoItem].newValue = value;
+							oController.hideEditor(oInfo.editor, oInfo.viewNode);
+						}
+						// updating element
+						oController.updateEditItem(oController._._editItem, aEditInfo);
+					} else {
+						for (var iInfoItem = 0; iInfoItem < aEditInfo.length; ++iInfoItem)
+							oController.hideEditor( aEditInfo[iInfoItem].editor, aEditInfo[iInfoItem].viewNode);
+					} //if
+					// resetting variables
+					oController._._editItem = null;
+					oController._._itemEditInfo = null;
+
+					// dispatching event informing about edit confirmation
+					var oEvent = bb.document.createEvent("Event");
+					oEvent.initEvent(bSave ? "editConfirm" : "editCancel", false, false);
+					oController.dispatchEvent(oEvent);
+
+					return true;
+				};
+			]]></d:resource>
+
+			<d:method name="startEdit">
+				<d:argument name="item"/>
+				<d:argument name="focusedEditor"/>
+				<d:body type="text/javascript"><![CDATA[
+					// edit was already started
+					if (this._._editItem !== null || item === null) {
+						return false;
+					}
+					var aEditInfo = this._._itemEditInfo = this.getEditInformation(item);
+					var oInfo = null, bEmpty = true;
+					// initializing all editors
+					for (var iInfoItem = 0; iInfoItem < aEditInfo.length; ++iInfoItem) {
+						oInfo = aEditInfo[iInfoItem];
+						// it's only if the editor was placed its value can be updated
+						this.placeEditor(oInfo.editor, oInfo.viewNode) &&
+						btl.itemsEditor.setValue(oInfo.editor, oInfo.value) &&
+						(bEmpty = false);
+						if (!focusedEditor && !bEmpty) {
+							focusedEditor = oInfo.editor;
+						}
+					}
+					// saving reference to the item we edit
+					this._._editItem = item;
+					// dispatching event informing about edit start
+					var oEvent = bb.document.createEvent("Event");
+					oEvent.initEvent("editStart", false, false);
+					this.dispatchEvent(oEvent);
+
+					// if no editors - canceling edit
+					if (bEmpty) {
+						this.cancelEdit();
+						return false;
+					} else {
+						focusedEditor.focus();
+					}
+
+					return true;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="confirmEdit">
+				<d:body type="text/javascript"><![CDATA[
+					return btl.itemsEditor._stopEdit(this, true);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="cancelEdit">
+				<d:body type="text/javascript"><![CDATA[
+					return btl.itemsEditor._stopEdit(this, false);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="isEdited">
+				<d:body type="text/javascript"><![CDATA[
+					return (this._._editItem !== null);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="placeEditor">
+				<d:argument name="editor"/>
+				<d:argument name="viewNode"/>
+				<d:body type="text/javascript"><![CDATA[
+					if (!editor || !viewNode) {
+						return false;
+					}
+					// saving the actual values from the cell (I'm doing this as a private property of the editor)
+					editor.__replacedContent = [];
+					while (viewNode.firstChild) {
+						editor.__replacedContent.push(viewNode.removeChild(viewNode.firstChild));
+					}
+					// placing editor
+					viewNode.appendChild(editor.viewNode || editor);
+
+					return true;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="hideEditor">
+				<d:argument name="editor"/>
+				<d:argument name="viewNode"/>
+				<d:body type="text/javascript"><![CDATA[
+					if (!editor || !viewNode) {
+						return false;
+					}
+					var oEditorView = editor.viewNode || editor;
+					viewNode.removeChild(oEditorView);
+					// placing all children back
+					for (var iChild = 0; iChild < editor.__replacedContent.length; ++iChild) {
+						viewNode.appendChild(editor.__replacedContent[iChild]);
+					}
+
+					return true;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="updateEditItem">
+				<d:argument name="item"/>
+				<d:argument name="values"/>
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:method name="getEditInformation">
+				<d:argument name="item"/>
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:handler event="construct" type="text/javascript"><![CDATA[
+				// initializing internal properties
+				this._._itemEditors = null;
+				this._._editItem = null;
+			]]></d:handler>
+		</d:element>
+
+		<d:behavior name="userSelect">
+			
+
+			<d:resource type="text/javascript"><![CDATA[
+				// Adding utility object. I will add command execution and
+				// keyboard bindings here.
+				btl.userSelect= {};
+
+				/**
+				 * Searches for the element with specified class name from the passed DOM tree leaf to some root element.
+				 * @param oElement {HTML element} - starting point of the search.
+				 * @param sClass {string} - one class name to search. It's important - ONE!
+				 * @param oRoot {HTML element} - stopping point of the search, default is document.body.
+				 * @return {HTML element} - found element.
+				 */
+				btl.userSelect.findTargetByClass = function btl_userSelect_findEventTargetByClass(oElement, sClass, oRoot) {
+					oRoot = oRoot || document.body;
+					while(oElement) {
+						if (typeof oElement.className == "string" && bb.html.hasClass(oElement, sClass)) {
+							return oElement;
+						}
+
+						if (oElement == oRoot) {
+							return null;
+						}
+
+						oElement = oElement.parentNode;
+					}
+
+					return null;
+				};
+
+				// set of keys that move focus, directions and offsets they move focus to
+				btl.userSelect.focusModifiers = {
+					"Up": ["vertical", -1],
+					"Down": ["vertical", 1],
+					"Left": ["horizontal", -1],
+					"Right": ["horizontal", 1],
+					"Home": ["vertical", "first"],
+					"End": ["vertical", "last"],
+					"PageUp": ["vertical", -10],
+					"PageDown": ["vertical", 10]
+				};
+
+				// set of keys that modify selection
+				btl.userSelect.selectionModifiers = ["Up", "Down", "Left", "Right", "Home", "End", "PageUp", "PageDown", "U+0020", "Enter"];
+			]]></d:resource>
+
+			<d:method name="resetRangeAnchor">
+				
+				<d:body type="text/javascript"><![CDATA[
+					this.__rangeAnchor = null;
+					this.__prevSelectedRange = null;
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="construct" type="text/javascript"><![CDATA[
+				if (!bb.instanceOf(this, btl.namespaceURI, "UIControl")) {
+					bb.command.trace(this, "userSelect behavior was applied to the element that does not implement UIControl class. This can lead to runtime errors in this object!", 3);
+				}
+			]]></d:handler>
+
+			<d:handler event="mousedown" type="text/javascript"><![CDATA[
+				// FIXME: refactor using viewHandlers
+				var oTarget = btl.userSelect.findTargetByClass(event.viewTarget, "btl-userSelect-item", this.viewNode);
+				// no target no work
+				if (!oTarget) {
+					return true;
+				}
+				// checking if we need to get anchor
+				if (event.shiftKey && !this.__rangeAnchor) {
+					this.__rangeAnchor = this.execUIQuery("get_focused_item_view");
+				} else if (!event.shiftKey) {
+					// clearing the anchor if this is not SHIFT mouse down
+					this.resetRangeAnchor();
+				}
+				// getting command to execute (default is clear_and_select_item)
+				var sCommand = "clear_and_select_item";
+				// getting CTRL modifier
+				var ctrlKey = event.ctrlKey || event.metaKey;
+				// checking if we need to change the command
+				if (event.shiftKey && this.__rangeAnchor) {
+					// this is range selection command
+					sCommand = this.__prevSelectedRange ? "replace_items_range" :
+							   ((ctrlKey ? "" : "clear_and_") + "select_items_range");
+				} else if (ctrlKey) {
+					// this is toggling command
+					sCommand = "toggle_item_selection";
+				}
+				// iTartget will always be the first element for mouse event
+				var aArguments = [oTarget];
+
+				// forming command arguments and doing command specific actions
+				switch(sCommand) {
+					case "clear_and_select_items_range":
+					case "select_items_range":
+						aArguments[1] = aArguments[0]
+						aArguments[0] = this.__rangeAnchor;
+						// saving this range
+						this.__prevSelectedRange = [aArguments[0], aArguments[1]];
+						break;
+
+					case "replace_items_range":
+						aArguments[0] = this.__prevSelectedRange;
+						aArguments[1] = [this.__rangeAnchor, oTarget];
+						this.__prevSelectedRange = [this.__rangeAnchor, oTarget];
+						break;
+				}
+
+				// executing commands
+
+				// moving focus
+				this.execUICommand("move_focus_to", [oTarget]);
+				// making selection
+				this.execUICommand(sCommand, aArguments);
+			]]></d:handler>
+
+			<d:handler event="keydown" type="text/javascript"><![CDATA[
+				// getting the key
+				var sKey = event.keyIdentifier;
+				// trying to get the focus modifier array
+				var aFocusModifier = btl.userSelect.focusModifiers[sKey];
+				// boolean pointing if this key modifies selection
+				var bSelectionModifier = bb.array.indexOf(btl.userSelect.selectionModifiers, sKey) != -1;
+				// getting CTRL key
+				var ctrlKey = event.metaKey || event.ctrlKey;
+				// command variable and its default value
+				var sCommand = (ctrlKey ? "" : "clear_and_") + "select_item",	aArguments = [];
+				// currently focused item, used to determine the range selection
+				var oFocusedItem = this.execUIQuery("get_focused_item_view");
+
+				// checking if this is the first SHIFT to set the anchor
+				if (event.shiftKey) {
+					this.__rangeAnchor = this.__rangeAnchor || oFocusedItem;
+				} else {
+					// otherwise reseting the anchor
+					this.resetRangeAnchor();
+				}
+
+				// first we try to move focus if needed
+				if (aFocusModifier) {
+					this.execUICommand("move_focus_for", aFocusModifier);
+				}
+
+				// trying to select if needed
+				if (bSelectionModifier) {
+					// Space or Enter
+					if (sKey == "U+0020" || sKey == "Enter") {
+						// default behavior is clear_and_select_item
+						sCommand = "clear_and_select_item";
+						// with CTRL key or on MAC OSX you either add item to selection or toggle its state
+						if (navigator.platform.indexOf('Mac') != -1 || ctrlKey) {
+							sCommand = (sKey == "Enter") ? "select_item" : "toggle_item_selection";
+						}
+						// executing command
+						this.execUICommand(sCommand, [oFocusedItem]);
+					} else if (!ctrlKey || event.shiftKey) { // other modifiers without CTRL pressed or with CTRL + SHIFT pressed
+						// in any case focused item will be the first argument and for actions without SHIFT pressed it will be the only
+						aArguments[0] = this.execUIQuery("get_focused_item_view");
+						// is this first range selection
+						if (event.shiftKey && !this.__prevSelectedRange) {
+							// the range anchor will be used as a range start
+							aArguments[1] = aArguments[0];
+							aArguments[0] = this.__rangeAnchor;
+							// modifying the command to work with range
+							sCommand += "s_range";
+							// saving this range to be able to remove it when user continues holding SHIFT
+							this.__prevSelectedRange = [aArguments[0], aArguments[1]];
+						} else if (event.shiftKey) {
+							// if its not the first range selection with this anchor the command will be this
+							sCommand = "replace_items_range";
+							// forming arguments (range to replace and range to replace with)
+							aArguments = [
+								[this.__prevSelectedRange[0], this.__prevSelectedRange[1]],
+								[this.__rangeAnchor, aArguments[0]]
+							];
+							// saving this range to be able to remove it when user continues holding SHIFT
+							this.__prevSelectedRange = [aArguments[1][0], aArguments[1][1]];
+						} else if (this.__prevSelectedRange) {
+							// if it's not an action with SHIFT key pressed resetting the property
+							this.__prevSelectedRange = null;
+						}
+						// executing command
+						this.execUICommand(sCommand, aArguments);
+					}
+					event.preventDefault();
+				}
+			]]></d:handler>
+		</d:behavior>
+
+		<d:behavior name="userEdit">
+			<d:resource type="text/javascript"><![CDATA[
+				btl.userEdit = {};
+
+				// reference to the curently edited item view
+				btl.userEdit._editedItemView = null;
+
+				// reference to edited element (controller object)
+				btl.userEdit._editedElement = null;
+
+				/**
+				 * Handler for the document mouse down to confirm editing.
+				 * @param oEvent {object} - mouse down event object.
+				 */
+				btl.userEdit.documentMouseDown = function(oEvent) {
+					var oContr = btl.userEdit._editedElement;
+					if (!oContr) {
+						return true;
+					}
+					if (oContr.execUIQuery("is_edited_item", [oEvent.target, oEvent.viewTarget])) {
+						return true;
+					}
+					// not an edited item, so exiting edit mode with confirmation
+					oContr.execUICommand("confirm_edit");
+				};
+
+				// adding listener to the document
+				bb.document.addEventListener("mousedown", btl.userEdit.documentMouseDown, true);
+			]]></d:resource>
+
+			<d:handler event="construct" type="text/javascript"><![CDATA[
+				if (!bb.instanceOf(this, btl.namespaceURI, "UIControl")) {
+					bb.command.trace(this, "userEdit behavior was applied to the element that does not implements UIControl class. This can lead to runtime errors in this object!", 3);
+				}
+			]]></d:handler>
+
+			<d:handler event="keydown" type="text/javascript"><![CDATA[
+				var bEdited = this.execUIQuery("is_edited");
+				var oFocusedItem = this.execUIQuery("get_focused_item_view");
+				var sKey = event.keyIdentifier;
+				switch (true) {
+					// if not in edit mode Enter and F2 triger edit mode
+					case Boolean(!bEdited && (sKey == "Enter" || sKey == "F2")):
+						this.execUICommand("start_edit", [oFocusedItem]);
+						break;
+
+					case Boolean(bEdited && (sKey == "Enter" || sKey == "U+001B")):
+						this.execUICommand((sKey == "Enter" ? "confirm" : "cancel") + "_edit");
+						break;
+				}
+			]]></d:handler>
+
+			<d:handler event="dblclick" type="text/javascript"><![CDATA[
+				var oToFocus = btl.userSelect.findTargetByClass(event.viewTarget, "btl-userEdit-focusable", this.viewNode);
+				var oTarget = btl.userSelect.findTargetByClass(oToFocus || event.viewTarget, "btl-userEdit-item", this.viewNode);
+				var bEdited = this.execUIQuery("is_edited");
+				if (oTarget && !bEdited) {
+					this.execUICommand("start_edit", [oTarget, oToFocus]);
+				} else if (oTarget && oTarget != btl.userEdit._editedItemView) {
+					this.execUICommand("confirm_edit");
+					this.execUICommand("start_edit", [oTarget, oToFocus]);
+				}
+			]]></d:handler>
+
+			<!-- I don't like this, but have no other solution for this kind of problem. Someone may call
+				 startEdit, confirmEdit or cancelEdit methods directly and to proceed mouse down closing
+				 for this cases behavior should be informed about that. -->
+			<d:handler event="editStart" type="text/javascript"><![CDATA[
+				btl.userEdit._editedElement = this;
+			]]></d:handler>
+
+			<d:handler event="editConfirm" type="text/javascript"><![CDATA[
+				btl.userEdit._editedElement = null;
+			]]></d:handler>
+
+			<d:handler event="editCancel" type="text/javascript"><![CDATA[
+				btl.userEdit._editedElement = null;
+			]]></d:handler>
+		</d:behavior>
+	</d:namespace>
+</d:tdl>

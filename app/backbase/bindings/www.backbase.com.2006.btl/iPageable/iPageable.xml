@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:interface name="iPageable">
+			
+
+			<d:property name="page">
+				
+			</d:property>
+
+			<d:property name="totalPages">
+				
+			</d:property>
+
+			<d:method name="goTo">
+				
+				<d:argument name="page">
+					
+				</d:argument>
+			</d:method>
+
+			<d:method name="goNext">
+				
+			</d:method>
+
+			<d:method name="goPrevious">
+				
+			</d:method>
+		</d:interface>
+	</d:namespace>
+</d:tdl>

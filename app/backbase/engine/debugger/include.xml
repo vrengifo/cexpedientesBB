@@ -1,0 +1,238 @@
+<e:fragment xmlns="http://www.w3.org/1999/xhtml" xmlns:cmd="http://www.backbase.com/2006/command" xmlns:e="http://www.backbase.com/2006/xel" xmlns:b="http://www.backbase.com/2006/btl" xmlns:t="http://www.backbase.com/2007/debugger">
+	<b:stretch>
+		<b:tabBox height="100%">
+			<b:tab label="Console" category="console" e:behavior="t:tab">
+				<b:toolBar>
+					<b:toolBarButton e:onclick="bb.tooling.console.clear()">
+						Clear
+					</b:toolBarButton>
+				</b:toolBar>
+				<b:stretch>
+					<t:console />
+				</b:stretch>
+			</b:tab>
+			<b:tab label="Model" category="model" e:behavior="t:tab">
+				<b:toolBar>
+					<b:toolBarSwitch e:behavior="t:treeInspect" icon="bb-debugger-inspect-icon">Inspect</b:toolBarSwitch>
+				</b:toolBar>
+				<b:stretch>
+					<b:panelSet columns="50% 50%" splitter="true">
+						<b:panel class="btl-border-right">
+							<t:modelTree />
+						</b:panel>
+						<b:panel class="btl-border-left">
+							<b:tabBox height="100%">
+								<b:tab label="DOM Node" subCategory="dom" e:behavior="t:tab">
+									<t:controllerNode />
+								</b:tab>
+								<b:tab label="Layout" subCategory="layout" e:behavior="t:tab">
+									<t:position />
+								</b:tab>
+								<b:tab label="Computed style" subCategory="style" e:behavior="t:tab">
+									<t:computedStyle />
+								</b:tab>
+							</b:tabBox>
+						</b:panel>
+					</b:panelSet>
+				</b:stretch>
+			</b:tab>
+			<b:tab label="View" category="view" e:behavior="t:tab">
+				<b:toolBar>
+					<b:toolBarSwitch e:behavior="t:treeInspect" icon="bb-debugger-inspect-icon">Inspect</b:toolBarSwitch>
+				</b:toolBar>
+				<b:stretch>
+					<b:panelSet columns="50% 50%" splitter="true">
+						<b:panel class="btl-border-right">
+							<t:viewTree />
+						</b:panel>
+						<b:panel class="btl-border-left">
+							<b:tabBox height="100%">
+								<b:tab label="DOM Node" subCategory="dom" e:behavior="t:tab">
+									<t:viewNode />
+								</b:tab>
+								<b:tab label="Layout" subCategory="layout" e:behavior="t:tab">
+									<t:position />
+								</b:tab>
+								<b:tab label="Computed style" subCategory="style" e:behavior="t:tab">
+									<t:computedStyle />
+								</b:tab>
+							</b:tabBox>
+						</b:panel>
+					</b:panelSet>
+				</b:stretch>
+			</b:tab>
+			<b:tab label="TDL" category="tdl" e:behavior="t:tab">
+				<b:toolBar>
+					<b:toolBarItem>
+						Color Legenda:
+						<span style="font-weight:bold;color: gray;">Abstract </span>
+						<span style="font-weight:bold;">Concrete </span>
+						<span style="font-weight:bold;color: green;">Interface </span>
+						<span style="font-weight:bold;color: blue;">Behavior </span>
+					</b:toolBarItem>
+				</b:toolBar>
+				<b:stretch>
+					<b:panelSet columns="50% 50%" splitter="true">
+						<b:panel class="btl-border-right">
+							<t:tdlNamespaces />
+						</b:panel>
+						<b:panel class="btl-border-left">
+							<t:controllerNode />
+						</b:panel>
+					</b:panelSet>
+				</b:stretch>
+			</b:tab>
+			<b:tab label="Network" category="net" e:behavior="t:tab">
+				<b:toolBar>
+					<b:toolBarButton e:onclick="bb.tooling.net.logger.clear()">
+						Clear
+					</b:toolBarButton>
+				</b:toolBar>
+				<b:stretch>
+					<t:netInspector />
+				</b:stretch>
+			</b:tab>
+			<b:tab label="Reports" category="reports" e:behavior="t:tab">
+				<b:toolBar>
+					<b:toolBarButton e:onclick="bb.document.getElementById('reportContainer').refresh()">
+						Refresh
+					</b:toolBarButton>
+				</b:toolBar>
+				<b:stretch>
+					<b:panelSet columns="200px *" splitter="true">
+						<b:panel class="btl-border-right">
+							<xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="reports/index.xml" />
+						</b:panel>
+						<b:panel class="btl-border-left">
+							<t:reportsViewer id="reportViewer" />
+						</b:panel>
+					</b:panelSet>
+				</b:stretch>
+			</b:tab>
+			<b:tab label="Preferences" category="prefs" e:behavior="t:tab" padding="5px">
+
+				<b class="bb-debugger-help-title">Generic settings</b>
+				<p>
+					<label style="margin:0px;" for="bb-debugger-startup"><input type="checkbox" id="bb-debugger-startup" style="height:16px;margin:0px;verxtical-align:middle;">
+						<e:handler event="construct" type="application/javascript">
+							this.setAttribute('checked',  bb.tooling.data.preferences.loadOnStartup ? 'checked' : '');
+						</e:handler>
+						<e:handler event="change" type="application/javascript">
+							bb.tooling.data.preferences.loadOnStartup = this.getProperty('checked');
+						</e:handler>
+					</input> Automatically load the debugger at startup</label><br />
+					<label style="margin:0px;" for="bb-debugger-exception"><input type="checkbox" id="bb-debugger-exception" style="height:16px;margin:0px;verxtical-align:middle;">
+						<e:handler event="construct" type="application/javascript">
+							this.setAttribute('checked',  bb.tooling.data.preferences.loadOnException ? 'checked' : '');
+						</e:handler>
+						<e:handler event="change" type="application/javascript">
+							bb.tooling.data.preferences.loadOnException = this.getProperty('checked');
+						</e:handler>
+					</input> Automatically open the debugger on exception</label><br />
+					<label style="margin:0px;" for="bb-debugger-loadinside"><input type="checkbox" id="bb-debugger-loadinside" style="height:16px;margin:0px;verxtical-align:middle;">
+						<e:handler event="construct" type="application/javascript">
+							this.setAttribute('checked',  bb.tooling.data.preferences.loadInside == 'popup' ? 'checked' : '');
+						</e:handler>
+						<e:handler event="change" type="application/javascript">
+							bb.tooling.data.preferences.loadInside = this.getProperty('checked') ? 'popup' : 'backbase';
+						</e:handler>
+					</input> Load the debugger inside a Browser pop-up window</label><br />
+				</p><br />
+
+
+				<b class="bb-debugger-help-title">Console settings</b>
+				<p>
+					<label style="margin:0px;" for="bb-debugger-console"><input type="checkbox" id="bb-debugger-console" style="height:16px;margin:0px;verxtical-align:middle;">
+						<e:handler event="construct" type="application/javascript">
+							this.setAttribute('checked',  bb.tooling.data.preferences.useConsole ? 'checked' : '');
+						</e:handler>
+						<e:handler event="change" type="application/javascript">
+							bb.tooling.data.preferences.useConsole = this.getProperty('checked');
+						</e:handler>
+					</input> Use the global <code>console</code> variable also (overwrite the possible other implementations)</label><br />
+				</p><br />
+
+
+				<b class="bb-debugger-help-title">Model settings</b>
+				<p>
+					<label style="margin:0px;" for="bb-debugger-modelShowExt"><input type="checkbox" id="bb-debugger-modelShowExt" style="height:16px;margin:0px;verxtical-align:middle;">
+						<e:handler event="construct" type="application/javascript">
+							this.setAttribute('checked',  bb.tooling.data.preferences.modelShowExt ? 'checked' : '');
+						</e:handler>
+						<e:handler event="change" type="application/javascript">
+							 bb.tooling.data.preferences.modelShowExt = this.getProperty('checked');
+						</e:handler>
+					</input> Show Inherited Attributes / Properties / Methods in DOM Tab</label><br />
+					<label style="margin:0px;" for="bb-debugger-modelShowCore"><input type="checkbox" id="bb-debugger-modelShowCore" style="height:16px;margin:0px;verxtical-align:middle;">
+						<e:handler event="construct" type="application/javascript">
+							this.setAttribute('checked', bb.tooling.data.preferences.modelShowCore ? 'checked' : '');
+						</e:handler>
+						<e:handler event="change" type="application/javascript">
+							 bb.tooling.data.preferences.modelShowCore = this.getProperty('checked');
+						</e:handler>
+					</input> Show Base Node Attributes / Properties / Methods in DOM Tab</label><br />
+				</p><br />
+				<b class="bb-debugger-help-title">TDL settings</b>
+				<p>
+					<label style="margin:0px;" for="bb-debugger-tdlShowExt"><input type="checkbox" id="bb-debugger-tdlShowExt" style="height:16px;margin:0px;verxtical-align:middle;">
+						<e:handler event="construct" type="application/javascript">
+							this.setAttribute('checked', bb.tooling.data.preferences.tdlShowExt ? 'checked' : '');
+						</e:handler>
+						<e:handler event="change" type="application/javascript">
+							 bb.tooling.data.preferences.tdlShowExt = this.getProperty('checked');
+						</e:handler>
+					</input> Show Inherited Attributes / Properties / Methods</label><br />
+
+					<label style="margin:0px;" for="bb-debugger-tdlShowCore"><input type="checkbox" id="bb-debugger-tdlShowCore" style="height:16px;margin:0px;verxtical-align:middle;">
+						<e:handler event="construct" type="application/javascript">
+							this.setAttribute('checked', bb.tooling.data.preferences.tdlShowCore ? 'checked' : '');
+						</e:handler>
+						<e:handler event="change" type="application/javascript">
+							 bb.tooling.data.preferences.tdlShowCore = this.getProperty('checked');
+						</e:handler>
+					</input> Show Base Node Attributes / Properties / Methods</label><br />
+				</p>
+			</b:tab>
+			<b:tab label="Help" category="help" e:behavior="t:tab" padding="5px">
+
+				<b class="bb-debugger-help-title">Backbase Debugger Tool:</b>
+				<p>This debugger tool is designed to help you debug your Backbase Client Edition application.</p>
+
+				<b class="bb-debugger-help-title">Reference Information:</b>
+				<p>The Client Edition provides API Reference information. This information, as well as the Basic Concepts Guide, are located in the <b>/documentation</b> directory of the Client Edition.</p>
+
+				<b class="bb-debugger-help-title">Available Tools:</b>
+				<ul>
+					<li><b>Console</b> - Allows you to write and evaluate JavaScript expressions.</li>
+					<li><b>Model</b> - Presents a collapsible and clickable view of the Model DOM tree.</li>
+					<li><b>View</b> - Presents a collapsible and clickable view of the View DOM tree.</li>
+					<li><b>TDL</b> - Presents a collapsible and clickable view of registered namespaces.</li>
+					<li><b>Network</b> - Presents a list of files transferred with XMLHttpRequest.</li>
+					<li><b>Reports</b> - Provides system information and a summary of elements in both the model space and the view space.</li>
+					<li><b>Preferences</b> - Change different settings like "Load debugger on application startup".</li>
+					<li><b>Help</b> - This welcome screen.</li>
+				</ul>
+				<b class="bb-debugger-help-title">Feedback:</b>
+				<p>We appreciate your feedback, as it helps us to improve the Backbase Client Edition. Please provide your feedback on the <a href="http://bdn.backbase.com/forum">BDN Forum</a>.</p>
+			</b:tab>
+		</b:tabBox>
+	</b:stretch>
+	<!--  -->
+	<b:toolBar>
+		<b:toolBarButton title="Click to toggle single/multiline editing mode">
+			<e:handler event="click" type="text/javascript">
+				var oConsole	= this.getProperty('ownerDocument').getElementById('consoleEdit'),
+					oButton		= this.getProperty("firstChild").viewNode;
+				oConsole.setProperty("multiline", !oConsole.getProperty("multiline"));
+				if (oConsole.getProperty("multiline"))
+					bb.html.addClass(oButton, "bb-debugger-console-mode-multi");
+				else
+					bb.html.removeClass(oButton, "bb-debugger-console-mode-multi");
+			</e:handler>
+			<div class="bb-debugger-console-mode" />
+		</b:toolBarButton>
+		<b:toolBarButton e:onclick="this.getProperty('ownerDocument').getElementById('consoleEdit').run()">Run</b:toolBarButton>
+		<b:toolBarButton e:onclick="this.getProperty('ownerDocument').getElementById('consoleEdit').clear()">Clear</b:toolBarButton>
+	</b:toolBar>
+	<t:consoleEdit id="consoleEdit"/>
+</e:fragment>

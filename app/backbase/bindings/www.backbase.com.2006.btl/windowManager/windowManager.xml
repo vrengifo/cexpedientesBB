@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+		<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="element" src="../element/element.xml"/>
+
+		<d:resource type="text/javascript"><![CDATA[btl.windowManager = {};
+
+//================================== window manager =========================
+/*
+	Sets a new window area for the windowManager
+	oController - windowManager
+*/
+btl.windowManager.getItem = function btl_windowManager_getItem(oController, oWindow){
+	for(var i = oController.__items.length - 1; i >= 0; i--){
+		if(oController.__items[i]._._window == oWindow){
+			oController.__items[i]._._index = i;
+			return oController.__items[i];
+		}
+	}
+	return null;
+}
+/*
+	Adds a window or array of windows to a window manager
+*/
+btl.windowManager.addWindows = function btl_windowManager_addWindows(oController, oWindow){
+	 var aWindows = oWindow instanceof Array ? oWindow : [oWindow];
+	 for(var i = 0, l = aWindows.length; i < l; i++){
+		 oController.addItem(aWindows[i]);
+	 }
+}
+/*
+	Removes a window or array of windows from a window manager
+*/
+btl.windowManager.removeWindows = function btl_windowManager_removeWindows(oController, oWindow){
+	 var aWindows = oWindow instanceof Array ? oWindow : [oWindow];
+	 for(var i = 0, l = aWindows.length; i < l; i++){
+		 oController.removeItem(oController.getItem(aWindows[i]));
+	 }
+}
+/*
+
+*/
+btl.windowManager.windowEventHandler = function btl_windowManager_windowEventHandler(oController, oEvent){
+	// oController, oEvent.target - windowManager
+	// oEvent.oWindowArea   - windowArea
+	// oEvent.oWindow       - window
+	var oWindow = oEvent.oWindow;
+	//setTimeout is used to reduce stack usage for Safari
+
+	if(oEvent.sAction == 'add')
+		btl.windowManager.addWindows(oController, oWindow);
+	else if(oEvent.sAction == 'remove'){
+		btl.windowManager.removeWindows(oController, oWindow)
+	} else if(oEvent.sAction == 'change')
+		setTimeout(function(){oController.getItem(oWindow).updateWindow()}, 1);
+	else if(oEvent.sAction == 'activate')
+		oController.setProperty('activeItem', this.getItem(oController, oWindow));
+}]]></d:resource>
+
+		<d:element name="windowManager" extends="b:element" abstract="true">
+			
+
+			<d:attribute name="windowArea" default="..">
+				
+				<!-- Does not have a mapper, initialization is done in the DOMNodeInsertedIntoDocument event -->
+				<d:changer type="text/javascript"><![CDATA[
+					var sXpath = this.getAttribute('windowArea');
+					var oElm = null;
+					if (sXpath) {
+						oElm = bb.evaluateSmart(sXpath, this, this);
+					}
+					this.setProperty('windowArea', oElm);
+				]]></d:changer>
+			</d:attribute>
+
+			<d:property name="windowArea">
+				
+				<!-- The getter is not required to get the value from the attribute and return the element
+				     that is queried. It can not be accessed when the element is not in the document.
+				     When the element is insterted into the document, the property will be stored, so it will be
+				     available with the correct value. The only reason for a getter is that it should return
+				     null when nothing is set (also before the element is insterted into the document  -->
+				<d:getter type="text/javascript"><![CDATA[
+					var oWindowArea = this._._windowArea;
+					if (!oWindowArea || !oWindowArea._) {
+						return (this._._windowArea = null);
+					}
+					return oWindowArea;
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					var bWindowArea = Boolean(value && value.instanceOf('http://www.backbase.com/2006/btl', 'windowArea'));
+
+					if (this._._windowArea && (bWindowArea || value == null)) {
+						// unregister and clear
+						this._._windowArea.removeWindowManager(this);
+						this.clear();
+						this._._windowArea = null;
+					}
+
+					if (bWindowArea) {
+						// register and initialize
+						this._._windowArea = value;
+						value.addWindowManager(this);
+						this.init();
+
+					} else if (value != null) {
+						// warning
+						var sWarning = 'An invalid value for the ' + name + ' property was set: ' + value + '.';
+						sWarning += ' Make sure a valid http://www.backbase.com/2006/btl#windowArea is set.';
+						bb.command.trace(this, sWarning);
+					}
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="activeItem">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					if(this._['_windowArea'] && value && !value._['_removed'] && (value != this._['_activeItem'])){
+						value.setProperty('active', true);
+					}else if(this._['_activeItem']){
+						this._['_activeItem'].setProperty('active', false);
+						this._['_activeItem'] = null;
+					}
+				]]></d:setter>
+			</d:property>
+
+			<d:method name="paint">
+				
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:method name="addItem">
+				
+				<d:argument name="oWindow">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					var oItem = this.createItem();
+					bb.html.disableUserSelect(oItem.viewNode);
+
+					oItem.setProperty('window', oWindow);
+					oItem.setProperty('name', oWindow.getProperty('label'));
+					oItem.setProperty('previousActive', null);
+					oItem.setProperty('nextActive', null);
+					this.appendChild(oItem); // !important, set active state after appenChild call
+					oItem.setProperty('active', this._['_windowArea'].getProperty('activeWindow') == oWindow);
+					oItem._['_index'] = this.__items.length;
+					this.__items[ oItem._['_index']] = oItem;
+					return oItem;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="createItem">
+				
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:method name="removeItem">
+				
+				<d:argument name="item"/>
+				<d:body type="text/javascript"><![CDATA[
+					//BUGFIX: added extra checks for presence of "_" property in the node object.
+					//This is due to the thing that engine, when destroying node, destroys its
+					//properties. So when we close a window, we have a reference to the node
+					//that does not contain any properties and get an error here without these extra checks.
+					if(item._._previousActive && item._._previousActive._)
+						item._._previousActive._._nextActive = (item._._nextActive != item._._previousActive ? item._._nextActive : null);
+
+					if(item._._nextActive && item._._nextActive._)
+						item._._nextActive._._previousActive = (item._._nextActive != item._._previousActive ? item._._previousActive : null);
+
+					item._._removed = true;
+					if(this._['_activeItem']) {
+						this.setProperty('activeItem', null);
+						if(item._._previousActive && item._._previousActive._ && !item._._previousActive._._window.getProperty('minimized'))
+								this.setProperty('activeItem', item._._previousActive);
+					}
+					bb.callMethod(this, 'removeChild', this.__items.splice(item.getProperty('index'), 1));
+					bb.destruct(item);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="getItem">
+				
+				<d:argument name="window"/>
+				<d:body type="text/javascript"><![CDATA[
+					return btl.windowManager.getItem(this, window);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="init">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var oWindowArea = this.getProperty('windowArea');
+					if (oWindowArea) {
+						var aWindows = oWindowArea.getProperty('windows');
+						var aOpenWindows = [];
+
+						for (var i = 0, iMax = aWindows.length; iMax > i; i++){
+							if (aWindows[i].getProperty('open'))
+								aOpenWindows[aOpenWindows.length] = aWindows[i];
+						}
+						btl.windowManager.addWindows(this, aOpenWindows);
+						this.paint();
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="clear">
+				
+				<d:body type="text/javascript"><![CDATA[
+					this.setProperty('activeItem', null);
+					if(this.__items)
+						for(var i = this.__items.length - 1; i >= 0; i--)
+							bb.callMethod(this, 'removeItem', [this.__items[i]]);
+				]]></d:body>
+			</d:method>
+
+			<d:destructor type="text/javascript"><![CDATA[
+				/* unregister from the windowArea when the windowManager is destroyed */
+				var oWindowArea = this.getProperty('windowArea');
+				if (oWindowArea) {
+					oWindowArea.removeWindowManager(this);
+				}
+			]]></d:destructor>
+
+			<d:handler event="windowChanged" type="text/javascript"><![CDATA[
+				btl.windowManager.windowEventHandler(this, event);
+			]]></d:handler>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				/* Check if a windowArea has been set already. This is possible by setting the property after
+				the element has been created and before the element is added to the document. */
+				if (!this.getProperty('windowArea')) {
+					var sXpath = this.getAttribute('windowArea');
+					var oElm = null;
+					if (sXpath) {
+						oElm = bb.evaluateSmart(sXpath, this, this);
+					}
+					this.setProperty('windowArea', oElm);
+				}
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

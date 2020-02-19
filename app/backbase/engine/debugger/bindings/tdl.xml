@@ -1,0 +1,296 @@
+<d:namespace
+	xmlns:t="http://www.backbase.com/2007/debugger"
+	xmlns:e="http://www.backbase.com/2006/xel"
+	xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:d="http://www.backbase.com/2006/tdl"
+	name="http://www.backbase.com/2007/debugger">
+
+	<d:element name="controllerNode" extends="t:baseDebuggerInspector" implements="t:iViewSubCategory t:iViewCategory">
+		<d:template type="application/xhtml+xml">
+			<table class="bb-grid" cellpadding="0" cellspacing="0" border="0">
+				<tbody></tbody>
+				<tbody></tbody>
+				<tbody></tbody>
+				<tbody></tbody>
+				<tbody></tbody>
+				<tbody></tbody>
+				<d:content />
+			</table>
+		</d:template>
+
+		<d:method name="update">
+			<d:argument name="controller" />
+			<d:body type="text/javascript"><![CDATA[
+
+				var sViewCat = this.getProperty('viewCategory');
+				var bShowCore = !bb.tooling.data.preferences[sViewCat+'ShowCore'];
+				var bShowExt = !bb.tooling.data.preferences[sViewCat+'ShowExt'];
+				var oTbodies = this.viewNode.tBodies;
+				var oClass = controller ? bb.tooling.window.bb.tdl.object.getDetails(controller).classObject : null;
+
+				var aAppenders = [
+					bb.tooling.tdl.getAttributesTree(controller, oClass, bShowCore, bShowExt),
+					bb.tooling.tdl.getPropertiesTree(controller, oClass, bShowCore, bShowExt),
+					bb.tooling.tdl.getMethodsTree(controller, oClass, bShowCore, bShowExt)
+				];
+
+				if(sViewCat != 'tdl'){
+					aAppenders.push( bb.tooling.xel.getBehaviorsTree(controller) );
+				}
+
+				aAppenders.push( bb.tooling.tdl.getHandlersTree(controller, oClass, bShowCore, bShowExt) );
+
+				if(sViewCat != 'tdl'){
+					aAppenders.push( bb.tooling.xel.getHandlersTree(controller) );
+				}
+
+				for(var i = 0; i < aAppenders.length; i++) {
+					oTbodies[i].appendChild(aAppenders[i]);
+					if(oTbodies[i].bOpen && oTbodies[i].firstChild)
+						Tdl_Toggle_GridItem( bb.selector.query(oTbodies[i], '.bb-grid-icon') );
+				}
+			]]></d:body>
+		</d:method>
+
+		<d:method name="cleanUpdate">
+			<d:argument name="controller" />
+			<d:body type="text/javascript"><![CDATA[
+				var i = 0, oTbody;
+				while(oTbody = this.viewNode.tBodies[i++]){
+					//Store open state
+					oTbody.bOpen = bb.selector.query(oTbody, '.bb-grid-icon-open') ? true : false;
+
+					//Clean item
+					while(oTbody.lastChild)
+						oTbody.removeChild(oTbody.lastChild);
+				}
+				//Call update
+				this.update(controller);
+			]]></d:body>
+		</d:method>
+
+		<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+			var i = 0, oTbody;
+			while(oTbody = this.viewNode.tBodies[i++])
+				oTbody.bOpen = true;
+
+			this.update();
+
+			var oThis = this;
+			bb.tooling.root.addEventListener('tree-select',function(event){ if( !oThis.getProperty('disabled') ) { oThis.cleanUpdate(event.treeTarget); } }, false);
+		]]></d:handler>
+
+
+		<d:property name="viewSubCategory" onget="return 'dom';" />
+
+		<d:property name="viewCategory" onget="return bb.evaluateSmart('string(ancestor::b:tab/@category)', this, bb.tooling.nsResolver);" />
+
+
+		<d:property name="disabled">
+			<d:setter type="text/javascript"><![CDATA[
+				if(this._['_'+name] != value){
+					if(value == false && bb.tooling.currentTree){
+						var selected = bb.getProperty(bb.tooling.currentTree, 'selectedNode');
+						if(selected && this.getProperty('viewCategory') != 'tdl')
+							this.cleanUpdate(bb.tooling.window.bb.getControllerFromModel(selected));
+						else
+							this.cleanUpdate();
+					}
+					this._['_'+name] = value;
+				}
+			]]></d:setter>
+		</d:property>
+	</d:element>
+
+	<d:element name="viewNode" extends="t:baseDebuggerInspector" implements="t:iViewSubCategory t:iViewCategory">
+
+		<d:template type="application/xhtml+xml">
+			<table class="bb-grid" cellpadding="0" cellspacing="0" border="0">
+				<tbody><d:content xmlns="http://www.backbase.com/2006/tdl" /></tbody>
+			</table>
+		</d:template>
+
+		<d:method name="cleanUpdate">
+			<d:argument name="controller" />
+			<d:body type="text/javascript"><![CDATA[
+
+				//Clean item
+				while(this.viewGate.lastChild)
+					this.viewGate.removeChild(this.viewGate.lastChild);
+
+				//Call update
+				this.update(controller);
+
+			]]></d:body>
+		</d:method>
+
+		<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+			var oThis = this;
+			bb.tooling.root.addEventListener('tree-select',function(event){ if( !oThis.getProperty('disabled') ) { oThis.cleanUpdate(event.treeViewTarget); } }, false);
+		]]></d:handler>
+
+
+
+		<d:method name="update">
+			<d:argument name="element" />
+			<d:body type="text/javascript"><![CDATA[
+				for(var i in element){
+					//if ( element.hasOwnProperty(i) ) {
+						try{
+							var oTr = createGridItem(i, element[i]);
+							this.viewGate.appendChild(oTr);
+						}catch(e){}
+					//}
+				}
+			]]></d:body>
+		</d:method>
+
+		<d:property name="viewSubCategory" onget="return 'dom';" />
+
+		<d:property name="viewCategory" onget="return 'view';" />
+
+		<d:property name="disabled">
+			<d:setter type="text/javascript"><![CDATA[
+				if(this._['_'+name] != value){
+					if(value == false && bb.tooling.currentTree){
+						var selected = bb.getProperty(bb.tooling.currentTree, 'selectedNode');
+						this.cleanUpdate(selected);
+					}
+				}
+				this._['_'+name] = value;
+			]]></d:setter>
+		</d:property>
+	</d:element>
+
+
+	<d:element name="tdlNamespaces" extends="t:baseDebuggerInspector" implements="t:iViewCategory">
+		<d:template type="application/xhtml+xml">
+			<table class="bb-grid" cellpadding="0" cellspacing="0" border="0">
+				<tbody><d:content xmlns="http://www.backbase.com/2006/tdl" /></tbody>
+			</table>
+		</d:template>
+
+		<d:method name="cleanUpdate">
+			<d:argument name="controller" />
+			<d:body type="text/javascript"><![CDATA[
+
+				//Clean item
+				while(this.viewGate.lastChild)
+					this.viewGate.removeChild(this.viewGate.lastChild);
+
+				//Call update
+				this.update(controller);
+
+			]]></d:body>
+		</d:method>
+
+		<d:method name="update">
+			<d:body type="text/javascript"><![CDATA[
+				var oNamespaces = bb.tooling.window.bb.tdl.getNamespaces();
+				for(var i = 0; i < oNamespaces.length; i++){
+					var oDetails = bb.tooling.window.bb.tdl.object.getDetails(oNamespaces[i]);
+
+					var oChildren = [];
+
+					var oElements = bb.tooling.window.bb.tdl.namespace.getElements(oNamespaces[i]), j = 0, oElm;
+					while(oElm = oElements[j++]) {
+						oChildren.push( new TDLNode(oElm) );
+					}
+					var oElements = bb.tooling.window.bb.tdl.namespace.getInterfaces(oNamespaces[i]), j = 0, oElm;
+					while(oElm = oElements[j++]) {
+						oChildren.push( new TDLNode(oElm) );
+					}
+
+					var oTr = createGridItem(null, new GenericGridItem(oDetails.name, 'boldText', '', oChildren));
+					this.viewGate.appendChild(oTr);
+				}
+			]]></d:body>
+		</d:method>
+
+		<d:property name="selectedNode">
+			<d:setter><![CDATA[
+				if (value && value.parentNode) {
+					bb.html.addClass(value.parentNode, 'bb-debugger-selected');
+				}
+				if (value != this._['_'+name] && this._['_'+name] && this._['_'+name].parentNode) {
+					bb.html.removeClass(this._['_'+name].parentNode, 'bb-debugger-selected');
+				}
+				this._['_'+name] = value;
+			]]></d:setter>
+		</d:property>
+
+		<d:method name="selectItem">
+			<d:argument name="node" />
+			<d:body type="application/javascript"><![CDATA[
+
+				var aTarget = node.getAttribute('target').split('#');
+				if(node.getAttribute('insidetdltree') == 'true'){
+					this.setProperty('selectedNode', node);
+
+				} else {
+					var oNamespace, aTargets = this.viewGate.childNodes, i = 0;
+					while(oNamespace = aTargets[i++]){
+						if((oNamespace.textContent || oNamespace.innerText) == aTarget[0])
+							break;
+					}
+					var oIcon = oNamespace.firstChild.firstChild.firstChild.firstChild;
+					if(!bb.html.hasClass(oIcon, 'bb-grid-icon-open'))
+						Tdl_Toggle_GridItem(oIcon);
+
+					while(oNamespace = oNamespace.nextSibling){
+						if((oNamespace.textContent || oNamespace.innerText) == aTarget[1]){
+							oIcon = oNamespace.firstChild.firstChild.firstChild.lastChild.firstChild;
+							this.setProperty('selectedNode', oIcon);
+							break;
+						}
+					}
+				}
+
+				var oNamespace = bb.tooling.window.bb.tdl.getNamespace(aTarget[0]);
+				var oNode = bb.tooling.window.bb.tdl.namespace.getElement(oNamespace, aTarget[1]);
+				if(!oNode) oNode = bb.tooling.window.bb.tdl.namespace.getInterface(oNamespace, aTarget[1]);
+
+				this.select(oNode);
+
+			]]></d:body>
+		</d:method>
+
+		<d:method name="select">
+			<d:argument name="treeNode" />
+			<d:body type="text/javascript"><![CDATA[
+				// dispatch tree-select event
+				var oEvent = bb.document.createEvent('Events');
+				oEvent.initEvent('tree-select', false, false);
+
+				oEvent.treeTarget = treeNode;
+
+				bb.tooling.root.dispatchEvent(oEvent);
+			]]></d:body>
+		</d:method>
+
+		<d:property name="disabled">
+			<d:setter type="text/javascript">
+				if(this._['_'+name] != value){
+					if(value == false){
+						this.cleanUpdate();
+					}
+					this._['_'+name] = value;
+				}
+			</d:setter>
+		</d:property>
+
+		<d:constructor type="text/javascript"><![CDATA[
+			bb.tooling[this.getProperty('viewCategory') + 'Tree'] = this;
+		]]></d:constructor>
+
+		<d:handler event="DOMNodeInsertedIntoDocument">
+			<e:call method="update" />
+		</d:handler>
+
+		<d:property name="viewCategory" onget="return 'tdl';" />
+
+	</d:element>
+
+
+
+</d:namespace>

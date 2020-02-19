@@ -1,0 +1,3 @@
+<reportContainer xmlns="http://www.backbase.com/2007/debugger" id="reportContainer">
+	<report label="System Information" url="nodeCount.js" />
+</reportContainer>

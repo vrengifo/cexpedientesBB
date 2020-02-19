@@ -1,0 +1,676 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="calendarBase" src="../calendarBase.xml"/>
+
+		<d:element name="calendar" extends="b:calendarBase">
+
+			<d:resource type="text/css"><![CDATA[.btl-calendar {
+	vertical-align: bottom;
+	background-color: Window;
+	width: 135px;
+	display: inline-block;
+}
+.btl-calendar-input {
+	width: 100%;
+	border-style: none;
+	padding: 0;
+	background-color: Window;
+}
+.btl-calendar-calendar {
+	width: 16em;
+	cursor: default;
+	background-color: Window;
+}
+.btl-calendar-goto-today {
+	text-decoration : none;
+	color: ButtonText;
+	padding: 2px 5px;
+	width: 100%;
+	cursor: pointer;
+}
+.btl-calendar-control {
+	position: relative;
+	overflow: hidden;
+	width: 100%;
+	background-color: ThreeDFace;
+	text-align: center;
+	padding: 5px 0;
+}
+.btl-calendar-button {
+	position: absolute;
+	top: 5px;
+	width: 15px;
+	height: 15px;
+	background-position: 0 0;
+	background-repeat: no-repeat;
+	overflow: hidden;
+	cursor: pointer;
+}
+.btl-calendar-button-pyear {
+	left: 5px;
+	background-image: url(media/icons.png);
+	background-position: 0 0;
+}
+.btl-calendar-button-pmonth {
+	left: 21px;
+	background-image: url(media/icons.png);
+	background-position: -15px 0;
+}
+.btl-calendar-button-nmonth {
+	right: 21px;
+	background-image: url(media/icons.png);
+	background-position: -30px 0;
+}
+.btl-calendar-button-nyear {
+	right: 5px;
+	background-image: url(media/icons.png);
+	background-position: -45px 0;
+}
+.btl-calendar-button-pyear-hover {
+	background-position: 0 -15px;
+}
+.btl-calendar-button-pmonth-hover {
+	background-position: -15px -15px;
+}
+.btl-calendar-button-nmonth-hover {
+	background-position: -30px -15px;
+}
+.btl-calendar-button-nyear-hover {
+	background-position: -45px -15px;
+}
+.btl-calendar-button-pyear-active {
+	background-position: 0 -30px;
+}
+.btl-calendar-button-pmonth-active {
+	background-position: -15px -30px;
+}
+.btl-calendar-button-nmonth-active {
+	background-position: -30px -30px;
+}
+.btl-calendar-button-nyear-active {
+	background-position: -45px -30px;
+}
+
+.btl-calendar-month,
+.btl-calendar-year {
+	display: inline;
+	text-align: center;
+	padding: 0 2px;
+}
+.btl-calendar-table {
+	table-layout: fixed;
+	width: 100%;
+}
+.btl-calendar-table td {
+	cursor: pointer;
+}
+.btl-calendar-today {
+	background-color: ActiveCaption;
+	color: CaptionText;
+	font-weight: bold;
+}
+.btl-calendar-restricted {
+	color: GrayText;
+	cursor: default;
+	font-weight: normal;
+}
+.btl-calendar-selected-day {
+	background-color: Highlight;
+	color: HighlightText;
+}
+.btl-calendar-calendar td,
+.btl-calendar-calendar th {
+	padding: 2px 4px;
+	text-align: center;
+	border-width: 0 0 1px 0;
+	border-style: none none solid none;
+	border-color: ButtonFace;
+}
+.focus .btl-calendar-selected-day {
+	border: 1px dotted WindowText;
+	padding: 1px 3px;
+}
+.btl-calendar-previousMonth,
+.btl-calendar-nextMonth {
+	background-color: InfoBackground;
+}
+.btl-disabled .btl-calendar-calendar,
+.btl-disabled .btl-calendar-table {
+	color: GrayText;
+}
+.btl-disabled .btl-calendar-today {
+	background-color: InactiveCaption;
+	color: InactiveCaptionText;
+}
+.btl-disabled .btl-calendar-button-pyear {
+	background-position: 0 -45px;
+}
+.btl-disabled .btl-calendar-button-pmonth {
+	background-position: -15px -45px;
+}
+.btl-disabled .btl-calendar-button-nmonth {
+	background-position: -30px -45px;
+}
+.btl-disabled .btl-calendar-button-nyear {
+	background-position: -45px -45px;
+}
+/* fixes */
+.btl-calendar,
+.btl-calendar *,
+.btl-calendar-calendar,
+.btl-calendar-calendar * {
+	box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	-khtml-box-sizing: border-box;
+}
+.ie .btl-calendar {
+	zoom: 1.0; /* needed to set opacity */
+}
+.ie .btl-calendar {
+	/* fix for not properly displaying inline(-block) */
+	display: inline;
+}
+.gecko .btl-calendar {
+	/* fix for not properly displaying inline(-block) */
+	display: -moz-inline-grid;
+}
+.btl-calendar-inline,
+.ie .btl-calendar-inline,
+.gecko .btl-calendar-inline {
+	/* Calendar with mode inline does not look correct in Firefox if display is inline, so for now
+	it stays block. */
+	display: block;
+}]]></d:resource>
+			<d:resource type="image/png" src="media/icons.png"/>
+
+			<d:template type="text/javascript">
+				this.calendar = new btl.calendar(this);
+
+				// The array of strings that will form the html fragment.
+				var aSource = [];
+				aSource.push('&lt;div class="btl-calendar"&gt;&lt;div class="btl-groove"&gt;&lt;div class="btl-groove-inner"&gt;&lt;input type="text" class="btl-calendar-input" ');
+
+				var value = this.getAttribute('value');
+				if (value)
+					aSource.push('value="' + value + '"');
+
+				aSource.push(' /&gt;&lt;/div&gt;&lt;/div&gt;');
+
+				if (this.getAttribute('mode') == 'inline')
+					aSource.push(this.getProperty('calendarSource') );
+
+				aSource.push('&lt;/div&gt;');
+
+				// Create the html fragment and return it.
+				var oLimbo = document.createElement('div');
+				oLimbo.innerHTML = aSource.join('');
+				var oRoot = oLimbo.firstChild;
+
+				var oInput = bb.selector.query(oRoot, 'input.btl-calendar-input');
+				oInput.onchange = btl.calendar.handleChange;
+
+				return [oRoot, oRoot];
+			</d:template>
+
+			<d:attribute name="opacity">
+				<d:mapper type="text/javascript"><![CDATA[
+					bb.html.setStyle(this.viewNode, name, value);
+					var oDropdown = this.getProperty('dropDownElement');
+					if (oDropdown) {
+						bb.html.setStyle(oDropdown, name, value);
+					}
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="mode">
+				<d:mapper type="text/javascript"><![CDATA[
+					switch (value) {
+						case 'inline':
+							bb.html.addClass(this.viewNode, 'btl-calendar-inline');
+							break;
+						default:
+							bb.html.removeClass(this.viewNode, 'btl-calendar-inline');
+					}
+				]]></d:mapper>
+			</d:attribute>
+
+			<!-- TODO: put in generic implementation or remove -->
+			<d:attribute name="width" onmap="if (value.match(/^\d*$/) ){ value += 'px'; }; this.viewNode.style.width = value;"/>
+
+			<d:attribute name="name" onmap="this.viewNode.getElementsByTagName('input')[0].name = value"/>
+
+			<d:property name="calendarSource">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					// The array of strings that will form the html fragment.
+					var aSource = [];
+
+					var aInfo = btl.calendar.getDaysInfo(this.calendar);
+
+					// Start the calendar.
+					aSource.push('<div class="btl-calendar-calendar btl-ridge">');
+
+					//start the calendar control
+					aSource.push('<div class="btl-calendar-control">');
+
+					//go to previous year button
+					aSource.push('<div class="btl-calendar-button btl-calendar-button-pyear"></div>');
+
+					//go to previous month button
+					aSource.push('<div class="btl-calendar-button btl-calendar-button-pmonth"></div>');
+
+					// Add localized month name.
+					aSource.push('<div class="btl-calendar-month">', this.calendar.locale.Months[this.calendar.oSelectedDate.getMonth()], '</div>');
+
+					// Add year in 4 digit format.
+					aSource.push('<div class="btl-calendar-year">', this.calendar.oSelectedDate.getFullYear(), '</div>');
+
+					// go to next month button
+					aSource.push('<div class="btl-calendar-button btl-calendar-button-nmonth"></div>');
+
+					//go to next year button
+					aSource.push('<div class="btl-calendar-button btl-calendar-button-nyear"></div>');
+
+					//end the calendar control
+					aSource.push('</div>');
+
+					//start the calendar table
+					aSource.push('<table cellspacing="0" cellpadding="0" border="0" class="btl-calendar-table"><thead><tr>');
+
+					var iDay;
+					for (var i = 7; i < 14; i++){
+						iDay = i + this.calendar.locale.StartDay;
+						if (iDay >= 14) {
+							iDay -= 7;
+						}
+						aSource.push('<th>', this.calendar.locale.Days[iDay], '</th>');
+					}
+					// Close the table head and open the table body.
+					aSource.push('</tr></thead><tbody>');
+
+					// Add table rows and cells with day numbers.
+					for (var i = 0; i < 6; i++){
+						aSource.push('<tr>');
+						for (var j = 0; j < 7; j++){
+							var iIndex = i * 7 + j;
+							aSource.push('<td class="btl-calendar-day ', aInfo[iIndex].sClass,
+										 aInfo[iIndex].bToday ? ' btl-chameleon-activeBackground btl-chameleon-activeText' : '',
+										 aInfo[iIndex].bSelected ? ' btl-chameleon-highlightBackground btl-chameleon-highlightText' : '',
+										 '">', aInfo[iIndex].iDay, '</td>');
+						}
+						aSource.push('</tr>');
+					}
+					// end the dates table and the calendar.
+					aSource.push('</tbody></table>');
+					aSource.push('<div class="btl-calendar-goto-today" '
+							, (btl.isTrueValue('showToday', this.getAttribute('showToday')) ? '' : 'style="display:none;"')
+							,' href="#today" onclick="return false">today: ' , btl.calendar.getFormattedValue( new Date(), this.getAttribute('format'), this.getAttribute('language')), '</div>');
+
+					aSource.push('</div>');
+
+					// Return the string.
+					return aSource.join('');
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="elmYearDisplay">
+				
+			</d:property>
+
+			<d:property name="elmMonthDisplay">
+				
+			</d:property>
+
+			<d:property name="elmDayDisplay">
+				
+			</d:property>
+
+			<!-- what does this actually do? -->
+			<d:method name="initialize">
+				
+				<d:body type="text/javascript"><![CDATA[
+					if (!this.__initialized) {
+						this._['_focusElement'] = this.viewNode.getElementsByTagName('input')[0];
+
+						// Render calendar if necessary and set the dropDownElement property.
+						if (this.getAttribute('mode') == 'inline'){
+							this.setProperty('calendarElement', this.viewNode.lastChild);
+							this._['_open'] = true;
+						} else {
+							var oLimbo = document.createElement('div');
+							oLimbo.innerHTML = this.getProperty('calendarSource');
+							this.setProperty('calendarElement', oLimbo.firstChild);
+							this.setProperty('dropDownElement', oLimbo.firstChild);
+						}
+						this._._initialValue = this.getAttribute('value'); //save the initial value for reset
+
+						// initialize element references
+						//workaround for IE 5.5 (what does it do?)
+						var calElem = this.getProperty('calendarElement');
+						var aDescendants = calElem.all || calElem.getElementsByTagName('*');
+
+						var sClass = null;
+						for (var i = 0; i < aDescendants.length; i++){
+							sClass = aDescendants[i].className;
+							if (sClass.indexOf('btl-calendar-year') != -1){
+								this.setProperty('elmYearDisplay', aDescendants[i]);
+
+							} else if (sClass.indexOf('btl-calendar-month') != -1){
+								this.setProperty('elmMonthDisplay', aDescendants[i]);
+
+							} else if (sClass.indexOf('btl-calendar-button-pyear') != -1){
+								this.calendar.elmPreviousYear = aDescendants[i];
+
+							} else if (sClass.indexOf('btl-calendar-button-pmonth') != -1){
+								this.calendar.elmPreviousMonth = aDescendants[i];
+
+							} else if (sClass.indexOf('btl-calendar-button-nmonth') != -1){
+								this.calendar.elmNextMonth = aDescendants[i];
+
+							} else if (sClass.indexOf('btl-calendar-button-nyear') != -1){
+								this.calendar.elmNextYear = aDescendants[i];
+
+							} else if (sClass.indexOf('btl-calendar-goto-today') != -1){
+								this.calendar.elmGoto = aDescendants[i];
+							}
+						}
+					}
+
+					// initialization complete!
+					this.__initialized = true;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="repaint">
+				
+				<d:body type="text/javascript"><![CDATA[
+					this.initialize();
+					// Draw year and month top label
+					var elmYearDisplay = this.getProperty('elmYearDisplay');
+					elmYearDisplay.innerText = elmYearDisplay.textContent = this.calendar.iDisplayYear;
+					var elmMonthDisplay = this.getProperty('elmMonthDisplay');
+					elmMonthDisplay.innerText = elmMonthDisplay.textContent = this.calendar.locale.Months[this.calendar.iDisplayMonth];
+
+					var elmCal = this.getProperty('calendarElement');
+					var aCells = elmCal.getElementsByTagName('td');
+					var elmSelectedDay = null;
+
+					var aInfo = btl.calendar.getDaysInfo(this.calendar);
+					for (var i = 0, iMax = aInfo.length; iMax > i; i++){
+						aCells[i].innerText = aCells[i].textContent = aInfo[i].iDay;
+						var sClass = aInfo[i].sClass;
+
+						if (aInfo[i].bSelected)
+							elmSelectedDay = aCells[i];
+
+						aCells[i].className = 'btl-calendar-day ' + sClass;
+					}
+					this.setProperty('elmDayDisplay', elmSelectedDay);
+
+					if (this.calendar.elmGoto) {
+						if (btl.isTrueValue('showToday', this.getAttribute('showToday'))) {
+							this.calendar.elmGoto.innerHTML = 'today: ' + btl.calendar.getFormattedValue(new Date(), this.getAttribute('format'), this.getAttribute('language'));
+							this.calendar.elmGoto.style.display = 'block';
+						} else {
+							this.calendar.elmGoto.style.display = 'none';
+						}
+					}
+
+					if (this.getProperty('disabled')){
+						this.disableView();
+					}
+				]]></d:body>
+			</d:method>
+
+			<!-- handle focus start -->
+			<!-- handler to set focus to the input element when the user clicks anywhere in the calendar -->
+			<!-- event.preventDefault() is used to prevent the input from being blurred. This would normally
+				happen because when the user clicks somewhere on the calendar, the user might click outside the input.
+				However, this does not work in IE. -->
+	 		<d:handler event="mousedown" type="text/javascript"><![CDATA[
+				if (event.viewTarget.nodeName.toLowerCase() != 'input') {
+					// focus the element..
+					this.focus();
+					// and prevent elements in the template from being focused
+					event.preventDefault();
+				}
+			]]></d:handler>
+
+			<d:handler event="keydown" type="text/javascript"><![CDATA[
+				if(event.keyIdentifier == "Enter") {
+					this.handleChange();
+					event.preventDefault();
+				}
+			]]></d:handler>
+
+			<!-- because event.prefentDefault() does not work in IE, we need another method of
+				keeping focus in the input. We do this by checking on beforedeactivate of the
+				input if the user has clicked inside the calendar. -->
+			<d:constructor type="text/javascript"><![CDATA[
+				this.callSuper();
+				if (bb.browser.ie) {
+					var oInput = bb.selector.query(this.viewNode, 'input.btl-calendar-input');
+					oInput.onbeforedeactivate = function(event) {
+						var oCalendar = bb.getControllerFromView(this);
+						if (oCalendar.__preventDeactivate) {
+							oCalendar.__preventDeactivate = false;
+							return false;
+						}
+					};
+				}
+			]]></d:constructor>
+
+	 		<d:handler event="mousedown" type="text/javascript"><![CDATA[
+				if (bb.browser.ie) {
+					this.__preventDeactivate = true;
+				}
+			]]></d:handler>
+
+	 		<d:handler event="mouseup" type="text/javascript"><![CDATA[
+				if (bb.browser.ie) {
+					this.__preventDeactivate = false;
+				}
+			]]></d:handler>
+			<!-- handle focus end -->
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				this.repaint();
+			]]></d:handler>
+
+			<d:handler event="focus" type="text/javascript"><![CDATA[
+				bb.html.addClass(this.getProperty('calendarElement'), 'focus');
+				if (this.getAttribute('mode') == 'popup' && !this.getProperty('open')) {
+					this.open();
+					this.repaint();
+				}
+			]]></d:handler>
+
+			<d:handler event="blur" type="text/javascript"><![CDATA[
+				bb.html.removeClass(this.getProperty('calendarElement'), 'focus');
+				this.close();
+			]]></d:handler>
+
+			<!-- handler to open the calendar if it is in popup mode -->
+	 		<d:handler event="mousedown" match=".btl-calendar-input" type="text/javascript"><![CDATA[
+				if (this.getAttribute('mode') == 'popup' && !this.getProperty('open')) {
+					this.open();
+					this.repaint();
+				}
+			]]></d:handler>
+
+			<!-- Handle a click on a day element -->
+			<d:handler event="click" match=".btl-calendar-day" type="text/javascript"><![CDATA[
+				var oTarget = event.currentView;
+
+				// Do not do anything when the calendar is read only.
+				if (this.getProperty('readOnly'))
+					return;
+
+				var oInput = this.getProperty('focusElement');
+
+				// curretly selected date cell
+				var elmSelDay = this.getProperty('elmDayDisplay');
+
+				// Do not do anything if the clicked day is already selected or restricted
+				/* In addition, if selected day was clicked but the input field is empty, it will set the value to the selected day again
+				(it will appear again in the input)
+				*/
+				if (oTarget == elmSelDay && oInput.value ||
+						bb.html.hasClass(oTarget, 'btl-calendar-restricted')) {
+					return;
+				}
+
+				//new date values to be set
+				var iDay = parseInt(oTarget.innerHTML);
+				var iMonth = this.calendar.iDisplayMonth;
+				var iYear = this.calendar.iDisplayYear;
+
+				if (bb.html.hasClass(oTarget, 'btl-calendar-previousMonth')) {
+					--iMonth;
+					if (iMonth < 0) {
+						iMonth = 11;
+						--iYear;
+					}
+				} else if (bb.html.hasClass(oTarget, 'btl-calendar-nextMonth')) {
+					++iMonth;
+					if (iMonth > 11) {
+						iMonth = 0;
+						++iYear;
+					}
+				}
+
+				// remove styling from the element that represents the day that was selected previously
+				if (elmSelDay) {
+					bb.html.removeClass(elmSelDay, 'btl-calendar-selected-day');
+				}
+
+				// set styling to the element that represents the selected day
+				bb.html.addClass(oTarget, 'btl-calendar-selected-day');
+
+				this.setProperty('elmDayDisplay', oTarget);
+
+				this.setProperty('selectedDate', new Date(iYear, iMonth, iDay));
+
+				bb.command.fireEvent(this, 'change', true, false);
+
+				if (this.getAttribute('mode') == 'popup')
+					this.close();
+			]]></d:handler>
+
+			<!-- previous year button start -->
+			<d:handler event="click" match=".btl-calendar-button-pyear" type="text/javascript"><![CDATA[
+				this.calendar.iDisplayYear--;
+				this.repaint();
+			]]></d:handler>
+
+			<d:handler event="mouseenter" match=".btl-calendar-button-pyear" type="text/javascript"><![CDATA[
+				bb.html.addClass(event.currentView, 'btl-calendar-button-pyear-hover');
+			]]></d:handler>
+
+			<d:handler event="mouseleave" match=".btl-calendar-button-pyear" type="text/javascript"><![CDATA[
+				bb.html.removeClass(event.currentView, 'btl-calendar-button-pyear-hover');
+				bb.html.removeClass(event.currentView, 'btl-calendar-button-pyear-active');
+			]]></d:handler>
+
+			<d:handler event="mousedown" match=".btl-calendar-button-pyear" type="text/javascript"><![CDATA[
+				bb.html.addClass(event.currentView, 'btl-calendar-button-pyear-active');
+			]]></d:handler>
+
+			<d:handler event="mouseup" match=".btl-calendar-button-pyear" type="text/javascript"><![CDATA[
+				bb.html.removeClass(event.currentView, 'btl-calendar-button-pyear-active');
+			]]></d:handler>
+			<!-- previous year button end -->
+
+			<!-- previous month button start -->
+			<d:handler event="click" match=".btl-calendar-button-pmonth" type="text/javascript"><![CDATA[
+				this.calendar.iDisplayMonth--;
+				if(this.calendar.iDisplayMonth < 0){
+					this.calendar.iDisplayMonth = 11;
+					this.calendar.iDisplayYear--;
+				}
+				this.repaint();
+			]]></d:handler>
+
+			<d:handler event="mouseenter" match=".btl-calendar-button-pmonth" type="text/javascript"><![CDATA[
+				bb.html.addClass(event.currentView, 'btl-calendar-button-pmonth-hover');
+			]]></d:handler>
+
+			<d:handler event="mouseleave" match=".btl-calendar-button-pmonth" type="text/javascript"><![CDATA[
+				bb.html.removeClass(event.currentView, 'btl-calendar-button-pmonth-hover');
+			]]></d:handler>
+
+			<d:handler event="mousedown" match=".btl-calendar-button-pmonth" type="text/javascript"><![CDATA[
+				bb.html.addClass(event.currentView, 'btl-calendar-button-pmonth-active');
+			]]></d:handler>
+
+			<d:handler event="mouseup" match=".btl-calendar-button-pmonth" type="text/javascript"><![CDATA[
+				bb.html.removeClass(event.currentView, 'btl-calendar-button-pmonth-active');
+			]]></d:handler>
+			<!-- previous month button end -->
+
+			<!-- next month button start -->
+			<d:handler event="click" match=".btl-calendar-button-nmonth" type="text/javascript"><![CDATA[
+				this.calendar.iDisplayMonth++;
+				if(this.calendar.iDisplayMonth > 11){
+					this.calendar.iDisplayMonth = 0;
+					this.calendar.iDisplayYear++;
+				}
+				this.repaint();
+			]]></d:handler>
+
+			<d:handler event="mouseenter" match=".btl-calendar-button-nmonth" type="text/javascript"><![CDATA[
+				bb.html.addClass(event.currentView, 'btl-calendar-button-nmonth-hover');
+			]]></d:handler>
+
+			<d:handler event="mouseleave" match=".btl-calendar-button-nmonth" type="text/javascript"><![CDATA[
+				bb.html.removeClass(event.currentView, 'btl-calendar-button-nmonth-hover');
+			]]></d:handler>
+
+			<d:handler event="mousedown" match=".btl-calendar-button-nmonth" type="text/javascript"><![CDATA[
+				bb.html.addClass(event.currentView, 'btl-calendar-button-nmonth-active');
+			]]></d:handler>
+
+			<d:handler event="mouseup" match=".btl-calendar-button-nmonth" type="text/javascript"><![CDATA[
+				bb.html.removeClass(event.currentView, 'btl-calendar-button-nmonth-active');
+			]]></d:handler>
+			<!-- next month button end -->
+
+			<!-- next year button start -->
+			<d:handler event="click" match=".btl-calendar-button-nyear" type="text/javascript"><![CDATA[
+				this.calendar.iDisplayYear++;
+				this.repaint();
+			]]></d:handler>
+
+			<d:handler event="mouseenter" match=".btl-calendar-button-nyear" type="text/javascript"><![CDATA[
+				bb.html.addClass(event.currentView, 'btl-calendar-button-nyear-hover');
+			]]></d:handler>
+
+			<d:handler event="mouseleave" match=".btl-calendar-button-nyear" type="text/javascript"><![CDATA[
+				bb.html.removeClass(event.currentView, 'btl-calendar-button-nyear-hover');
+			]]></d:handler>
+
+			<d:handler event="mousedown" match=".btl-calendar-button-nyear" type="text/javascript"><![CDATA[
+				bb.html.addClass(event.currentView, 'btl-calendar-button-nyear-active');
+			]]></d:handler>
+
+			<d:handler event="mouseup" match=".btl-calendar-button-nyear" type="text/javascript"><![CDATA[
+				bb.html.removeClass(event.currentView, 'btl-calendar-button-nyear-active');
+			]]></d:handler>
+			<!-- next year button end -->
+
+			<!-- go to today start -->
+			<d:handler event="click" match=".btl-calendar-goto-today" type="text/javascript"><![CDATA[
+				var oDate = new Date();
+				if( this.calendar.iDisplayMonth != oDate.getMonth()
+					|| this.calendar.iDisplayYear != oDate.getFullYear()){
+					this.calendar.iDisplayMonth = oDate.getMonth();
+					this.calendar.iDisplayYear = oDate.getFullYear();
+					this.repaint();
+				}
+			]]></d:handler>
+			<!-- go to today end -->
+		</d:element>
+	</d:namespace>
+</d:tdl>

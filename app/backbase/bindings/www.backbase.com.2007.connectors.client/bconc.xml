@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns:b="http://www.backbase.com/2006/btl" xmlns:bconc="http://www.backbase.com/2007/connectors/client" xmlns:d="http://www.backbase.com/2006/tdl" xmlns:e="http://www.backbase.com/2006/xel" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+
+	<d:namespace name="http://www.w3.org/1999/xhtml">
+
+		<d:element name="destination" abstract="true">
+			<d:handler event="click" type="text/javascript"><![CDATA[
+				// @FIXME: Should define this attribute in TDL
+				var sDest = this.getAttribute('destination');
+
+				if(sDest) {
+					event.preventDefault();
+					// @FIXME: Should define the attribute in TDL and add a default value?
+					var sMode = this.getAttribute('mode') || 'appendChild';
+
+					var sUrl = this.viewNode.getAttribute('href');
+					var oDest = bb.getControllerFromModel(bb.evaluateSmart(sDest, this.modelNode, this.modelNode));
+					bb.command.load(sUrl, 'GET', '', null, oDest, sMode, null, null);
+				}
+				else {
+					var oEvent = bb.document.createEvent('UIEvents');
+					oEvent.initUIEvent('DOMActivate', true, true, window, event.detail);
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="a" extends="xhtml:a xhtml:destination"/>
+
+		<d:element name="area" extends="xhtml:area xhtml:destination"/>
+	</d:namespace>
+
+	<d:namespace name="http://www.backbase.com/2007/connectors/client">
+
+		<!-- BackbaseStruts Clientside Element -->
+		<d:element name="BSElement" abstract="true">
+			<d:property name="children" onget="return this.modelNode.childNodes"/>
+
+			<d:method name="renderChildren">
+				<d:body type="text/javascript"><![CDATA[
+					var aChildNodes = this.getProperty('children');
+					//check for childnodes
+					if (aChildNodes.length) {
+						if (this.modelNode.nextSibling) {
+							for(var i = 0, iMax = aChildNodes.length; i < iMax; i++) {
+								var oElm = aChildNodes[i];
+								if (oElm.nodeType == 1) {
+									this.modelNode.parentNode.appendChild(oElm);
+								}
+							}
+						}
+					}
+					else {
+						for(var i = 0, iMax = aChildNodes.length; i < iMax; i++) {
+							// @FIXME: never gets here....
+							var oElm = aChildNodes[i];
+							if (oElm.nodeType == 1) {
+								this.modelNode.parentNode.insertBefore(oElm, this.modelNode.nextSibling);
+							}
+						}
+					}
+				]]></d:body>
+			</d:method>
+		</d:element>
+
+		<d:element name="setDestination" extends="bconc:BSElement">
+
+			<d:template type="text/javascript">
+				this.renderChildren();
+			</d:template>
+
+			<d:property name="type" onget="return this.hasAttribute('type') ? this.getAttribute('type') : 'default'"/>
+
+			<d:method name="setDestination">
+				<d:argument name="destination"/>
+				<d:body type="text/javascript"><![CDATA[
+					if (!destination) {
+						bb.command.trace(this, 'destination tags require destination attribute!', 3);
+					}
+					else {
+						var aChildren = this.getProperty('children');
+						var sTarget = this.modelNode.getAttribute('target');
+						var sMode = this.modelNode.getAttribute('mode') || 'replaceChildren';
+
+						var sXpathExpression;
+						var sType = this.getProperty('type');
+
+						//determine the sXpathExpression according to their type.
+						switch (sType) {
+							case 'link'	:
+								if (aChildren.length) {
+									sXpathExpression = '[..//a]';
+								}
+								else {
+									if (this.modelNode.parentNode.nodeName == 'a') {
+										sXpathExpression = 'ancestor-or-self::a[1]';
+									}
+									else {
+										sXpathExpression = '[..//a]';
+									}
+								}
+								break;
+
+							case 'form'	:
+								if (aChildren.length) {
+									sXpathExpression = '[..//form]';
+								}
+								else {
+									if (this.modelNode.parentNode.nodeName == 'form') {
+										sXpathExpression = '[ancestor-or-self::form]';
+									}
+									else {
+										sXpathExpression = '[..//form]';
+									}
+								}
+								break;
+
+							case 'area'	:
+								if (aChildren.length) {
+									sXpathExpression = '[.//area]';
+								}
+								else {
+									sXpathExpression = '[ancestor-or-self::map[1]//area]';
+								}
+								break;
+
+							default :
+								if (sTarget) {
+									sXpathExpression = sTarget;
+								}
+								else if (aChildren.length) {
+									sXpathExpression = '[..//a]';
+								}
+								break;
+						}
+
+						if(sXpathExpression) {
+							var oTarget = bb.evaluateSmart(sXpathExpression, this);
+
+							if (oTarget.length) {
+								var aTarget = oTarget;
+								for (i = 0, iMax = aTarget.length; i < iMax; i++) {
+									var oTarget = aTarget[i];
+
+									if (sType == 'form') {
+										oTarget.setAttributeNS('http://www.backbase.com/2007/forms', 'bf:destination', destination);
+										oTarget.setAttributeNS('http://www.backbase.com/2007/forms', 'bf:mode', sMode);
+									}
+									else {
+										oTarget.setAttribute('destination', destination);
+										oTarget.setAttribute('mode', sMode);
+									}
+								}
+							}
+							else if (oTarget.nodeType == 1){
+								if (sType == 'form') {
+									oTarget.setAttributeNS('http://www.backbase.com/2007/forms', 'bf:destination', destination);
+									oTarget.setAttributeNS('http://www.backbase.com/2007/forms', 'bf:mode', sMode);
+								}
+								else {
+									oTarget.setAttribute('destination', destination);
+									oTarget.setAttribute('mode', sMode);
+								}
+							}
+						}
+						else  {
+							var oParent = this.getProperty('parentNode');
+							if (sType == 'form') {
+								oParent.setAttributeNS('http://www.backbase.com/2007/forms', 'bf:destination', destination);
+								oParent.setAttributeNS('http://www.backbase.com/2007/forms', 'bf:mode', sMode);
+							}
+							else {
+								oParent.setAttribute('destination', destination);
+								oParent.setAttribute('mode', sMode);
+							}
+						}
+					}
+
+					bb.destruct(this);
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				this.setDestination(this.modelNode.getAttribute('destination'));
+			]]></d:handler>
+		</d:element>
+
+		<!--
+			can't inherit from BSEelement, since that one destructs it self on construct, which is before
+			the domnode inserted into doc. event. Prob. we can come up with a diff. class hierarchy which will
+			be more effiecent in sense of duplicate methods etc., but lack of time avoids us to do so.
+		-->
+		<d:element name="setBehavior">
+			<d:template type="text/javascript">
+				if (this.modelNode.childNodes.length) {
+					if (!this.modelNode.getAttribute('target')) {
+						this.__aRenderedChildNodes = this.renderChildren();
+					} else {
+						bb.command.trace(this, 'setBehavior as wrapper and a target is not supported!', 3);
+					}
+				}
+			</d:template>
+
+			<d:property name="nameSpaceUri">
+				<d:getter type="text/javascript"><![CDATA[
+					// @FIXME: is this property still used?
+					// Is it possible to resolve the namespace instead of using an ns attribute?
+					return this.modelNode.getAttribute('ns') || 'http://www.w3.org/1999/xhtml';
+				]]></d:getter>
+			</d:property>
+
+			<d:method name="renderChildren">
+				<d:body type="text/javascript"><![CDATA[
+					var aChildNodes = this.modelNode.childNodes;
+					var aRendered = new Array();
+
+					if (aChildNodes.length) {
+						if (this.modelNode.nextSibling) {
+							for (var i = 0, iMax = aChildNodes.length; i < iMax; i++) {
+								var oElm = aChildNodes[i];
+								if (oElm.nodeType == 1) {
+									this.modelNode.parentNode.appendChild(oElm);
+									aRendered[aRendered.length] = oElm;
+								}
+							}
+						}
+					}
+					else {
+						for (var i = 0, iMax = aChildNodes.length; i < iMax; i++) {
+							// @FIXME: never gets here....
+							var oElm = aChildNodes[i];
+							if (oElm.nodeType == 1) {
+								aRendered[aRendered.length] = oElm;
+								this.modelNode.parentNode.insertBefore(oElm, this.modelNode.nextSibling);
+							}
+						}
+					}
+					return aRendered;
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				var sBehavior = this.modelNode.getAttribute('behavior');
+				var sNameSpaceURI = this.modelNode.getAttribute('ns') || 'http://www.w3.org/1999/xhtml';
+				var aChildNodes = this.modelNode.childNodes;
+				var sTarget = this.modelNode.getAttribute('target');
+
+				/*If we the target attribute set we do xpath so on dom node inserted. in to doc event*/
+				if (!aChildNodes.length) {
+					if (sBehavior) {
+						if (sTarget) {
+							var oTarget = bb.evaluateSmart(sTarget, this.modelNode, this.modelNode);
+							if (oTarget.length) {
+								var aTarget = oTarget;
+								for (var i = 0, iMax = aTarget.length; i < iMax; i++) {
+									bb.addBehavior(bb.getControllerFromModel(aTarget[i]), sNameSpaceURI, sBehavior);
+								}
+							}
+							else {
+								bb.addBehavior(bb.getControllerFromModel(oTarget), sNameSpaceURI,  sBehavior);
+							}
+						}
+						else {//with children behavior is all ready appended
+							var oParent = this.getProperty('parentNode');
+							bb.addBehavior(oParent, sNameSpaceURI, sBehavior);
+						}
+					}
+					else {
+						bb.command.trace(this, 'Behavior not set!', 3);
+					}
+				}
+				else if (!sTarget) {
+					//BECAUSE CHILDREN ARE RENDERED IN TEMPLATE WE HAVE TO CATCH THEM AGAIN
+					for (var i = 0; i < this.__aRenderedChildNodes.length; i++) {
+						bb.addBehavior(bb.getControllerFromModel(this.__aRenderedChildNodes[i]), sNameSpaceURI, sBehavior);
+					}
+				}
+
+				//DESTRUCT MYSELF ON INSERTED INTO DOC.
+				bb.destruct(this);
+			]]></d:handler>
+		</d:element>
+
+		<!--
+			escape element is more or less a copy of b:xhtml
+			it is used to escape the bb parser for struts 2.0.8
+			(dojo enabled) controls
+		-->
+		<d:element name="escape">
+			<d:resource type="text/javascript"><![CDATA[
+				var oRegX = /dojo/gi;
+			]]></d:resource>
+
+			<d:template type="text/javascript">
+				var oElm = document.createElement('div');
+				var oCDATA = bb.html.getFirstByNodeType(this.modelNode, 4);
+				if (oCDATA) { //this cdata is there, because it is rendered by the serverside tag
+					oElm.innerHTML = oCDATA.nodeValue;
+					if (oRegX.test(oCDATA.nodeValue)) {
+						this.___oRef = oElm;
+					}
+				}
+				return [oElm, oElm];
+			</d:template>
+
+			<d:method name="__children">
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				if (this.___oRef) {
+					dojo.widget.createWidget(this.___oRef);
+				}
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

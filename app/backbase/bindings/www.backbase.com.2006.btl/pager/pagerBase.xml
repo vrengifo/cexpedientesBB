@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="element" src="../element/element.xml"/>
+		<d:uses element="positionElement dimensionElement containerElement" src="../visualElement/visualElement.xml"/>
+
+		<d:resource type="text/javascript"><![CDATA[
+			btl.pagerBase = {};
+
+			btl.pagerBase.setForElementByXPath = function btl_pagerBase_setForElementByXPath(oPager, sXPath){
+				var oFor = sXPath ? bb.evaluateSmart(sXPath, oPager, oPager) : null;
+				if(sXPath && !oFor){
+					bb.command.trace(oPager, 'Element targeted with XPath "' + sXPath + '" was not found by ' + oPager.getProperty('localName') );
+				} else {
+					oPager.setProperty('forElement', oFor);
+				}
+			}
+
+			btl.pager = {};
+
+			btl.pager.activateButton = function btl_pager_activateButton(oButton){
+				var oParent = oButton.getProperty('parentNode');
+				while(oParent){
+					if(bb.instanceOf(oParent, btl.namespaceURI, 'pager')){
+						break;
+					}
+					oParent = oParent.getProperty('parentNode');
+				}
+				var oForElement = oParent.getProperty('forElement');
+				if(oForElement){
+					var sType = oButton.getAttribute('type');
+					if(sType == 'Previous'){
+						oForElement.goPrevious();
+					} else if(sType == 'Next'){
+						oForElement.goNext();
+					} else if(sType == 'First'){
+						oForElement.goTo(1);
+					} else if(sType == 'Last'){
+						oForElement.goTo(oForElement.getProperty('totalPages'));
+					} else {
+						// It's probably a numeric button, try to get its number.
+						var iPage = parseInt(oButton.viewGate.innerHTML, 10);
+						if(!isNaN(iPage)){
+							oForElement.goTo(iPage);
+						}
+					}
+				}
+			};
+
+			btl.pager.handleJumperChange = function btl_pager_handleJumperChange(oInput){
+				var iPage = parseInt(oInput.value, 10);
+				var oJumper = bb.getControllerFromView(oInput);
+				var oForElement = oJumper.getProperty('parentNode').getProperty('forElement');
+				if(oForElement){
+					if(isNaN(iPage)){
+						oInput.value = oForElement.getProperty('page');
+					} else {
+						oForElement.goTo(iPage);
+					}
+				}
+			};
+			btl.pager.updateElements = function btl_pager_updateElements( oPager, oElement){
+				var aNodes = oPager.getProperty( 'childNodes');
+				var aElements = [];
+				for( var i=0; i < aNodes.length; i++)
+					if(aNodes[i] && bb.instanceOf(aNodes[i], btl.namespaceURI, 'pagerElement')){
+						aElements.push( aNodes[i]);
+						if( !oElement || oElement == aNodes[i]){
+							aNodes[i].repaint();
+						}
+					}
+				oPager.setProperty( 'elements', aElements);
+			};
+		]]></d:resource>
+
+		<d:interface name="iPagerJumper">
+			
+			<d:property name="pageInput">
+				
+			</d:property>
+			<d:property name="totalDisplay">
+				
+			</d:property>
+		</d:interface>
+
+		<d:interface name="iPagerNumbers">
+			
+			<d:property name="serializedButton">
+				
+			</d:property>
+		</d:interface>
+
+		<d:element name="pagerElement" extends="b:element" abstract="true">
+				
+			<d:method name="repaint">
+				
+				<d:argument name="oForElement"/>
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:handler event="DOMNodeRemovedFromDocument" type="text/javascript"><![CDATA[
+				var oParent = this.getProperty('parentNode')
+				if(bb.instanceOf(oParent, btl.namespaceURI, 'pager'))
+					oParent.update();
+			]]></d:handler>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				var oParent = this.getProperty('parentNode')
+				if(bb.instanceOf(oParent, btl.namespaceURI, 'pager'))
+					oParent.update( this);
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="pagerBase" extends="b:positionElement" abstract="true">
+			
+
+			<d:attribute name="for">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					if( this.__pageRefreshedHandler)
+						btl.pagerBase.setForElementByXPath(this, value);
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:property name="forElement">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					if (value && !bb.instanceOf(value, btl.namespaceURI, 'iPageable')){
+						bb.command.trace(this, this.getProperty('localName') + ' can not use ' + value.getProperty('localName') + ' as pageable element because it does not implement the iPageable interface')
+						value = null;
+					}
+					if( this._._forElement && this._._forElement._)
+						this._._forElement.removeEventListener('pageRefreshed', this.__pageRefreshedHandler, false);
+					this._._forElement = value;
+					if( value && value._){
+						value.addEventListener('pageRefreshed', this.__pageRefreshedHandler, false);
+						var oPager = this;
+						value.addEventListener('destruct', function( event){
+									if( oPager && oPager._){
+										oPager.setProperty('forElement', null);
+										var aNodes = oPager.getProperty('elements')
+										for(var i=0; aNodes.length > i; i++){
+											aNodes[i].repaint();
+										}//for
+									}
+								}, false );
+						this.update();
+					}
+
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="elements">
+				
+			</d:property>
+
+			<d:method name="update">
+				
+				<d:argument name="pagerElement"/>
+				<d:body type="text/javascript"><![CDATA[
+					btl.pager.updateElements( this, pagerElement);
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				if( !this.__pageRefreshedHandler){
+					var oPager = this;
+					this.__pageRefreshedHandler = function( event){
+						var aNodes = oPager.getProperty('elements')
+						for(var i=0; aNodes.length > i; i++){
+							aNodes[i].repaint( event.target);
+						}//for
+					}//function
+				}
+				btl.pagerBase.setForElementByXPath(this, this.modelNode.getAttribute('for'));
+			]]></d:handler>
+
+			<d:handler event="destruct" type="text/javascript"><![CDATA[
+				this.setProperty('forElement', null)
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="pagerButtonBase" extends="b:dimensionElement b:containerElement b:pagerElement" abstract="true">
+			
+
+			<d:attribute name="type">
+				
+			</d:attribute>
+
+			<d:method name="repaint">
+				
+				<d:argument name="oForElement"/>
+				<d:body type="text/javascript"><![CDATA[
+					// Local variables...
+					var sType = this.getAttribute('type');
+					if( !oForElement){
+						var oParent = this.getProperty('parentNode');
+						oForElement = oParent.getProperty('forElement');
+					}
+					var iCurrentPage, iTotalPages, bDisabled = true;
+					if( oForElement){
+						iCurrentPage = oForElement.getProperty('page');
+						iTotalPages = oForElement.getProperty('totalPages');
+						bDisabled = false;
+						// Determine disabled state and set it
+						if(sType == 'First' && iCurrentPage == 1){
+							bDisabled = true;
+						} else if(sType == 'Previous' && iCurrentPage == 1){
+							bDisabled = true;
+						} else if(sType == 'Next' && iCurrentPage == iTotalPages || !iTotalPages){
+							bDisabled = true;
+						} else if(sType == 'Last' && iCurrentPage == iTotalPages || !iTotalPages){
+							bDisabled = true;
+						}
+					}
+					this.setProperty('disabled', bDisabled);
+				]]></d:body>
+			</d:method>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				bb.html.disableUserSelect(this.viewNode);
+			]]></d:constructor>
+
+			<d:handler event="click" type="text/javascript"><![CDATA[
+				if(event.button == 0){
+					btl.pager.activateButton(this);
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="pagerNumbersBase" extends="b:pagerElement" abstract="true">
+			
+			<d:attribute name="numbers" default="5">
+				
+			</d:attribute>
+
+			<d:method name="repaint">
+				
+				<d:argument name="oForElement"/>
+				<d:body type="text/javascript"><![CDATA[
+					// Takes care of the following:
+					// - set page numbers in page links
+					// - page number cannot be lower than 1
+					// - page number cannot be higher than total number of pages
+					// - number of visible links cannot be higher than total number of pages
+					// - highlight and disable current link
+
+					// This is a workaround for the case when pager and element it is for
+					// are destroyed by destroy command
+					if (this.getProperty("childNodes").length === 0) {
+						return null;
+					}
+
+					if( !oForElement){
+						var oParent = this.getProperty('parentNode');
+						oForElement = oParent.getProperty('forElement');
+					}
+					var iTotalPages=0, iCurrentPage=0, iStart=0, iEnd=0
+					var	iLinks = this.aLinks.length;
+					if( oForElement){
+						iTotalPages = oForElement.getProperty('totalPages');
+						iCurrentPage = oForElement.getProperty('page');
+						iStart = iCurrentPage - Math.floor(iLinks / 2);
+						iEnd = iCurrentPage + Math.floor(iLinks / 2);
+					}
+					if(iEnd > iTotalPages){
+						iStart -= iEnd - iTotalPages;
+						iEnd -= iEnd - iTotalPages;
+					}
+					if(iStart < 1){
+						iEnd += 1 - iStart;
+						iStart += 1 - iStart;
+					}
+					if(iEnd > iTotalPages) iEnd = iTotalPages;
+					var iToSet = iStart;
+					for(var i = 0, iLimit = iLinks; i < iLimit; i++){
+						// Set displayed number
+						this.aLinks[i].viewGate.innerHTML = iToSet;
+						if(iToSet == iCurrentPage){
+							bb.html.addClass(this.aLinks[i].viewNode, 'btl-pagerButton-currentNumber');
+						} else {
+							bb.html.removeClass(this.aLinks[i].viewNode, 'btl-pagerButton-currentNumber');
+						}
+						this.aLinks[i].viewNode.title = 'Page ' + iToSet;
+						iToSet++;
+
+						// Manage visibility of links
+						if(i > iTotalPages - 1){
+							this.aLinks[i].viewNode.style.display = 'none';
+						} else {
+							this.aLinks[i].viewNode.style.display = '';
+						}
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				if( this._initialized) return; //core bug 9286
+				// Generate page links
+				var iLinkCount = parseInt(this.getAttribute('numbers'), 10);
+
+				var oClone = bb.xml.parse(this.getProperty('serializedButton')).documentElement;
+				for(var i = 0; iLinkCount > i; i++){
+					bb.command.create(oClone.cloneNode(true), this, 'appendChild');
+				}
+
+				// Store references to page links
+				var aChildren = this.getProperty('childNodes');
+				this.aLinks = [];
+				for(var i = 0, iLimit = aChildren.length; iLimit > i; i++){
+					if(bb.instanceOf(aChildren[i], btl.namespaceURI, 'pagerButton'))
+						this.aLinks[this.aLinks.length] = aChildren[i];
+				}
+				this._initialized = true;
+			]]></d:handler>
+
+			<d:handler event="DOMNodeRemovedFromDocument" type="text/javascript"><![CDATA[
+				for( var i= this.aLinks.length-1; i >= 0; i--)
+					bb.command.destroy( this.removeChild( this.aLinks[i]))
+				this._initialized = false;
+			]]></d:handler>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				bb.html.disableUserSelect(this.viewNode);
+				return;
+
+				// Generate page links
+				var iLinkCount = parseInt(this.getAttribute('numbers'), 10);
+				var oClone = bb.xml.parse(this.getProperty('serializedButton')).documentElement;
+				for(var i = 0; i < iLinkCount; i++){
+					bb.command.create(oClone.cloneNode(true), this, 'appendChild');
+				}
+
+				// Store references to page links
+				var aChildren = this.getProperty('childNodes');
+				this.aLinks = [];
+				for(var i = 0, iLimit = aChildren.length; i < iLimit; i++){
+					if(bb.instanceOf(aChildren[i], btl.namespaceURI, 'pagerButton')) this.aLinks[this.aLinks.length] = aChildren[i];
+				}
+			]]></d:constructor>
+		</d:element>
+
+		<d:element name="pagerJumperBase" extends="b:pagerElement" abstract="true">
+			
+
+			<d:method name="repaint">
+				
+				<d:argument name="oForElement"/>
+				<d:body type="text/javascript"><![CDATA[
+					// Set values of input (current page) and display (total pages)
+					if( !oForElement){
+						var oParent = this.getProperty('parentNode');
+						oForElement = oParent.getProperty('forElement');
+					}
+					var iCurrentPage = 0, iTotalPages = 0;
+					if(oForElement){
+						iCurrentPage = oForElement.getProperty('page');
+						iTotalPages = oForElement.getProperty('totalPages');
+					}
+					this.getProperty('pageInput').value = iCurrentPage;
+					this.getProperty('totalDisplay').innerHTML = iTotalPages;
+				]]></d:body>
+			</d:method>
+		</d:element>
+	</d:namespace>
+</d:tdl>

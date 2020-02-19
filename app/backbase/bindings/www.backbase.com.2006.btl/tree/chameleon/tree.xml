@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="treeBase treeBranchBase treeLeafBase" src="../treeBase.xml"/>
+
+		<d:element name="tree" extends="b:treeBase">
+			
+
+			<d:resource type="text/css"><![CDATA[.btl-tree {
+	position: relative;
+	overflow: auto;
+	height: 100%;
+	background-color: #FFF;
+}
+.btl-tree-focusElement {
+	position: absolute;
+	left: 0;
+	top: 0;
+}
+.btl-treeBranch-content {
+	padding-left: 17px;
+}
+.btl-tree-rtl .btl-treeBranch-content {
+	padding-left: 0;
+	padding-right: 17px;
+}
+.btl-treeBranch-div,
+.btl-treeBranch-div *,
+.btl-treeLeaf,
+.btl-treeLeaf * {
+	cursor: pointer;
+}
+.btl-treeBranch-closed .btl-treeBranch,
+.btl-treeBranch-closed .btl-treeLeaf,
+.btl-treeBranch-closed .btl-treeBranch-content,
+.btl-treeBranch-empty .btl-treeBranch-content {
+	display: none;
+	visibility: hidden;
+}
+.btl-treeBranch-label-container,
+.btl-treeLeaf .btl-treeLeaf-label-container {
+	font-size: 100%;
+	line-height: 130%;
+}
+.btl-tree-rtl .btl-treeLeaf-label-container,
+.btl-tree-rtl .btl-treeBranch-label-container {
+	direction: rtl;
+	unicode-bidi: bidi-override;
+}
+.btl-treeBranch-div {
+	background-repeat: no-repeat;
+	padding-left: 17px;
+	position: relative;
+}
+.btl-tree-rtl .btl-treeBranch-div {
+	padding-left: 0;
+	padding-right: 17px;
+}
+.btl-treeBranch-label,
+.btl-treeLeaf-label {
+	padding: 1px 3px;
+	display: inline;
+}
+.btl-tree-focus .btl-treeItem-focus .btl-treeBranch-focusIndicator,
+.btl-tree-focus .btl-treeItem-focus .btl-treeLeaf-focusIndicator {
+	border: 1px dotted black;
+	padding: 0 2px;
+}
+.btl-disabled .btl-treeBranch-label,
+.btl-disabled .btl-treeLeaf-label {
+	color: #AAA;
+}
+.btl-disabled .selected,
+.btl-disabled .selected {
+	color: #AAA;
+	background-color: #DDD;
+}
+.btl-treeBranch-open .btl-treeBranch-div {
+	background-image: url(media/treeBranchOpen.png);
+	background-position: 0 center;
+}
+.btl-tree-rtl .btl-treeBranch-open .btl-treeBranch-div {
+	background-position: right center;
+}
+.btl-treeBranch-closed .btl-treeBranch-div {
+	background-image: url(media/treeBranchClosed.png);
+	background-position: 0 center;
+}
+.btl-treeBranch-empty .btl-treeBranch-div {
+	background-image: url(media/treeBranchEmpty.png);
+}
+.btl-tree-rtl .btl-treeBranch-closed .btl-treeBranch-div {
+	background-position: right center;
+	background-image: url(media/rtlTreeBranchClosed.png);
+}
+.btl-treeLeaf-label-container {
+	background-repeat: no-repeat;
+	background-image: url(media/treeLeaf.png);
+	background-position: 0 center;
+	padding-left: 17px;
+}
+.btl-tree-rtl .btl-treeLeaf-label-container {
+	background-position: right center;
+	padding-left: 0;
+	padding-right: 17px;
+}
+/* fixes */
+.btl-tree,
+.btl-tree * {
+	box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	-khtml-box-sizing: border-box;
+}
+.gecko .btl-tree {
+	-moz-outline: none;
+	padding-bottom: 1px; /* fix for bug 9028 */
+}
+.ie .btl-tree,
+.ie .btl-tree * {
+	zoom: 1.0;/* Fix to prevent bug 8493. Also solves a problem with onclick */
+}
+.ie .btl-tree {
+	width: 100%;
+}
+.ie .btl-treeBranch-content {
+	/* zoom: normal; /* fix for bug 5948 that can not be used due to causing bug 8493 */
+	line-height: 0; /* makes bug 5948 a little more acceptable */
+}]]></d:resource>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-tree btl-chameleon-normalText" tabindex="-1">
+					<input class="btl-invisibleFocusInput btl-tree-focusElement" onbeforedeactivate="if(this.parentNode.controller.__focused){return false;}" readonly="readonly"/>
+					<d:content/>
+				</div>
+			</d:template>
+
+			<d:handler event="focus" type="text/javascript"><![CDATA[
+				bb.html.addClass(this.viewNode, 'btl-tree-focus');
+			]]></d:handler>
+
+			<d:handler event="blur" type="text/javascript"><![CDATA[
+				bb.html.removeClass(this.viewNode, 'btl-tree-focus');
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="treeBranch" extends="b:treeBranchBase">
+			
+
+			<d:resource type="image/png" src="media/treeBranchOpen.png"/>
+			<d:resource type="image/png" src="media/treeBranchClosed.png"/>
+			<d:resource type="image/png" src="media/treeBranchEmpty.png"/>
+			<d:resource type="image/png" src="media/rtlTreeBranchClosed.png"/>
+			<d:resource type="text/javascript"><![CDATA[
+				if (!btl.treeBranch) {
+					btl.treeBranch = {};
+				}
+				btl.treeBranch.getIconElement = function(oNode) {
+					if (oNode.__iconNode) {return oNode.__iconNode;}
+					var oEl = oNode.viewNode;
+					while(oEl && !bb.html.hasClass(oEl, "btl-treeBranch-div")) {
+						oEl = bb.html.getFirstByNodeType(oEl, 1);
+					}
+					return (oNode.__iconNode = oEl);
+				};
+			]]></d:resource>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-treeBranch btl-treeBranch-closed">
+					<div class="btl-tree-line-vertical">
+						<div>
+							<div class="btl-tree-line-horizontal">
+								<div class="btl-treeBranch-div btl-dataTree-toggleOpenClose">
+									<div class="btl-treeBranch-label-container btl-dataTree-selectAndToggle">
+										<span class="btl-label btl-treeBranch-label btl-treeBranch-focusIndicator"/>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="btl-treeBranch-content btl-tree-line-vertical">
+						<d:content/>
+					</div>
+				</div>
+			</d:template>
+
+			<!-- ATTRIBUTES -->
+			<d:attribute name="open">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					if( btl.isTrueValue(name, value) ) {
+						bb.html.removeClass(this.viewNode, 'btl-treeBranch-closed');
+						bb.html.addClass(this.viewNode, 'btl-treeBranch-open');
+					} else {
+						bb.html.removeClass(this.viewNode, 'btl-treeBranch-open');
+						bb.html.addClass(this.viewNode, 'btl-treeBranch-closed');
+					}
+					btl.treeBranchBase.setProperIcon(this, btl.treeBranch.getIconElement(this));
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="selected">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					var oLabel = this.getProperty('labelGate');
+					if ( btl.isTrueValue(name, value) )
+						bb.html.addClass( oLabel, ['btl-chameleon-highlightBackground', 'btl-chameleon-highlightText'] );
+					else
+						bb.html.removeClass( oLabel, ['btl-chameleon-highlightBackground', 'btl-chameleon-highlightText']);
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="empty">
+				<d:mapper type="text/javascript"><![CDATA[
+					if(btl.isTrueValue(name, value)) {
+						bb.html.addClass(this.viewNode, 'btl-treeBranch-empty')
+					} else {
+						bb.html.removeClass(this.viewNode, 'btl-treeBranch-empty')
+					}
+					btl.treeBranchBase.setProperIcon(this, btl.treeBranch.getIconElement(this));
+				]]></d:mapper>
+			</d:attribute>
+
+			<!--  METHODS -->
+			<d:method name="appendChild">
+				<d:argument name="node"/>
+				<d:body type="text/javascript"><![CDATA[
+					if(!this.hasChildNodes()){
+						bb.html.removeClass(this.viewNode, 'btl-treeBranch-empty');
+					}
+					this.callSuper('appendChild', [node]);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="insertBefore">
+				<d:argument name="node"/>
+				<d:argument name="child"/>
+				<d:body type="text/javascript"><![CDATA[
+					if(!this.hasChildNodes()){
+						bb.html.removeClass(this.viewNode, 'btl-treeBranch-empty');
+					}
+					this.callSuper('insertBefore', [node, child]);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="removeChild">
+				<d:argument name="node"/>
+				<d:body type="text/javascript"><![CDATA[
+					this.callSuper('removeChild', [node]);
+					if(!this.hasChildNodes()){
+						bb.html.addClass(this.viewNode, 'btl-treeBranch-empty');
+					}
+				]]></d:body>
+			</d:method>
+		</d:element>
+
+		<d:element name="treeLeaf" extends="b:treeLeafBase">
+			
+
+			<d:resource type="image/png" src="media/treeLeaf.png"/>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-treeLeaf">
+					<div class="btl-treeLeaf-label-container">
+						<span class="btl-label btl-treeLeaf-label btl-treeBranch-focusIndicator"/>
+						<d:content/>
+					</div>
+				</div>
+			</d:template>
+
+			<!-- ATTRIBUTES -->
+			<d:attribute name="selected">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					var oLabel = this.getProperty('labelGate');
+					if ( btl.isTrueValue(name, value) )
+						bb.html.addClass( oLabel, ['btl-chameleon-highlightBackground','btl-chameleon-highlightText']);
+					else
+						bb.html.removeClass( oLabel, ['btl-chameleon-highlightBackground','btl-chameleon-highlightText']);
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="icon" onmap="bb.html.getFirstByNodeType(this.viewNode, 1).style.backgroundImage = this.getProperty(name) ? 'url(' + this.getProperty(name) + ')' : '';"/>
+		</d:element>
+	</d:namespace>
+</d:tdl>

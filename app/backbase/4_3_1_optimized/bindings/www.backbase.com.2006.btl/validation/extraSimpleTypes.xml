@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?><schema xmlns="http://www.w3.org/2001/XMLSchema" targetNamespace="http://www.backbase.com/2006/btl"><simpleType name="zipcode-nl"><restriction base="token"><pattern value="\d{4} ?[a-zA-Z]{2}"/></restriction></simpleType><simpleType name="phone-nl"><restriction base="token"><pattern value="(\d[ \-]*){10}"/></restriction></simpleType><simpleType name="creditcard"><annotation><documentation>
+				This type defines an ID number that conforms to ISO/IEC 7812-1:2000
+				Identification cards -- Identification of issuers -- Part 1: Numbering system.
+				This type does not apply the Luhn checksum algorithm.
+			</documentation></annotation><restriction base="string"><minLength value="12"/><maxLength value="19"/><pattern value="[0-9]+"/></restriction></simpleType><simpleType name="country"><restriction base="token"><pattern value="[a-zA-Z]{2}"/></restriction></simpleType><simpleType name="email"><annotation><documentation>
+				This datatype represents an email address, as defined by RFC 2822.
+			</documentation></annotation><restriction base="string"><pattern value="[a-zA-Z0-9!#$%&amp;'*+\-/=?^_`{|}~\.]+\@([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9]{2,}"/></restriction></simpleType><simpleType name="currency"><restriction base="decimal"><fractionDigits value="2"/></restriction></simpleType><simpleType name="sex"><restriction base="string"><enumeration value="male"/><enumeration value="female"/></restriction></simpleType></schema>

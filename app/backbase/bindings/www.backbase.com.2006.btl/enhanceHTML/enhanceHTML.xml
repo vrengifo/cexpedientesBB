@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:element name="enhanceHTML">
+			
+
+			<!-- ATTRIBUTES -->
+			<d:attribute name="select">
+				
+			</d:attribute>
+			<d:attribute name="destination">
+				
+			</d:attribute>
+			<d:attribute name="rules">
+				
+			</d:attribute>
+			<d:attribute name="mode">
+				
+			</d:attribute>
+			<d:attribute name="moveView">
+				
+			</d:attribute>
+			<d:attribute name="children">
+				
+			</d:attribute>
+
+
+			<d:template type="text/javascript">
+				var oElm = document.createElement('span'); return [oElm, oElm];
+			</d:template>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				if (!bb.htmlRulesets)
+					bb.htmlRulesets = {};
+
+				var oDestination;
+				if (this.modelNode.getAttribute('destination')) {
+					oDestination = bb.evaluateSmart(this.modelNode.getAttribute('destination'), this, this);
+				}
+				var oSelect = bb.evaluateSmart(this.modelNode.getAttribute('select'), this, this);
+
+				//Set the correct mode
+				var sMode = this.modelNode.getAttribute('mode');
+				if (oDestination && !sMode)
+					sMode = 'appendChild';
+
+				//If no destination take the current one and insert before
+				if (!oDestination) {
+					oDestination = this;
+					if(!sMode)
+						sMode = 'insertBefore';
+				}
+
+				var oRules = bb.htmlRulesets[this.modelNode.getAttribute('rules')];
+				var bChildren = this.modelNode.getAttribute('children') !== 'false';
+				if (oSelect) {
+					if (this.modelNode.getAttribute('moveView') == 'true') {
+						if (oDestination.viewGate) {
+							bb.command.move(oSelect, oDestination.viewGate, sMode);
+						}
+					}
+
+					bb.importHTML(oSelect, oRules, bChildren, oDestination, null, sMode);
+
+				}
+
+				bb.destruct(this);
+
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="enhanceHTMLRuleSet">
+			
+
+			<d:method name="__children">
+				
+				<d:body type="text/javascript"/>
+			</d:method>
+
+			<d:attribute name="name">
+				
+			</d:attribute>
+
+
+			<d:constructor type="text/javascript"><![CDATA[
+				if (!bb.htmlRulesets)
+					bb.htmlRulesets = {};
+
+				var oRuleset = {},oRule,oARule,sLocalName,sLocalName2;
+
+				var oChild = this.modelNode.firstChild;
+				while (oChild) {
+					sLocalName = oChild.localName || oChild.baseName;
+					if (sLocalName == 'enhanceHTMLRule') {
+						oRule = [];
+						oRule[0] = oChild.getAttribute('ns');
+						oRule[1] = oChild.getAttribute('localName');
+						oRule[2] = (oChild.getAttribute('template')=='false') ? false : true;
+
+						oRule[3] = [];
+						var oChild2 = oChild.firstChild;
+						while (oChild2) {
+							sLocalName2 = oChild2.localName || oChild2.baseName;
+							if (sLocalName2 == 'enhanceHTMLAttribute') {
+								if (oChild2.getAttribute('ref')) {
+									oARule = oChild2.getAttribute('ref');
+								}
+								else {
+									oARule = [];
+									oARule[0] = oChild2.getAttribute('name');
+									if(oChild2.getAttribute('value')) {
+
+										if (oChild2.getAttribute('force')=='true') {
+											oARule[1] = true;
+										}
+										else {
+											if(oChild2.getAttribute('originalName'))
+												oARule[1] = oChild2.getAttribute('originalName');
+											else
+												oARule[1] = false;
+										}
+										oARule[2] = oChild2.getAttribute('value');
+									}
+								}
+								oRule[3].push(oARule);
+							}
+							oChild2 = oChild2.nextSibling;
+						}
+
+						oRuleset[oChild.getAttribute('name')] = oRule;
+					}
+					oChild = oChild.nextSibling;
+				}
+
+				var sName = this.modelNode.getAttribute('name');
+				bb.htmlRulesets[sName] = oRuleset;
+			]]></d:constructor>
+		</d:element>
+
+		<d:element name="enhanceHTMLRule">
+			
+			<d:attribute name="name">
+				
+			</d:attribute>
+			<d:attribute name="localName">
+				
+			</d:attribute>
+			<d:attribute name="ns">
+				
+			</d:attribute>
+			<d:attribute name="template">
+				
+			</d:attribute>
+		</d:element>
+
+		<d:element name="enhanceHTMLAttribute">
+			
+			<d:attribute name="ref">
+				
+			</d:attribute>
+			<d:attribute name="name">
+				
+			</d:attribute>
+			<d:attribute name="originalName">
+				
+			</d:attribute>
+			<d:attribute name="value">
+				
+			</d:attribute>
+			<d:attribute name="force">
+				
+			</d:attribute>
+		</d:element>
+	</d:namespace>
+</d:tdl>

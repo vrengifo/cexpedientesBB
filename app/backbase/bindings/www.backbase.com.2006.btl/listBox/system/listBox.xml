@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="listBoxBase listBoxOptionBase" src="../listBoxBase.xml"/>
+
+		<d:element name="listBox" extends="b:listBoxBase">
+			
+
+			<d:resource type="text/css"><![CDATA[.btl-listBox {
+	background-color: Window;
+	cursor: default;
+}
+.btl-listBox-list {
+	height: 100%;
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+.btl-listBox-table {
+	width: 100%;
+	table-layout: fixed;
+}
+.btl-listBoxOption {
+	cursor: pointer;
+}
+.btl-disabled .btl-listBoxOption {
+	color: GrayText !important;
+}
+.btl-listBoxOption-td {
+	height: 1.5em;
+	padding: 2px;
+	white-space: nowrap;
+}
+.btl-listBox-focus .btl-listBoxOption-focused-td {
+	padding: 1px;
+	border: 1px dotted #000000;
+}
+.btl-listBoxOption-highlight {
+	background-color: ThreeDLightShadow;
+}
+.btl-listBox-focus .btl-listBoxOption-highlight {
+	background-color: Highlight;
+	color: HighlightText;
+}
+/* fixes */
+.btl-listBox,
+.btl-listBox * {
+	box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	-khtml-box-sizing: border-box;
+}
+.btl-listBox {
+	position: relative; /* added for the input that should receive focus */
+}
+.btl-listBox {
+	-moz-outline-style: none;
+}
+.ie .btl-listBox {
+	overflow: hidden; /* without this IE6 / 7 will render the control too tall */
+}
+.opera .btl-listBox-list {
+	overflow: auto;
+}]]></d:resource>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-listBox btl-groove" hidefocus="true" onactivate="if(!this.firstChild.disabled)this.firstChild.focus()">
+					<input onbeforedeactivate="if(this.parentNode.controller.__mouseDown){return false;}" class="btl-invisibleFocusInput" style="position:absolute;" readonly="readonly"/>
+					<select multiple="multiple" style="display:none;"/>
+					<div class="btl-listBox-list btl-groove-inner" tabindex="-1">
+						<table onmousedown="this.parentNode.parentNode.controller.__mouseDown = true" class="btl-listBox-table" cellspacing="0" cellpadding="0" border="0">
+							<tbody><d:content/></tbody>
+						</table>
+					</div>
+				</div>
+			</d:template>
+
+			<d:attribute name="name" onmap="this.viewNode.getElementsByTagName('select')[0].name = value"/>
+
+			<d:attribute name="size">
+				<d:mapper type="text/javascript"><![CDATA[
+					if( !this.modelNode.getAttribute('height')){
+						var iPix = bb.html.convertToPixels('1em');
+						var itemH = 1.5;
+						if( bb.browser.webkit)  itemH += 3.75 / iPix;
+						else if( bb.browser.ie) itemH += 0.125 / iPix;
+						else itemH += 0.5 / iPix;
+
+						var Height = Math.ceil((itemH * parseInt(value) + 4 / iPix) * 100) / 100;
+						this.viewNode.style.height = Height + 'em';
+					}
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:property name="value" onget="return this.viewNode.getElementsByTagName('select')[0].value">
+				<d:setter type="text/javascript"><![CDATA[
+					var aOptions = this.getProperty('options');
+					var iIndex = -1;
+						 for(var i = 0, iLimit = aOptions.length; i < iLimit; i++){
+							 if(aOptions[i].getProperty('value') == value){
+							this.viewNode.getElementsByTagName('select')[0].value = value;
+							iIndex = i;
+							break;
+						}
+					}
+					this.setProperty('selectedIndex', iIndex);
+				]]></d:setter>
+			</d:property>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				// disable userselect
+				this.__scrollBox = this.viewNode.getElementsByTagName('div')[0];
+				bb.html.disableUserSelect(this.viewNode);
+				if( bb.browser.ie){
+					var oC = this;
+					var func = function(){oC.__mouseDown = false;}
+					this.addEventListener('mouseup', func, false);
+					this.addEventListener('mouseleave', func, false);
+				}
+				iIndex = this.getProperty('selectedIndex');
+				if( iIndex >= 0){
+					var el = this.getProperty('options')[iIndex].viewNode;
+					window.setTimeout( function(){ bb.html.scrollIntoView( el)}, 10);
+				}
+			]]></d:handler>
+
+			<d:handler event="focus" type="text/javascript"><![CDATA[
+				bb.html.addClass(this.viewNode, 'btl-listBox-focus');
+			]]></d:handler>
+
+			<d:handler event="blur" type="text/javascript"><![CDATA[
+				bb.html.removeClass(this.viewNode, 'btl-listBox-focus');
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="listBoxOption" extends="b:listBoxOptionBase">
+			
+
+			<d:template type="application/xhtml+xml">
+				<tr class="btl-listBoxOption">
+					<td class="btl-listBoxOption-td"><d:content/></td>
+				</tr>
+			</d:template>
+
+			<d:method name="showFocus">
+				
+				<d:body type="text/javascript"><![CDATA[
+					bb.html.addClass(this.viewNode.firstChild, 'btl-listBoxOption-focused-td');
+				]]></d:body>
+			</d:method>
+
+			<d:method name="hideFocus">
+				
+				<d:body type="text/javascript"><![CDATA[
+					bb.html.removeClass(this.viewNode.firstChild, 'btl-listBoxOption-focused-td');
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				var oShadowSelect = this.getProperty('parentNode').viewNode.getElementsByTagName('select')[0];
+
+				var oShadowOption = new Option(this.getProperty('text'), this.getProperty('value'), false, this.getProperty('selected'));
+
+				this.__shadowOption = oShadowOption;
+
+				oShadowSelect.options[oShadowSelect.options.length] = oShadowOption;
+
+				if(this.getProperty('selected'))
+					bb.html.addClass(this.viewNode, ['btl-listBoxOption-highlight']);
+			]]></d:handler>
+
+			<d:handler event="select" type="text/javascript"><![CDATA[
+				this.__shadowOption.selected = true;
+				bb.html.addClass(this.viewNode, ['btl-listBoxOption-highlight']);
+			]]></d:handler>
+
+			<d:handler event="deselect" type="text/javascript"><![CDATA[
+				this.__shadowOption.selected = false;
+				bb.html.removeClass(this.viewNode, ['btl-listBoxOption-highlight']);
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

@@ -1,0 +1,334 @@
+<d:namespace
+		xmlns:b="http://www.backbase.com/2006/btl"
+		xmlns:t="http://www.backbase.com/2007/debugger"
+		xmlns:e="http://www.backbase.com/2006/xel"
+		xmlns="http://www.w3.org/1999/xhtml"
+		xmlns:d="http://www.backbase.com/2006/tdl"
+		name="http://www.backbase.com/2007/debugger">
+
+		<d:element name="tree" extends="t:baseDebuggerInspector">
+			<d:template type="application/xhtml+xml">
+				<div style="overflow:auto; height:100%; width:100%; whxite-space:nowrap;"><d:content /></div>
+			</d:template>
+
+			<!-- Keeps the currently selected tree node -->
+			<d:property name="selectedTree">
+				<d:setter type="text/javascript"><![CDATA[
+					var oOld = this._['_'+name];
+					if(oOld && oOld.childNodes){
+						var oText = oOld.childNodes.length > 1 ? oOld.firstChild.nextSibling : oOld.firstChild;
+						bb.html.removeClass(oText, 'tool-tree-item-selected');
+					}
+					if(value && value.childNodes){
+						var oText = value.childNodes.length > 1 ? value.firstChild.nextSibling : value.firstChild;
+						bb.html.addClass(oText, 'tool-tree-item-selected');
+					}
+					this._['_'+name] = value;
+				]]></d:setter>
+			</d:property>
+
+			<!-- Keeps the currently selected real node -->
+			<d:property name="selectedNode" />
+
+
+			<d:method name="getOpenedTreeIndex">
+				<d:argument name="treeNode" />
+				<d:body type="text/javascript">
+					return bb.array.indexOf(this.getProperty('openedTrees'), treeNode);
+				</d:body>
+			</d:method>
+
+			<d:method name="addOpenedTree">
+				<d:argument name="treeNode" />
+				<d:body type="text/javascript">
+					if(bb.callMethod(this, 'getOpenedTreeIndex', [treeNode]) == -1 ) {
+						this._.openedTrees.push(treeNode);
+					}
+				</d:body>
+			</d:method>
+
+			<d:method name="removeOpenedTree">
+				<d:argument name="treeNode" />
+				<d:body type="text/javascript">
+					var iIndex = bb.callMethod(this, 'getOpenedTreeIndex', [treeNode]);
+					if(iIndex != -1){
+						this._.openedTrees.splice(iIndex, 1);
+					}
+				</d:body>
+			</d:method>
+
+			<d:method name="toggleOpenedTree">
+				<d:argument name="treeNode" />
+				<d:body type="text/javascript"><![CDATA[
+					var iIndex = bb.callMethod(this, 'getOpenedTreeIndex', [treeNode.oRealItem]);
+					if(iIndex != -1){
+						while(treeNode.firstChild.nextSibling.nextSibling){
+							INSPECTOR_KillNode(treeNode.lastChild);
+							treeNode.removeChild(treeNode.lastChild);
+						}
+						bb.html.removeClass(treeNode.firstChild, 'tool-tree-icon-open');
+
+						this._.openedTrees.splice(iIndex, 1);
+					}
+					else {
+						INSPECTOR_RenderTreeItem( treeNode.oRealItem, treeNode, this);
+						treeNode.firstChild.className += ' tool-tree-icon-open';
+
+						this._.openedTrees.push(treeNode.oRealItem);
+					}
+
+					]]>
+				</d:body>
+			</d:method>
+
+			<d:property name="openedTrees">
+				<d:getter><![CDATA[
+					if( !this._.openedTrees ){
+						var root = this.getProperty('rootElement').firstChild;
+						this._.openedTrees = [root];
+						if(root.documentElement){
+							this._.openedTrees.push(root.documentElement);
+							if(root.documentElement.namespaceURI == 'http://www.backbase.com/2006/client'){
+								var oLL = root.documentElement.firstChild;
+								while(oLL){
+									if (oLL.nodeType == 1)
+										this._.openedTrees.push(oLL);
+									oLL = oLL.nextSibling;
+								}
+							}
+
+						}
+
+					}
+					return this._.openedTrees;
+				]]></d:getter>
+			</d:property>
+
+			<d:method name="select">
+				<d:argument name="treeNode" required="true" />
+				<d:body type="text/javascript">
+					this.setProperty('selectedTree', treeNode);
+					this.setProperty('selectedNode', treeNode.oRealItem);
+					bb.tooling.currentContext = (this.getProperty('viewCategory') == 'view') ? treeNode.oRealItem : bb.tooling.window.bb.getControllerFromModel(treeNode.oRealItem);
+				</d:body>
+			</d:method>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				//Should this be the currently selected?
+				var sCategory = this.getProperty('viewCategory');
+				if(sCategory == bb.tooling.data.category)
+					bb.tooling.currentTree = this;
+				bb.tooling[sCategory+'Tree'] = this;
+			]]></d:constructor>
+
+			<d:destructor type="text/javascript">
+				this._.openedTrees = null;
+			</d:destructor>
+
+			<!-- Repaints the complete tree -->
+			<d:method name="repaint">
+				<d:argument name="onlyRemove" />
+				<d:body type="text/javascript">
+					while(this.viewNode.firstChild){
+						INSPECTOR_KillNode(this.viewNode.firstChild);
+						this.viewNode.removeChild(this.viewNode.firstChild);
+					}
+					if(!onlyRemove)
+						INSPECTOR_RenderTreeItem( bb.getProperty(this, 'rootElement'), this.viewNode, this);
+				</d:body>
+			</d:method>
+
+			<d:handler event="click" type="text/javascript"><![CDATA[
+				var oElm = event.viewTarget;
+
+				//Clicked on an icon, open close item!
+				if(oElm.className.indexOf('tool-tree-icon') != -1){
+
+					this.toggleOpenedTree(oElm.parentNode);
+
+				} else {
+					//Edit the attribute
+					//if(oElm.className == 'red'){
+					//	INSPECTOR_EditAttr(oElm);
+					//}
+					if(oElm.className == 'blue'){
+						//Actually select it
+						while(oElm && !oElm.oRealItem){
+							oElm = oElm.parentNode;
+						}
+						if(oElm){
+							if(this.getOpenedTreeIndex(oElm.oRealItem) == -1){
+								this.toggleOpenedTree(oElm);
+							}
+							this.select(oElm);
+						}
+					}
+				}
+				event.stopPropagation();
+
+			]]></d:handler>
+
+
+			<d:method name="selectItem">
+				<d:argument name="target" required="true" />
+				<d:body type="text/javascript"><![CDATA[
+
+					var aParents = [target];
+					while(target = target.parentNode)
+						aParents.push(target);
+
+					var oTreeItem = null;
+					for(var i = aParents.length-1; i > 0; i--){
+						this.addOpenedTree( aParents[i] );
+					}
+
+					//Repaint complete tree
+					this.repaint();
+
+					var oTreeItem = this.viewNode.firstChild;
+
+					oTreeItem = INSPECTOR_GetTreeItemFromReal(aParents, oTreeItem);
+					if(oTreeItem){
+						this.select(oTreeItem);
+						bb.html.scrollIntoView(oTreeItem);
+					}
+
+				]]></d:body>
+			</d:method>
+
+			<d:property name="disabled">
+				<d:setter type="text/javascript"><![CDATA[
+					if(value != this._['_'+name]){
+						if(value == false){
+							var oCurrentItem = bb.tooling.currentTree ? bb.tooling.currentTree.getProperty('selectedNode') : null;
+							if(oCurrentItem && bb.tooling.currentTree != this){
+								var oTarget;
+								if (bb.tooling.currentTree.getProperty('viewCategory') == 'view') {
+									oTarget = bb.tooling.window.bb.getControllerFromView(oCurrentItem);
+									if(oTarget && oTarget.modelNode) oTarget = oTarget.modelNode;
+									else oTarget = bb.tooling.window.bb.document;
+								} else if(bb.tooling.currentTree.getProperty('viewCategory') == 'model') {
+									oTarget = bb.tooling.window.bb.getControllerFromModel(oCurrentItem);
+									if(oTarget && oTarget.viewNode) oTarget = oTarget.viewNode;
+									else oTarget = bb.tooling.window.document;
+								}
+								this.selectItem(oTarget);
+							} else
+								this.repaint();
+							bb.tooling.currentTree = this;
+						} else {
+							this.repaint(true);
+						}
+					}
+					this._['_'+name] = value;
+				]]></d:setter>
+			</d:property>
+		</d:element>
+
+		<d:element name="modelTree" extends="t:tree" implements="t:iViewCategory">
+			<d:property name="rootElement" onget="return { firstChild: bb.tooling.window.bb.document.modelNode };" />
+
+			<d:property name="viewCategory" onget="return 'model';" />
+
+			<d:method name="select">
+				<d:argument name="treeNode" />
+				<d:body type="text/javascript">
+					this.callSuper('select', arguments);
+
+					var oController = bb.tooling.window.bb.getControllerFromModel(treeNode.oRealItem);
+
+					// dispatch tree-select event
+					var oEvent = bb.document.createEvent('Events');
+					oEvent.initEvent('tree-select', false, false);
+
+					oEvent.treeModelTarget = treeNode.oRealItem;
+					oEvent.treeTarget = oController;
+
+					bb.tooling.root.dispatchEvent(oEvent);
+				</d:body>
+			</d:method>
+
+		</d:element>
+		<d:element name="viewTree" extends="t:tree" implements="t:iViewCategory">
+			<d:property name="rootElement" onget="return { firstChild: bb.tooling.window.document };" />
+
+			<d:property name="viewCategory" onget="return 'view';" />
+
+			<d:method name="select">
+				<d:argument name="treeNode" />
+				<d:body type="text/javascript">
+					this.callSuper('select', arguments);
+
+					var oController = bb.tooling.window.bb.getControllerFromView(treeNode.oRealItem);
+
+					// dispatch tree-select event
+					var oEvent = bb.document.createEvent('Events');
+					oEvent.initEvent('tree-select', false, false);
+
+					oEvent.treeViewTarget = treeNode.oRealItem;
+					oEvent.treeTarget = oController;
+
+					bb.tooling.root.dispatchEvent(oEvent);
+				</d:body>
+			</d:method>
+		</d:element>
+
+		<d:element name="treeDrillDown">
+			<d:template type="application/xhtml+xml">
+				<div><d:content /></div>
+			</d:template>
+
+			<d:method name="update">
+				<d:argument name="controller" />
+				<d:body type="application/javascript"><![CDATA[
+
+					var oBuild = [];
+					bb.tooling.formatter.formats['object'](controller, oBuild);
+					while(controller = controller.getProperty('parentNode')){
+						oBuild.push( document.createTextNode(' < ') );
+						bb.tooling.formatter.formats['object'](controller, oBuild);
+
+					}
+					oBuild.reverse();
+					while(this.viewGate.firstChild)
+						this.viewGate.removeChild(this.viewGate.firstChild);
+
+					while(oBuild.length){
+						this.viewGate.appendChild(oBuild.pop());
+					}
+				]]></d:body>
+			</d:method>
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript">
+					var oThis = this;
+					bb.tooling.root.addEventListener('tree-select',
+						function(eEvent){
+							oThis.update(eEvent.treeTarget);
+						}, false);
+			</d:handler>
+		</d:element>
+
+
+		<d:behavior name="treeInspect">
+			<d:handler event="active" type="application/javascript">
+				bb.tooling.currentInspector = this;
+
+				bb.tooling.window.bb.tooling.highLighter.show();
+				bb.tooling.window.bb.document.addEventListener('mouseover', bb.tooling.window.bb.tooling.routeHandlers.documentMouseover, false);
+				bb.tooling.window.bb.document.addEventListener('mousedown', bb.tooling.window.bb.tooling.routeHandlers.documentMousedown, true);
+
+				bb.tooling.window.bb.document.addEventListener('click', 	bb.tooling.window.bb.tooling.routeHandlers.preventDefault, true);
+				bb.tooling.window.bb.document.addEventListener('mouseup', 	bb.tooling.window.bb.tooling.routeHandlers.preventDefault, true);
+			</d:handler>
+			<d:handler event="inactive" type="application/javascript">
+				//Sometimes it's killed
+				if(bb.tooling.window.bb.tooling) {
+					bb.tooling.window.bb.tooling.highLighter.hide();
+					bb.tooling.window.bb.document.removeEventListener('mouseover', bb.tooling.window.bb.tooling.routeHandlers.documentMouseover, false);
+					bb.tooling.window.bb.document.removeEventListener('mousedown', bb.tooling.window.bb.tooling.routeHandlers.documentMousedown, true);
+
+					bb.tooling.window.bb.document.removeEventListener('click', bb.tooling.window.bb.tooling.routeHandlers.preventDefault, true);
+					bb.tooling.window.bb.document.removeEventListener('mouseup', bb.tooling.window.bb.tooling.routeHandlers.preventDefault, true);
+				}
+			</d:handler>
+		</d:behavior>
+</d:namespace>

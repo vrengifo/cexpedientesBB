@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="accordionBase accordionItemBase" src="../accordionBase.xml"/>
+
+		<d:element name="accordion" extends="b:accordionBase">
+			
+
+			<d:resource type="text/css"><![CDATA[.btl-accordion {
+	overflow: hidden;
+}
+.btl-accordionItem {
+	overflow: hidden;
+	background-repeat: repeat-x;
+	background-image: url(media/accordionBackground.png);
+	background-color: #EDEDED;
+}
+.btl-accordionItem-head {
+	cursor: pointer;
+}
+.btl-accordionItem-button {
+	float: right;
+	margin-top: 4px;
+	margin-right: 4px;
+	height: 13px;
+	width: 14px;
+	background-color: black;
+	background-image: url(media/openClose.png);
+}
+.btl-accordionItem-open .btl-accordionItem-button {
+	background-position: 0 0;
+}
+.btl-accordionItem-open .btl-accordionItem-button-hover {
+	background-position: 0 -26px;
+}
+.btl-accordionItem-open .btl-accordionItem-button-press {
+	background-position: 0 -52px;
+}
+.btl-accordionItem-closed .btl-accordionItem-button {
+	background-position: 0 -13px;
+}
+.btl-accordionItem-closed .btl-accordionItem-button-hover {
+	background-position: 0 -39px;
+}
+.btl-accordionItem-closed .btl-accordionItem-button-press {
+	background-position: 0 -65px;
+}
+.btl-accordionItem-body {
+	position: relative;
+	overflow: auto;
+	background-color: #FFFFFF;
+}
+.btl-accordionItem-open .btl-accordionItem-body {
+	display: block;
+}
+.btl-accordionItem-closed .btl-accordionItem-body {
+	display: none;
+}
+.btl-disabled .btl-accordionItem-head {
+	color: #CCCCCC;
+}
+/* fixes */
+.btl-accordion {
+	/* for focusElement */
+	position: relative;
+}
+.gecko .btl-accordionItem-head {
+	-moz-user-select: none;
+	-moz-outline: none;
+}
+.gecko .btl-accordionItem-body {
+	-moz-outline: none;
+}
+.ie .btl-accordionItem-head {
+	/* fixes some instabilities in rendering, like icons disappearing */
+	zoom: 1.0;
+}
+.ie .btl-accordionItem-button {
+	overflow: hidden; /* to make sure the button does not overflow in IE */
+}]]></d:resource>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-accordion">
+					<input onbeforedeactivate="if(this.parentNode.controller.__passingFocus){return false;}" class="btl-invisibleFocusInput" style="position:absolute;top:-20px;left:-20px;" readonly="readonly"/>
+					<d:content/>
+				</div>
+			</d:template>
+
+			<d:property name="focusIndex">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					if( this._['_focusIndex'] == value){
+						return;
+					}
+
+					var aElements = this.getProperty('elements');
+					if(!isNaN(this._['_focusIndex']) && this._['_focusIndex'] >= 0) {
+						var oFocusIndicator = bb.selector.query(aElements[this._['_focusIndex']].viewNode, 'div.btl-focusIndicator');
+						bb.html.removeClass(oFocusIndicator, 'btl-focusIndicator-visible');
+					}
+					this._['_focusIndex'] = value;
+					if( !isNaN(value) && value >= 0) {
+						var oFocusIndicator = bb.selector.query(aElements[value].viewNode, 'div.btl-focusIndicator');
+						bb.html.addClass(oFocusIndicator, 'btl-focusIndicator-visible');
+						bb.html.scrollIntoView(aElements[value].viewNode);
+					}
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="selectedIndex">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					var aElements = this.getProperty('elements');
+
+					if (aElements[value]) {
+						if(!aElements[value].getProperty('selected'))
+							aElements[value].setProperty('selected', true);
+
+						for(var i = 0, iMax = aElements.length; iMax > i ; i++){
+							if(i != value && aElements[i].getProperty('selected'))
+								aElements[i].setProperty('selected', false);
+						}
+					}
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					var iSelectedIndex  = 0;
+					var aElements = this.getProperty('elements');
+
+					for (var i = 0, iMax = aElements.length; iMax > i ; i++) {
+						if(aElements[i].getProperty('selected')){
+							iSelectedIndex = i;
+							break;
+						}
+					}
+					return iSelectedIndex;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="height">
+				<d:setter type="text/javascript"><![CDATA[
+					this.viewNode.style.height = value;
+					this._._height = value;
+					bb.ui.reflow(this, true, true);
+				]]></d:setter>
+			</d:property>
+
+			<d:handler event="reflow" type="text/javascript"><![CDATA[
+				var aElements = this.getProperty('elements');
+				var iSelectedIndex = this.getProperty('selectedIndex');
+				var oSelectedAccordionItem = aElements[iSelectedIndex];;
+
+				for (var i = 0, iCount = aElements.length; iCount > i; i++) {
+					aElements[i].viewNode.style.height = 'auto';
+					bb.html.replaceClass(aElements[i].viewNode, 'btl-accordionItem-open', 'btl-accordionItem-closed');
+				}
+
+				if (oSelectedAccordionItem){
+					bb.html.replaceClass(oSelectedAccordionItem.viewNode, 'btl-accordionItem-closed', 'btl-accordionItem-open');
+
+					if (this.hasAttribute('height') && this.getAttribute('height') !== 'auto') {
+						btl.html.stretch(oSelectedAccordionItem.viewNode);
+						btl.html.stretch(oSelectedAccordionItem.viewNode.firstChild.nextSibling);
+					} else {
+						oSelectedAccordionItem.viewNode.style.height = '';
+						oSelectedAccordionItem.viewNode.firstChild.nextSibling.style.height = '';
+					}
+				}
+			]]></d:handler>
+
+			<d:handler event="focus" type="text/javascript"><![CDATA[
+				bb.html.addClass(this.viewNode, 'btl-accordion-focus');
+				this.setProperty('focusIndex', this.getProperty('selectedIndex'));
+			]]></d:handler>
+
+			<d:handler event="blur" type="text/javascript"><![CDATA[
+				bb.html.removeClass(this.viewNode, 'btl-accordion-focus');
+				this.setProperty('focusIndex', -1);
+			]]></d:handler>
+
+			<d:handler event="keydown" type="text/javascript"><![CDATA[
+				if((event.target == this) || bb.instanceOf(event.target, btl.namespaceURI, 'accordionItem')){
+					var arr = this.getProperty('elements');
+					var iFocusIndex = this.getProperty('focusIndex');
+					if((event.keyIdentifier == "Enter" || event.keyIdentifier == "U+0020")) {
+						if(arr[iFocusIndex].getProperty('disabled')) return;
+						this.setProperty('selectedIndex', iFocusIndex);
+						event.preventDefault();
+					} else if (event.keyIdentifier == 'Up') {
+						var iCount = arr.length;
+						iFocusIndex = (iFocusIndex > 0) ? (--iFocusIndex % iCount) : (iCount - 1);
+						this.setProperty('focusIndex', iFocusIndex);
+						event.preventDefault();
+					} else if (event.keyIdentifier == 'Down') {
+						iFocusIndex = ++iFocusIndex % arr.length;
+						this.setProperty('focusIndex', iFocusIndex);
+						event.preventDefault();
+					}
+					this.__passingFocus = false;
+				}
+			]]></d:handler>
+
+			<d:handler event="construct" type="text/javascript"><![CDATA[
+				if( bb.browser.ie){
+					var oController = this;
+					var func = function(){oController.__passingFocus = false;}
+					this.addEventListener('mouseup', func, false);
+					this.addEventListener('mouseleave', func, false);
+					this.addEventListener('destruct', function(){
+						oController.removeEventListener('mouseup', func, false);
+						oController.removeEventListener('mouseleave', func, false);
+					}, false);
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="accordionItem" extends="b:accordionItemBase">
+			
+
+			<d:resource type="image/png" src="media/accordionBackground.png"/>
+			<d:resource type="image/png" src="media/openClose.png"/>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-accordionItem btl-accordionItem-closed">
+					<div class="btl-accordionItem-head btl-head btl-bevel-top-bottom">
+						<div class="btl-accordionItem-button"/>
+						<div class="btl-focusIndicatorContainer">
+							<div class="btl-focusIndicator">
+								<div class="btl-label"> </div>
+							</div>
+						</div>
+					</div>
+					<div class="btl-accordionItem-body" tabindex="-1">
+						<d:content/>
+					</div>
+				</div>
+			</d:template>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				bb.html.disableUserSelect(this.viewNode.firstChild);
+			]]></d:constructor>
+
+			<d:handler event="click" match=".btl-accordionItem-head" type="text/javascript"><![CDATA[
+				if (event.button === 0){
+					this.setAttribute('selected', 'true');
+				}
+			]]></d:handler>
+
+			<d:handler event="mousedown" match=".btl-accordionItem-head" type="text/javascript"><![CDATA[
+				var oParent = this.getProperty('parentNode');
+				if (oParent.instanceOf('http://www.backbase.com/2006/btl', 'accordion')) {
+					// set focus element position to avoid it scrolling into view when focusing
+					var oStyle = oParent.getProperty('focusElement').style;
+					oStyle.left = event.currentView.offsetLeft + 'px';
+					oStyle.top = event.currentView.offsetTop + 'px';
+
+					var aElements = oParent.getProperty('elements');
+					var iIndex = 0;
+					for (var i = 0, iMax = aElements.length; iMax > i; i++){
+						if (aElements[i] == this) {
+							iIndex = i;
+							break;
+						}
+					}
+					oParent.focus();
+					oParent.setProperty('focusIndex', iIndex);
+
+					// reset focus element position
+					oStyle.left = '-20px';
+					oStyle.top = '-20px';
+
+					oParent.__passingFocus = true;
+
+					// prevent browser focus
+					event.preventDefault();
+				}
+			]]></d:handler>
+
+			<d:handler event="mouseenter" match=".btl-accordionItem-head" type="text/javascript"><![CDATA[
+				var oButton = bb.selector.query(event.currentView, '.btl-accordionItem-button');
+				bb.html.addClass(oButton, ['btl-chameleon-highlightBackground', 'btl-accordionItem-button-hover']);
+			]]></d:handler>
+
+			<d:handler event="mouseleave" match=".btl-accordionItem-head" type="text/javascript"><![CDATA[
+				var oButton = bb.selector.query(event.currentView, '.btl-accordionItem-button');
+				bb.html.removeClass(oButton, ['btl-chameleon-highlightBackground', 'btl-accordionItem-button-hover', 'btl-chameleon-activeBackground',  'btl-accordionItem-button-press']);
+			]]></d:handler>
+
+			<d:handler event="mousedown" match=".btl-accordionItem-head" type="text/javascript"><![CDATA[
+				var oButton = bb.selector.query(event.currentView, '.btl-accordionItem-button');
+				bb.html.addClass(oButton, ['btl-chameleon-activeBackground', 'btl-accordionItem-button-press']);
+			]]></d:handler>
+
+			<d:handler event="mouseup" match=".btl-accordionItem-head" type="text/javascript"><![CDATA[
+				var oButton = bb.selector.query(event.currentView, '.btl-accordionItem-button');
+				bb.html.removeClass(oButton, ['btl-chameleon-activeBackground', 'btl-accordionItem-button-press']);
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

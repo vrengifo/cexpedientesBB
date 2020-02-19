@@ -1,0 +1,499 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="sliderBase" src="../sliderBase.xml"/>
+
+		<d:element name="slider" extends="b:sliderBase">
+			
+			<d:resource type="text/css"><![CDATA[/* SLIDER */
+.btl-slider {
+	font-size: smaller;
+	position: relative;
+}
+
+.btl-slider-horizontal {
+	width: 150px;
+	padding-top: 1.8em;
+}
+
+.btl-slider-vertical {
+	height: 150px;
+}
+
+/* THE COLOR FILL AREA */
+.btl-slider-fillArea {
+	position: absolute;
+	overflow: hidden;
+}
+
+.btl-slider-horizontal .btl-slider-fillArea {
+	top: 3px;
+	margin-left: 1px;
+	height: 8px;
+}
+
+.btl-slider-vertical .btl-slider-fillArea {
+	left: 3px;
+	margin-bottom: 1px;
+	width: 8px;
+	font-size: 0px;
+}
+
+/* THE LABELS */
+.btl-slider-current {
+	position: absolute;
+	z-index: 9997; /* value two lower than b:toolTip */
+	text-align: center;
+}
+
+/* the active label should be above all other labels */
+.btl-slider-activeCurrent {
+	z-index: 9998; /* value one lower than b:toolTip */
+
+}
+
+.btl-slider-horizontal .btl-slider-current {
+	top: -1.8em;
+}
+
+.btl-slider-horizontal .btl-slider-min {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	z-index: 1;
+}
+
+.btl-slider-horizontal .btl-slider-max {
+	position: absolute;
+	bottom: 0;
+	right: 0;
+}
+
+.btl-slider-vertical .btl-slider-min {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	z-index: 1;
+}
+
+.btl-slider-vertical .btl-slider-max {
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+
+.btl-slider-vertical .btl-slider-value-label-container {
+	position: absolute;
+	left: 14px;
+	height: 150px;
+}
+
+.btl-slider-vertical .btl-slider-current {
+	left: 22px;
+}
+
+.btl-slider-current-value {
+	display: block;
+	padding: 0 3px;
+	border: 1px solid #919397;
+	white-space: nowrap;
+}
+
+.btl-slider-arrow {
+	position: absolute;
+	overflow: hidden;
+}
+
+.btl-slider-arrow div {
+	border-color: #919397;
+	border-style: solid;
+	height: 1px;
+	overflow: hidden;
+}
+
+.btl-slider-horizontal .btl-slider-arrow {
+	bottom: -4px;
+	left: 50%;
+	margin-left: -5px;
+	width: 10px;
+	height: 5px;
+}
+
+.btl-slider-horizontal .btl-slider-arrow div {
+	border-width: 0 1px;
+}
+
+.btl-slider-horizontal .btl-slider-arrow-line-1  {
+	margin-left: 0;
+	margin-right: 0;
+}
+
+.btl-slider-horizontal .btl-slider-arrow-line-2  {
+	margin-left: 1px;
+	margin-right: 1px;
+}
+
+.btl-slider-horizontal .btl-slider-arrow-line-3  {
+	margin-left: 2px;
+	margin-right: 2px;
+}
+
+.btl-slider-horizontal .btl-slider-arrow-line-4  {
+	margin-left: 3px;
+	margin-right: 3px;
+}
+
+.btl-slider-horizontal .btl-slider-arrow-line-5  {
+	margin-left: 4px;
+	margin-right: 4px;
+}
+
+.btl-slider-horizontal .btl-slider-arrow-line-6,
+.btl-slider-horizontal .btl-slider-arrow-line-7,
+.btl-slider-horizontal .btl-slider-arrow-line-8,
+.btl-slider-horizontal .btl-slider-arrow-line-9,
+.btl-slider-horizontal .btl-slider-arrow-line-10 {
+	display: none;
+}
+
+.btl-slider-vertical .btl-slider-arrow {
+	left: -4px;
+	top: 50%;
+	margin-top: -5px;
+	width: 5px;
+	height: 10px;
+}
+
+.btl-slider-vertical .btl-slider-arrow div {
+	border-width: 0 0 0 1px;
+}
+
+.btl-slider-vertical .btl-slider-arrow-line-1,
+.btl-slider-vertical .btl-slider-arrow-line-10 {
+	margin-left: 4px;
+}
+
+.btl-slider-vertical .btl-slider-arrow-line-2,
+.btl-slider-vertical .btl-slider-arrow-line-9  {
+	margin-left: 3px;
+}
+
+.btl-slider-vertical .btl-slider-arrow-line-3,
+.btl-slider-vertical .btl-slider-arrow-line-8  {
+	margin-left: 2px;
+}
+
+.btl-slider-vertical .btl-slider-arrow-line-4,
+.btl-slider-vertical .btl-slider-arrow-line-7  {
+	margin-left: 1px;
+}
+
+.btl-slider-vertical .btl-slider-arrow-line-5,
+.btl-slider-vertical .btl-slider-arrow-line-6  {
+	margin-left: 0;
+}
+
+/* THE GRIPPY CONTAINER */
+.btl-slider-container {
+	position: relative;
+	overflow: visible;
+	z-index: 2;
+}
+
+.btl-slider-horizontal .btl-slider-container {
+	height: 14px;
+}
+
+.btl-slider-vertical .btl-slider-container {
+	width: 14px;
+	height: 100%;
+}
+
+/* THE GRIPPY */
+.btl-slider-grippy {
+	position: absolute;
+	overflow: hidden;
+	z-index: 10;
+}
+
+/* rules for the active grippy */
+.btl-slider-activeGrippy {
+	z-index: 11; /* one level higher than simple grippy */
+}
+
+.btl-slider-horizontal .btl-slider-grippy {
+	width: 7px;
+	height: 14px;
+	background-image: url(media/horizontalSliderGrippy.png);
+	background-position: 0 0;
+}
+
+/* active grippy while it is dragged */
+.btl-slider-horizontal .btl-slider-active .btl-slider-activeGrippy {
+	background-position: 0 14px;
+}
+
+.btl-slider-vertical .btl-slider-grippy {
+	width: 14px;
+	height: 7px;
+	background-image: url(media/verticalSliderGrippy.png);
+	background-position: 0 0;
+}
+
+/* active grippy while it is dragged */
+.btl-slider-vertical .btl-slider-active .btl-slider-activeGrippy {
+	background-position: 14px 0;
+}
+
+/* Cursors for the grippy and label */
+.btl-slider-horizontal .btl-slider-grippy,
+.btl-slider-horizontal .btl-slider-current {
+	cursor: col-resize;
+	cursor: e-resize;
+}
+
+.btl-slider-vertical .btl-slider-grippy,
+.btl-slider-vertical .btl-slider-current {
+	cursor: row-resize;
+	cursor: s-resize;
+}
+
+/* THE SLIDER LINES */
+.btl-slider-line {
+	position: absolute;
+	overflow: hidden;
+}
+
+.btl-slider-horizontal .btl-slider-line {
+	left: 0;
+	top: 2px;
+	height: 10px;
+	width: 100%;
+	padding: 0 1px;
+	background-image: url(media/horizontalSliderSides.png);
+	background-repeat: repeat-x;
+}
+
+.btl-slider-focus-indicator {
+	border-width: 0;
+	border-style: none;
+	padding: 1px;
+}
+
+.btl-slider-focus .btl-slider-focus-indicator {
+	border-width: 1px;
+	border-style: dotted;
+	border-color: black;
+	padding: 0;
+}
+
+.btl-slider-horizontal .btl-slider-focus-indicator {
+	height: 16px;
+}
+
+.btl-slider-vertical .btl-slider-focus-indicator {
+	width: 16px;
+	height: 100%;
+}
+
+.btl-slider-horizontal .btl-slider-line-inner {
+	height: 10px;
+	width: 100%;
+	background-image: url(media/horizontalSliderBackground.png);
+	background-repeat: repeat-x;
+	overflow: hidden;
+}
+
+.btl-slider-vertical .btl-slider-line {
+	left: 2px;
+	top: 0;
+	height: 100%;
+	width: 10px;
+	padding: 1px 0;
+	background-image: url(media/verticalSliderSides.png);
+	background-repeat: repeat-y;
+}
+
+.btl-slider-vertical .btl-slider-line-inner {
+	height: 100%;
+	width: 10px;
+	background-image: url(media/verticalSliderBackground.png);
+	background-repeat: repeat-y;
+	overflow: hidden;
+}
+
+/* SHOWING OR HIDING LABELS */
+.btl-slider-no-labels {
+}
+.btl-slider-vertical-labels {
+	padding-top: 1.2em;
+	padding-bottom: 1.2em;
+}
+.btl-slider-horizontal-labels {
+	padding-bottom: 1.2em;
+}
+
+.btl-slider-drag-tooltip .btl-slider-current,
+.btl-slider-no-tooltip .btl-slider-current,
+.btl-slider-no-labels .btl-slider-min,
+.btl-slider-no-labels .btl-slider-max {
+	display: none;
+}
+
+.btl-slider-drag-tooltip .btl-slider-active .btl-slider-current {
+	display: block;
+}
+
+.btl-disabled .btl-slider-current-value,
+.btl-disabled .btl-slider-max,
+.btl-disabled .btl-slider-min {
+	color: #AAA !important;
+}
+
+.btl-disabled .btl-slider-current-value,
+.btl-disabled .btl-slider-arrow div,
+.btl-disabled .btl-slider-line-inner {
+	background-color: #DDD !important;
+}
+
+/* FIXES */
+.btl-slider,
+.btl-slider * {
+	box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	-khtml-box-sizing: border-box;
+}
+]]></d:resource>
+			<d:resource type="image/png" src="media/horizontalSliderGrippy.png"/>
+			<d:resource type="image/png" src="media/horizontalSliderSides.png"/>
+			<d:resource type="image/png" src="media/horizontalSliderBackground.png"/>
+			<d:resource type="image/png" src="media/verticalSliderBackground.png"/>
+			<d:resource type="image/png" src="media/verticalSliderGrippy.png"/>
+			<d:resource type="image/png" src="media/verticalSliderSides.png"/>
+
+			<!--  the styling (top+left values of -10px) are set to the btl-invisibleFocusInput element to avoid the panelSet from moving around when the slider is focused -->
+			<d:template type="application/xhtml+xml">
+				<div class="btl-slider">
+					<input type="text" class="btl-invisibleFocusInput" style="position:absolute;top:-10px;left:-10px;" readonly="readonly"/>
+					<span class="btl-slider-max"/>
+					<div class="btl-slider-focus-indicator">
+						<div class="btl-slider-container" onmousedown="return false" onselectstart="return false">
+							<div class="btl-slider-line">
+								<div class="btl-slider-line-inner btl-chameleon-activeBackground"/>
+							</div>
+							<div class="btl-slider-fillArea btl-chameleon-highlightBackground"/>
+							<d:content/>
+						</div>
+					</div>
+					<span class="btl-slider-min"/>
+				</div>
+			</d:template>
+
+			<d:attribute name="name" onmap="this.getProperty('focusElement').name = value"/>
+
+			<d:attribute name="min">
+				<d:mapper type="text/javascript"><![CDATA[
+					// FIXME: refactor using bb.selector.query
+					var oMinValue = this.viewNode.getElementsByTagName('span');
+					oMinValue = oMinValue[oMinValue.length - 1];
+					var aOptions = this.getProperty('options');
+					if(aOptions.length)
+						value = aOptions[0].getProperty('text') || aOptions[0].getProperty('value');
+					oMinValue.innerHTML = value;
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="max">
+				<d:mapper type="text/javascript"><![CDATA[
+					var oMaxValue = this.viewNode.getElementsByTagName('span')[0];
+					var aOptions = this.getProperty('options');
+					if(aOptions.length)
+						value = aOptions[aOptions.length-1].getProperty('text') || aOptions[aOptions.length-1].getProperty('value');
+					oMaxValue.innerHTML = value;
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="showLabels">
+				<d:mapper type="text/javascript"><![CDATA[
+					bb.html.removeClass(this.viewNode, ['btl-slider-no-labels', 'btl-slider-horizontal-labels', 'btl-slider-vertical-labels']);
+					if (value == 'false')
+						bb.html.addClass(this.viewNode, 'btl-slider-no-labels');
+					else
+						bb.html.addClass(this.viewNode, this.getAttribute('orientation') == 'horizontal'? 'btl-slider-horizontal-labels' : 'btl-slider-vertical-labels');
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="showToolTip">
+				<d:mapper type="text/javascript"><![CDATA[
+					if (value == 'false' || value == 'never')
+						bb.html.addClass(this.viewNode, 'btl-slider-no-tooltip');
+					else if (value == 'drag')
+						bb.html.addClass(this.viewNode, 'btl-slider-drag-tooltip');
+					else
+						bb.html.removeClass(this.viewNode, ['btl-slider-no-tooltip', 'btl-slider-drag-tooltip']);
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:method name="getScaleElement">
+				<d:body type="text/javascript"><![CDATA[
+					var oEl = null;
+					if (!this.__sliderScale) {
+						oEl = bb.html.getLastByNodeType(this.viewNode, 1);
+						oEl = bb.html.getPreviousByNodeType(oEl, 1);
+						this.__sliderScale = bb.html.getFirstByNodeType(oEl, 1);
+					}
+					return this.__sliderScale;
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="blur" type="text/javascript"><![CDATA[
+				bb.html.removeClass(this.viewNode, 'btl-slider-focus');
+			]]></d:handler>
+
+			<d:handler event="focus" type="text/javascript"><![CDATA[
+				bb.html.addClass(this.viewNode, 'btl-slider-focus');
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="sliderGrippy" extends="b:sliderGrippyBase">
+			
+
+			<d:resource type="application/xhtml+xml" name="tooltip"><![CDATA[
+				]]><span class="btl-slider-current"><span class="btl-slider-current-value btl-chameleon-infoBackground btl-chameleon-infoText"/>
+					<div class="btl-slider-arrow">
+						<div class="btl-slider-arrow-line-1 btl-chameleon-infoBackground"/>
+						<div class="btl-slider-arrow-line-2 btl-chameleon-infoBackground"/>
+						<div class="btl-slider-arrow-line-3 btl-chameleon-infoBackground"/>
+						<div class="btl-slider-arrow-line-4 btl-chameleon-infoBackground"/>
+						<div class="btl-slider-arrow-line-5 btl-chameleon-infoBackground"/>
+						<div class="btl-slider-arrow-line-6 btl-chameleon-infoBackground"/>
+						<div class="btl-slider-arrow-line-7 btl-chameleon-infoBackground"/>
+						<div class="btl-slider-arrow-line-8 btl-chameleon-infoBackground"/>
+						<div class="btl-slider-arrow-line-9 btl-chameleon-infoBackground"/>
+						<div class="btl-slider-arrow-line-10 btl-chameleon-infoBackground"/>
+					</div>
+				</span><![CDATA[
+			]]></d:resource>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-slider-grippy btl-chameleon-highlightBackground" onbeforeactivate="return false;">
+				</div>
+			</d:template>
+
+			<d:method name="getLabelElement">
+				<d:body type="text/javascript"><![CDATA[
+					var oEl = null;
+					if (!this.__label) {
+						oEl = this.getToolTipElement().firstChild;
+						while (oEl && oEl.tagName && oEl.tagName.toLowerCase() != "span") {
+							oEl = oEl.nextSibling;
+						}
+						this.__label = oEl;
+					}
+					return this.__label;
+				]]></d:body>
+			</d:method>
+		</d:element>
+	</d:namespace>
+</d:tdl>

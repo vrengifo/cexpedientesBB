@@ -1,0 +1,722 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="positionElement dimensionElement containerElement" src="../visualElement/visualElement.xml"/>
+
+		<d:element name="panelLayout" extends="b:positionElement b:dimensionElement">
+			
+
+			<d:resource type="text/javascript"><![CDATA[btl.panelLayout = {};
+
+//constants
+btl.panelLayout.UNITS_NORMAL     = 1;	//px em pt in 	e.g. b:columns="300px * 200px"
+btl.panelLayout.UNITS_PERCENTAGE = 2;	//% 			e.g. b:columns="30% * 20%"
+btl.panelLayout.UNITS_MIXED      = 3;	//mixed up		e.g. b:columns="30% * 200px"
+
+//function doesn't acutally build the panelLayout, but it does
+//configure it and build its children
+btl.panelLayout.define = function (oController, oDim){
+//--------------------------------
+	var oOldDim = oController.getProperty('dimensions');
+	var oChildren = [];
+	var oChild = oController.getProperty('firstChild');
+	while(oChild) {
+		if(bb.instanceOf(oChild, btl.namespaceURI, "panelLayoutItem") || bb.instanceOf(oChild, btl.namespaceURI, "panelLayout"))
+			oChildren.push(oChild);
+		oChild = oChild.getProperty("nextSibling");
+	}
+
+	//may need to do a clean up. If this isn't the first time the panel set has been
+	//set then if content was Mixed we need to tidy up
+	//first test if theis cleanup is necessary
+
+	//tag_PANELLAYOUT__DEBUG(oController.viewNode, 'after define:');
+	if ( btl.panelLayout.testIfTidyRequired(oOldDim, oDim) ){
+
+		//now simply chuck all the panels out of the panelLayout div
+		var oParentElm = oController.viewNode;
+		var oContLen;
+		var oContainerDiv;
+		//tag_PANELLAYOUT__DEBUG(oParentElm, 'before tidy:');
+		if (oOldDim.iLeadUnit == btl.panelLayout.UNITS_PERCENTAGE){
+			//if lead unit is percentage then container div is the last child
+			oContainerDiv = oParentElm.removeChild(oParentElm.lastChild);
+			oContLen = oContainerDiv.childNodes.length;
+			for (var i = 0; i < oContLen; i++)
+				oParentElm.appendChild(oContainerDiv.childNodes[0]);
+		} else {
+			//if lead unit is not percentage then the container div is the first child
+			oContainerDiv = oParentElm.removeChild(oParentElm.firstChild);
+			//need reference to current first child
+			var oOrigFirstChild = oParentElm.firstChild;
+			oContLen = oContainerDiv.childNodes.length;
+			for (var i = 0; i < oContLen; i++)
+				oParentElm.insertBefore(oContainerDiv.childNodes[0], oOrigFirstChild);
+		}
+		//tag_PANELLAYOUT__DEBUG(oParentElm, 'after tidy:');
+	}
+
+	//Set the dimension on the node(for later cleanup)
+	oController.setProperty('dimensions', oDim);
+
+
+
+
+	//now that we have parsed the string, see if we actual have the required number of children
+	//throw error if number of panel(set)s in xml don't match those in dimensions
+	if (oDim.aDimensions.length != oChildren.length)
+		throw ['Number of panels doesnt match attribute value', oDim.aDimensions.length];
+
+	//just set the default styles that all panelLayout have
+	//this step also resets the panelLayout to the default values
+	btl.panelLayout.setPanelLayoutDefaultStyles(oController.viewNode);
+
+
+	//In IE you need to clear the padding, (this is very logical too, since if the
+	//parentnode actually needs padding, it will get given it in tag_PANELLAYOUT_DefinePanelMixed or Normal
+	//However in Mozilla leaving the padding set seems to cure a strange bug.
+	if (bb.browser.ie)
+		oController.viewNode.style.padding = '';
+
+
+	switch(oDim.iUnitType){
+		case btl.panelLayout.UNITS_NORMAL:
+			btl.panelLayout.definePanelNormal(oChildren, oController, oDim);
+			break;
+		case btl.panelLayout.UNITS_PERCENTAGE:
+			btl.panelLayout.definePanelPercentage(oChildren, oController, oDim);
+			break;
+		case btl.panelLayout.UNITS_MIXED:
+			btl.panelLayout.definePanelMixed(oChildren, oController, oDim);
+			break;
+	}
+
+	//tag_PANELLAYOUT__DEBUG(oController.viewNode, 'after define:');
+
+	if (bb.browser.ie)
+		document.body.scrollIntoView(true); // solves all rendering problems?!??!
+}
+//--------------------------------
+btl.panelLayout.parseDimensions = function(arrSplit, sStyle1D, sStyle1D_Inverse, sStyle1DSecond, sStyle2D){
+//--------------------------------
+	//create new dimension object
+	var oDims = {};
+	var iTrailUnit;
+
+	oDims.aDimensions 		= [];
+	oDims.iUnitType			= null; //Initial
+
+	//oDims.iStar = null; //either null or equal to index of star
+	//oDims.iLeadUnit = null; //only used when iUnitType == PANELLAYOUT_UNITS_MIXED
+	//oDims.iTrailUnit = null; //iUnitType == PANELLAYOUT_UNITS_MIXED
+
+	oDims.sStyle1D			= sStyle1D; //either top or left
+	oDims.sStyle1D_Inverse	= sStyle1D_Inverse; //either top or left, using opposite axis from sStyle1D
+	oDims.sStyle1DSecond	= sStyle1DSecond; //either bottom or right
+	oDims.sStyle2D			= sStyle2D; //either width or height
+	oDims.bContainerStable 	= false; //indicates if true that even though the units are mixed, no new container needs to be
+
+	//Parse out the input string of dimensions
+	var arrRxOutput;
+	//var _RX_Dim = /^([0-9]*\.)?[0-9]+(.*)/;
+
+	//now parse out the unit type and check for basic correctness
+	for (var i=0; i < arrSplit.length; i++){
+		if (arrSplit[i]){
+
+			if (arrSplit[i] == '*'){
+				arrRxOutput = ['*', null, '*'];
+				oDims.iStar = oDims.aDimensions.length;
+			} else{
+				arrRxOutput = arrSplit[i].match(/^([0-9]*\.)?[0-9]+(.*)/);
+				//If no arrRxOutput parsing really went wrong
+				if(!arrRxOutput)
+					throw ['parse mixing general'];
+				//Assume px if no units are defined
+				if (!arrRxOutput[2]){
+					arrRxOutput[0] += 'px';
+					arrRxOutput[2] = 'px';
+				}
+			}
+			oDims.aDimensions[oDims.aDimensions.length] = [arrRxOutput[0], arrRxOutput[2]];
+		}
+	}
+
+	var sPrevUnit = null;
+	var iCheckAgainst, iCheckAgainst_Inverse, sCurrUnit;
+	//now analyse the sequence. All panels in a set must have the same units (or a star).
+	//However On either side of a * the units may differ. This is a special case.
+	for (var j=0; j < oDims.aDimensions.length; j++){
+		sCurrUnit = oDims.aDimensions[j][1];
+
+		if(sCurrUnit != '*'){
+
+			if(sCurrUnit == '%'){
+				iCheckAgainst = btl.panelLayout.UNITS_NORMAL;
+				iCheckAgainst_Inverse = btl.panelLayout.UNITS_PERCENTAGE;
+			}else{
+				iCheckAgainst = btl.panelLayout.UNITS_PERCENTAGE;
+				iCheckAgainst_Inverse = btl.panelLayout.UNITS_NORMAL;
+			}
+
+			switch (oDims.iUnitType){
+				case iCheckAgainst:
+					//now we have a problem. If there was a star and it was the prev char then we may be OK
+					if (oDims.iStar && oDims.iStar == j - 1){
+						//moving to mixed situation. Need to know what start and end units are
+						oDims.iUnitType = btl.panelLayout.UNITS_MIXED;
+						oDims.iLeadUnit = iCheckAgainst;
+						iTrailUnit = iCheckAgainst_Inverse;
+					}
+					else 	//mixing units in wrong way. Pattern: "3px 4px 4%" or "3px * 4px 4%"
+						throw ['parse mixing'];
+					break;
+				case btl.panelLayout.UNITS_MIXED:
+					//if mixed then the previous unit must also be a %
+					if (iTrailUnit != iCheckAgainst_Inverse) //mixing units in wrong way. Pattern: "3% * 4px 4%"
+						throw ['parse mixing'];
+					if(sPrevUnit &&  sPrevUnit != sCurrUnit) //mixing units in wrong way. Pattern: "4% * 4px 3em"
+						throw ['parse mixing'];
+						//nothing else changes
+					break;
+				case iCheckAgainst_Inverse:
+					//need to check if sPrevUnit is same unit as current if not error
+					if (sPrevUnit &&  sPrevUnit != sCurrUnit) //mixing units in wrong way. Pattern: "3px 4px 4%" or "3px * 4px 4%"
+						throw ['parse mixing'];
+					break;
+				default:
+					//start up case
+					oDims.iUnitType = iCheckAgainst_Inverse;
+					break;
+			}
+			sPrevUnit = sCurrUnit;
+		}else
+		//only update the previous character if not 0 or * which are both unit less
+			sPrevUnit = null;
+	}
+
+	//for the case "0 *" then simply cast unit type to percentage since this is most efficient
+	if (!oDims.iUnitType)
+		oDims.iUnitType = btl.panelLayout.UNITS_PERCENTAGE;
+
+	return oDims;
+}
+
+
+
+
+//Function sets the default styles that a PanelLayout should have
+//--------------------------------
+btl.panelLayout.setPanelLayoutDefaultStyles = function btl_panelLayout_setPanelLayoutDefaultStyles(oElm) {
+//--------------------------------
+	var oController = oElm.controller;
+	var oParent = oController ? oController.getProperty('parentNode') : null;
+
+	// Only overwrite defined style information if the panelLayout is not the first one in a set
+	if (oController && oParent && !bb.instanceOf(oParent, btl.namespaceURI, 'panelLayout')) {
+
+// these settings are now in the classes:
+
+// the root panelLayout should be positioned relatively
+//		if (!oElm.style.position)
+//			oElm.style.position	= 'relative';
+//		if (!oElm.style.height)
+//			oElm.style.height = '100%';
+//		if (!oElm.style.width)
+//			oElm.style.width = '100%';
+
+	} else {
+
+		oElm.style.position = 'absolute';
+		oElm.style.height = '100%';
+		oElm.style.width = '100%';
+
+		if(!oElm.style.overflow){
+			if(oController && oParent && bb.instanceOf(oParent, btl.namespaceURI, 'panelLayout'))
+				oElm.style.overflow = 'hidden';
+			else
+				oElm.style.overflow = 'auto';
+		}
+	}
+}
+
+
+
+//function sets up a a panelLayout where the unit type of the dimension is percentage
+//This is probably the most simple of 3 types. Just need to set the appropriate widths and lefts or
+//heights and tops and do some kind of calculation for *
+//--------------------------------
+btl.panelLayout.definePanelPercentage = function btl_panelLayout_definePanelPercentage(oChildren, oController, oDim){
+//--------------------------------
+	//don't need to do anything to parent
+	//Just add children and calculate porportions
+	var iCulm2D = 0, i2D, oStyle, oLL;
+
+	for(var i = 0; i < oChildren.length; i++){
+		oLL = oChildren[i];
+		btl.panelLayout.resetStyle(oLL.viewNode);
+								//star need to total everything up and calculate remainder 	  	//not star
+		i2D = oDim.iStar == i ? btl.panelLayout.diffStar(oDim, 0, oDim.aDimensions.length - 1) : oDim.aDimensions[i][0];
+		//grab style object of panel node
+		var oStyle = oLL.viewNode.style;
+		oStyle[oDim.sStyle1D] = iCulm2D + '%';
+		oStyle[oDim.sStyle2D] = i2D;
+		iCulm2D += parseInt(i2D, 10);
+	}
+}
+
+//function sets up a a panelLayout where the unit type of the dimension is a normal (non-percentage) measurement unit.
+//Need to do following. If no star then simply fix width/height and left/top. If there is a star, then need to calculate
+//cumulative total above star and below star. Then we need to fix the padding of the parentNode to reflect this
+//cumalitve above and below. Then add the normal panels from above and below and then finally add the * panel as a relatively
+//div
+//--------------------------------
+btl.panelLayout.definePanelNormal = function btl_panelLayout_definePanelNormal(oChildren, oController, oDim){
+//--------------------------------
+	//don't need to do anything to parent
+	//Just add children and calculate porportions
+	var iCulm2D = 0,
+		oStyle,
+		oLL,
+		i2D,
+		i;
+
+	//determine whether there is a star or not
+	if(oDim.iStar >= 0){
+		//there is a star
+		//move forward first of all until star
+		var oPadding = new btl.panelLayout.padding;
+		var sUnit = '';
+
+		for(i = 0; i < oDim.iStar; i++){
+			oLL = oChildren[i];
+
+			btl.panelLayout.resetStyle(oLL.viewNode);
+			//grab style object from panel node and set up defaults
+			//not star. So simply set 1D and 2D
+			//grab prevailing unit
+			i2D = oDim.aDimensions[i][0];
+			sUnit = oDim.aDimensions[i][1];
+
+			oStyle = oLL.viewNode.style;
+			oStyle[oDim.sStyle1D] = iCulm2D + sUnit;
+			oStyle[oDim.sStyle2D] = i2D;
+			iCulm2D += parseFloat(i2D);
+		}
+
+		oPadding[oDim.sStyle1D] = iCulm2D + sUnit;
+
+		//Reset something
+		iCulm2D = 0;
+		sUnit = '';
+
+		//now move backwards until star
+		for(i = oDim.aDimensions.length - 1; i > oDim.iStar; i--){
+			oLL = oChildren[i];
+
+			btl.panelLayout.resetStyle(oLL.viewNode);
+			//grab style object from panel node and set up defaults
+
+
+			//not star. So simply set 1D and 2D
+			i2D = oDim.aDimensions[i][0];
+			sUnit = oDim.aDimensions[i][1];
+
+			oStyle = oLL.viewNode.style;
+			oStyle[oDim.sStyle1DSecond] = iCulm2D + sUnit;
+			oStyle[oDim.sStyle2D] = i2D;
+			iCulm2D += parseFloat(i2D);
+
+			//quick fix for dynamic style application ??? Why
+			oStyle.top = '';
+			oStyle.left = '';
+			oStyle[oDim.sStyle1D_Inverse] = '0px';
+		}
+
+		//now fix the padding of the parent
+		oPadding[oDim.sStyle1DSecond] = iCulm2D + sUnit;
+
+
+		oController.viewNode.style.padding = btl.panelLayout.getPaddingString(oPadding);
+
+		//now finally fix the star. It needs to have a position relative
+		btl.panelLayout.resetStyle(oChildren[oDim.iStar].viewNode);
+		oChildren[oDim.iStar].viewNode.style.position = 'relative';
+
+	} else {
+		//no star
+		for(i = 0; i < oChildren.length; i++){
+			oLL = oChildren[i];
+
+			btl.panelLayout.resetStyle(oLL.viewNode);
+			//grab style object from panel node and set up defaults
+
+			//not star. So simply set 1D and 2D
+			i2D = oDim.aDimensions[i][0];
+
+			oStyle = oLL.viewNode.style;
+			oStyle[oDim.sStyle1D] = iCulm2D + oDim.aDimensions[i][1];
+			oStyle[oDim.sStyle2D] = i2D;
+			iCulm2D += parseFloat(i2D);;
+		}
+	}
+}
+
+/*
+<b:panelLayout columns="100px * 30%">
+	<b:panelLayoutItem></b:panelLayoutItem>
+	<b:panelLayoutItem></b:panelLayoutItem>
+	<b:panelLayoutItem></b:panelLayoutItem>
+</b:panelLayout>
+
+
+<div>
+	 <div style="position left:0; width: 70%; padding-top: 100px">
+		<div style="width: 100px;">panel1</div>
+		<div style="position: relative">panel2</div>
+	 </div>
+	 <div style="left:70%; width: 30%;">panel3</div>
+</div>
+
+Bascially to do this, you take the panel(s) with the non-percentage along with
+The panel with the *. You wrap these in their own div. Then you can treat the whole as two distinct groups
+
+1. The non-percentage measurement and the star are solved as in tag_PANELLAYOUT_DefinePanelNormal, except there is
+only measurements on one side of the star
+2. The percentage measurement is grouped with the new containing div and resolved as in tag_PANELLAYOUT_DefinePanelNormal
+*/
+
+//--------------------------------
+btl.panelLayout.definePanelMixed = function btl_panelLayout_definePanelMixed(oChildren, oController, oDim){
+//--------------------------------
+	var oNonPercDiv, oStyle;
+	//need to ascertain whether the normal measurements are top or bottom
+	var bPercentTop = oDim.iLeadUnit === btl.panelLayout.UNITS_PERCENTAGE;
+
+	//lets do the percentage portion first. This works on the outer set of divs
+	//Determine start and end set of panels to work on
+	var iPercentStart = (bPercentTop) ?  0 : oDim.iStar;
+	var iPercentEnd = (bPercentTop) ?  oDim.iStar : oDim.aDimensions.length - 1;
+	//Now do the non-percentage portion these work on the inner div and the container
+	//lets do the percentage portion first. This works on the outer set of divs
+	//Determine start and end set of panels to work on
+	//now we really have to start at the right side (either top or bottom) and head towards the star, otherwise
+	//it really doesn't work.
+
+
+	//now start assigning height/width
+	var iCulm2D = 0,
+		sUnit = '',
+		oLL,
+		i2D,
+		oPadding = new btl.panelLayout.padding;
+
+	//tag_PANELLAYOUT__DEBUG(oParentJSX.oElm, 'before define:');
+
+	for (var i = iPercentStart; i <= iPercentEnd; i++){
+		oLL = oChildren[i];
+
+		if (i == oDim.iStar){
+			//create container for non-percentage measurements
+			//need to insert this container at right place this is important later on for taking it out again
+			//so grab the next panel, so we know where to insert it before
+			var oNewDiv = document.createElement('div');
+			oNewDiv.setAttribute('class', 'btl-panel');
+
+			oNonPercDiv = oDim.bContainerStable ? oLL.viewNode.parentNode : oController.viewNode.insertBefore(oNewDiv, oChildren[i+1].viewNode);
+
+			btl.panelLayout.setPanelLayoutDefaultStyles(oNonPercDiv);  //can reset padding here
+
+			i2D = btl.panelLayout.diffStar(oDim, iPercentStart, iPercentEnd);
+			oStyle = oNonPercDiv.style;
+
+		} else{
+			btl.panelLayout.resetStyle(oLL.viewNode);
+			//grab style object from panel node and set up defaults
+			i2D = oDim.aDimensions[i][0];
+			oStyle = oLL.viewNode.style;
+		}
+
+		oStyle[oDim.sStyle1D] = iCulm2D + '%';
+		oStyle[oDim.sStyle2D] = i2D;
+		iCulm2D += parseFloat(i2D);
+	}
+
+	//reset some stuff
+	iCulm2D = 0;
+
+	//It is very important to put the divs into the container in the right order
+	//so that when they get thrown out the container in tag_PANELLAYOUT__TidyUpMixedPanelset
+	//they end up in their original order
+	//therefore need to register the previous node
+	//Depending on order this may remain null, but this helps the whole trick to work
+	var oPrevElm = null;
+
+	if (bPercentTop){
+		//start at bottom work up to star, but don't do star
+		for (var i = oDim.aDimensions.length - 1; i > oDim.iStar; i--){
+			oLL = oChildren[i];
+			//this node needs to be brutally ripped out of its current context
+			//and slammed into the new container div
+
+			if (!oDim.bContainerStable){
+				oController.viewNode.removeChild(oLL.viewNode);
+				//since we are looping backwards need to insert before the previous node
+				oNonPercDiv.insertBefore(oLL.viewNode, oPrevElm);
+			}
+
+			btl.panelLayout.resetStyle(oLL.viewNode);
+
+			//grab style object from panel node and set up defaults
+
+			//not star. So simply set 1D and 2D
+			sUnit = oDim.aDimensions[i][1];
+			i2D = oDim.aDimensions[i][0];
+
+			oStyle = oLL.viewNode.style;
+			oStyle[oDim.sStyle1DSecond] = iCulm2D + sUnit;
+			oStyle[oDim.sStyle2D] = i2D;
+			iCulm2D += parseFloat(i2D);
+
+			//quick fix for dynamic style application
+			oStyle[oDim.sStyle1D_Inverse] = '0px';
+
+			//store prevElm
+			oPrevElm = oLL.viewNode;
+		}
+
+		//Set padding to object
+		oPadding[oDim.sStyle1DSecond] = iCulm2D + sUnit;
+	} else{
+		//start at top work down to star, but don't do star
+		for (var i = 0; i < oDim.iStar; i++){
+			oLL = oChildren[i];
+			//this node needs to be brutally ripped out of its current context
+			//and slammed into the new container div
+			if (!oDim.bContainerStable){
+				oController.viewNode.removeChild(oLL.viewNode);
+				oNonPercDiv.appendChild(oLL.viewNode);
+			}
+
+			btl.panelLayout.resetStyle(oLL.viewNode);
+
+			//grab style object from panel node and set up defaults
+
+			//not star. So simply set 1D and 2D
+			sUnit = oDim.aDimensions[i][1];
+			i2D = oDim.aDimensions[i][0];
+
+			oStyle = oLL.viewNode.style;
+			oStyle[oDim.sStyle1D] = iCulm2D + sUnit;
+			oStyle[oDim.sStyle2D] = i2D;
+			iCulm2D += parseFloat(i2D);
+		}
+		//Set padding to object
+		oPadding[oDim.sStyle1D] = iCulm2D + sUnit;
+	}
+
+	//apply padding to the new container div
+	oNonPercDiv.style.padding = btl.panelLayout.getPaddingString(oPadding);
+
+	//the star node finally also needs to be brutally ripped out of its current context
+	//and slammed into the new container div
+
+	oLL = oChildren[oDim.iStar];
+
+	if (!oDim.bContainerStable){
+		oController.viewNode.removeChild(oLL.viewNode);
+		//depending on direction which nodes where insert oPrevElm is either filled
+		//or it is null (which causes it to be appended at the end)
+		oNonPercDiv.insertBefore(oLL.viewNode, oPrevElm);
+	}
+
+	btl.panelLayout.resetStyle(oLL.viewNode);
+	oLL.viewNode.style.position = 'relative';
+
+	//tag_PANELLAYOUT__DEBUG(oHostNode.viewNode, 'after define:');
+}
+
+//calculate size of the star
+//--------------------------------
+btl.panelLayout.diffStar = function btl_panelLayout_diffStar(oDim, iStart, iEnd){
+//--------------------------------
+	var arrDim = oDim.aDimensions;
+	var iStar2D = 100;
+	for (var i= iStart; i <= iEnd; i++)
+		if(i != oDim.iStar) iStar2D -= parseInt(arrDim[i][0], 10);
+	return iStar2D + '%';
+}
+
+//--------------------------------
+btl.panelLayout.padding = function btl_panelLayout_padding(){
+//--------------------------------
+	this.top 		= '0px';
+	this.right 		= '0px';
+	this.bottom 	= '0px';
+	this.left 		= '0px';
+}
+//--------------------------------
+btl.panelLayout.getPaddingString = function btl_panelLayout_getPaddingString(oObj){
+//--------------------------------
+	return oObj.top + ' ' + oObj.right + ' ' + oObj.bottom + ' ' + oObj.left;
+}
+
+//--------------------------------
+btl.panelLayout.resetStyle = function btl_panelLayout_resetStyle(oElm){
+//--------------------------------
+	//first set or reset default styles for a panel
+	if (oElm.controller && oElm.controller.getProperty('localName') == 'panel'){
+
+		//Function sets the default styles that a Panel should have
+		oElm.style.position	= 'absolute';
+		oElm.style.height 		= '100%';
+		oElm.style.width		= '100%';
+
+		// Only set the overflow if it hasn't been set by the developer
+		if (!oElm.style.overflow) oElm.controller.viewGate.style.overflow = 'auto';
+
+		//clean up
+		oElm.style.top 	= '';
+		oElm.style.left 	= '';
+		oElm.style.bottom 	= '';
+		oElm.style.right 	= '';
+
+	} else
+		btl.panelLayout.setPanelLayoutDefaultStyles(oElm); //must not reset padding here
+}
+
+//--------------------------------
+btl.panelLayout.testIfTidyRequired = function btl_panelLayout_testIfTidyRequired(oOldDim, oNewDim){
+//--------------------------------
+	if(oOldDim && oOldDim.iUnitType == btl.panelLayout.UNITS_MIXED){
+		//now compare oOldDim with oNewDim
+		var oOldArr = oOldDim.aDimensions;
+		var oNewArr = oNewDim.aDimensions;
+		if (oOldArr.length == oNewArr.length){
+			//check whether old array and new array have the same pattern, when it comes to units used.
+			for (var i = 0; i < oOldArr.length; i++)
+				if (oOldArr[i][1] != oNewArr[i][1])
+					return true;
+		} else //if not the same length then definitely do clean up
+			return true;
+		//if it gets through this test test then the structure of the container is stable.
+		oNewDim.bContainerStable = true;
+	}//do nothing
+	return false;
+}
+
+btl.panelLayout.debug =  function btl_panelLayout_debug(arr, sMessage){
+	sOutput = '\n' + sMessage;
+	sOutput = '\nParentNode';
+	sOutput += '\n' +'position: ' + arr.style.position;
+	sOutput += '\n' +'padding: ' + arr.style.padding;
+	sOutput += '\n';
+
+	for (var i = 0; i < arr.childNodes.length; i++){
+		var oStyle = arr.childNodes[i].style;
+		sOutput += '\n' + i + ': ' + arr.childNodes[i].id;
+		sOutput += '\n' +'position: ' + oStyle.position;
+		sOutput += '\n' +'display: ' + oStyle.display;
+		sOutput += '\n' +'width: ' + oStyle.width;
+		sOutput += '\n' +'top: ' + oStyle.top;
+		sOutput += '\n' +'left: ' + oStyle.left;
+		sOutput += '\n';
+	}
+	alert(sOutput);
+}]]></d:resource>
+
+			<d:resource type="text/css"><![CDATA[
+				.btl-panelLayout,
+				.btl-panelLayoutItem {
+					box-sizing: border-box;
+					-moz-box-sizing: border-box;
+					-khtml-box-sizing: border-box;
+					height: 100%;
+					width: 100%;
+				}
+				.btl-panelLayout {
+					position: relative;
+					overflow: hidden;
+				}
+				.btl-panelLayoutItem {
+					overflow: auto;
+				}
+				.HTML-btl-panelLayout-fullScreen,
+				.HTML-btl-panelLayout-fullScreen BODY {
+					padding: 0;
+					margin: 0;
+				}
+				.btl-panelLayout-fullScreen {
+					position: absolute;
+					width: 100%;
+					height: 100%;
+					top: 0;
+					left: 0;
+				}
+			]]></d:resource>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-panelLayout"><d:content/></div>
+			</d:template>
+
+			<d:attribute name="rows">
+				
+
+				<d:mapper type="text/javascript"><![CDATA[
+					btl.panelLayout.define(
+						this,
+						btl.panelLayout.parseDimensions(value.split(' '), 'top', 'left', 'bottom', 'height' )
+					);
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="columns">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					btl.panelLayout.define(
+						this,
+						btl.panelLayout.parseDimensions(value.split(' '), 'left', 'top', 'right', 'width' )
+					);
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="fullScreen">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					if(btl.isTrueValue(name, value)){
+						bb.html.addClass(this.viewNode, 'btl-panelLayout-fullScreen');
+						bb.html.addClass(document.documentElement, 'HTML-btl-panelLayout-fullScreen');
+					} else {
+						bb.html.removeClass(this.viewNode, 'btl-panelLayout-fullScreen');
+						bb.html.removeClass(document.documentElement, 'HTML-btl-panelLayout-fullScreen');
+					}
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:property name="dimensions">
+				
+			</d:property>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				var sMessage = '';
+				sMessage += 'The http://www.backbase.com/2006/btl#panelLayout has been deprecated.';
+				sMessage += ' Please use the http://www.backbase.com/2006/btl#panelSet instead.';
+				bb.command.trace(this, sMessage)
+			]]></d:constructor>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				if(!this.modelNode.getAttribute('columns') && !this.modelNode.getAttribute('rows') || (this.modelNode.getAttribute('columns') && this.modelNode.getAttribute('rows')))
+					bb.command.trace(this, 'Either "columns" or "rows" attribute has to be defined!', 2);
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="panelLayoutItem" extends="b:containerElement">
+			
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-panelLayoutItem"><d:content/></div>
+			</d:template>
+		</d:element>
+	</d:namespace>
+</d:tdl>

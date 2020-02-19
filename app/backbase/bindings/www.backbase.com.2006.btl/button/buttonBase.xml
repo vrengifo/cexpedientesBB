@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="focusableElement" src="../focus/focus.xml"/>
+		<d:uses element="positionElement dimensionElement containerElement" src="../visualElement/visualElement.xml"/>
+
+		<d:element name="buttonBase" extends="b:positionElement b:dimensionElement b:containerElement b:focusableElement" abstract="true">
+			
+		</d:element>
+	</d:namespace>
+</d:tdl>

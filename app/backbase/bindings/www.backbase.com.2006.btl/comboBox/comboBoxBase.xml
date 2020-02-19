@@ -1,0 +1,762 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="positionElement dimensionElement" src="../visualElement/visualElement.xml"/>
+		<d:uses element="dropDown" src="../dropDown/dropDown.xml"/>
+		<d:uses element="formList" src="../formList/formList.xml"/>
+		<d:uses element="focusableElement" src="../focus/focus.xml"/>
+
+		<d:element name="comboBoxBase" extends="b:dropDown b:formList b:positionElement b:dimensionElement b:focusableElement" abstract="true">
+			
+
+			
+
+			<d:attribute name="readonly">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					this.setReadOnly(btl.isTrueValue(name, value));
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="filter" default="false">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					if (btl.isFalseValue(name, value)) {
+						this.resetFilter();
+					}
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:property name="selectedOption">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					// by default, the selectedOption is null, unless an option is selected;
+					var oSelectedOption = null;
+					var aOptions = this.getProperty('options');
+					for (var i = 0, iMax = aOptions.length; iMax > i; i++) {
+						var oOption = aOptions[i];
+						if (oOption.getProperty('selected')) {
+							oSelectedOption = oOption;
+							break;
+						}
+					}
+					return oSelectedOption;
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					if (value) {
+						if (bb.instanceOf(value, 'http://www.backbase.com/2006/btl', 'comboBoxOptionBase') &&
+								value.getProperty('parentNode') == this) {
+
+							value.setProperty('selected', true);
+						}
+					} else {
+						this.handleSelectedOption(null);
+					}
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="selectedIndex">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					if (value === -1) {
+						var oSelectedOption;
+						while (oSelectedOption = this.getProperty('selectedOption')) {
+							oSelectedOption.setProperty('selected', false);
+						}
+						this.setLabel('');
+						// updating internal input value
+						this.setValue("");
+					} else if (value > -1) {
+						var aOptions = this.getProperty('options');
+						if (aOptions.length && aOptions[value]) {
+							aOptions[value].setProperty('selected', true);
+						}
+					}
+				]]></d:setter>
+				<!-- TODO: remove getter when bug 6509 is fixed -->
+				<d:getter type="text/javascript"><![CDATA[
+					// by default, the index is -1, unless an option is selected;
+					var iSelectedIndex = -1;
+					var aOptions = this.getProperty('options');
+					for (var i = 0, iMax = aOptions.length; iMax > i; i++) {
+						if (aOptions[i].getProperty('selected')) {
+							iSelectedIndex = i;
+							break;
+						}
+					}
+					return iSelectedIndex;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="value">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					/* If the provided value is different from the current value, the option with
+					\* the provided value should be selected. */
+
+					var aOptions = this.getProperty('options');
+					var bIsOption = false;
+					for (var i = 0, iMax = aOptions.length; iMax > i; i++){
+						var oOption = aOptions[i];
+						if (oOption.getProperty('value') == value) {
+							oOption.setProperty('selected', true);
+							bIsOption = true;
+							break;
+						}
+					}
+
+					/* If the value is not an option, the comboBox should not change its value.
+					** When the comboBox is not readOnly, it may accept the new value. The value
+					\* will be set visually. There it will be picked up by the value property getter. */
+
+					if (!bIsOption) {
+						if (!this.getProperty('readOnly')) {
+							var oSelectedOption = this.getProperty('selectedOption');
+							if (oSelectedOption) {
+								oSelectedOption.setProperty('selected', false);
+							}
+							this.setLabel(value);
+							this.setValue(value);
+						}
+					}
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					/* If an option is selected, the value of the option should be returned.
+					** If no option is selected (selectedIndex == -1), the value should return an
+					** empty string when the comboBox is readOnly and it should return whatever
+					\* the user has entered. */
+
+					var oSelectedOption = this.getProperty('selectedOption');
+
+					var sValue = '';
+					if (oSelectedOption) {
+						sValue = oSelectedOption.getProperty('value');
+					} else if (!this.getProperty('readOnly')) {
+						sValue = this.getLabel();
+					}
+					return sValue;
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="highlightIndex">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					var iCurrentIndex = this.getProperty('highlightIndex');
+					var iOptionsLength = this.getProperty('options').length;
+
+					if (iCurrentIndex > -1 && iOptionsLength > iCurrentIndex) {
+						//remove highlight from the view
+						this.removeHighlight(iCurrentIndex);
+					}
+
+					if (value > -1 && iOptionsLength > value) {
+						// highlight the option in the view
+						this.setHighlight(value);
+					}
+
+					if (value >= -1 && iOptionsLength > value) {
+						// store the value
+						this._['_highlightIndex'] = value;
+					}
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					if (this._['_highlightIndex'] === undefined)
+						this._['_highlightIndex'] = -1;
+					return this._['_highlightIndex'];
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="filter">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					return btl.isTrueValue(name, this.getAttribute(name));
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					if (value)
+						this.setAttribute(name, 'true');
+					else
+						this.removeAttribute(name);
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="readOnly">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					if (value != this.getProperty('readOnly')) {
+						value ? this.setAttribute('readonly', 'readonly') : this.removeAttribute('readonly');
+					}
+				]]></d:setter>
+				<d:getter type="text/javascript"><![CDATA[
+					return btl.isTrueValue('readonly', this.getAttribute('readonly'));
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="valueBeforeChange">
+				
+			</d:property>
+
+			<d:property name="selectedIndexBeforeChange">
+				
+			</d:property>
+
+			<d:method name="handleSelectedOption">
+				
+				<d:argument name="selectedOption">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					/* Only one option can be selected at a time.
+					\* Deselect all options that are currently selected (but are not the provided argument) */
+
+					var iSelectedOptionIndex = -1;
+
+					for (var i = 0, aOptions = this.getProperty('options'), iMax = aOptions.length; i < iMax; i++) {
+						var oOption = aOptions[i];
+						if (oOption.getProperty('selected') && oOption != selectedOption) {
+							oOption.setProperty('selected', false);
+						}
+						if (oOption == selectedOption) {
+							iSelectedOptionIndex = i;
+						}
+					}
+
+					// @TODO: refactor. The following lines make it work, but both patterns aren't really efficient/clear.
+					// For one thing, dealing with the visual changes can be done differently (in the skin ideally).
+					// Also, the value set in the label is now the text property, which should be the label property.
+					// Setting highlightIndex will manage
+					if (selectedOption)
+						this.setLabel(selectedOption.getProperty('text'));
+
+					this.setProperty('highlightIndex', iSelectedOptionIndex);
+
+					// updating the internal input value
+					this.setValue(this.getProperty("value"));
+				]]></d:body>
+			</d:method>
+
+			<d:method name="handleDeselectedOption">
+				
+				<d:argument name="deselectedOption">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					// if no options are selected, everything should be cleared
+					if (this.getProperty('selectedIndex') == -1) {
+						this.setProperty('highlightIndex', -1);
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="filter">
+				 
+				<d:body type="text/javascript"><![CDATA[
+					/* TODO: move skin related code */
+					if (this._.__emptyDiv != undefined) {
+						this._.__emptyDiv.parentNode.removeChild(this._.__emptyDiv);
+						this._.__emptyDiv = undefined;
+					}
+
+					var sLabel = this.getLabel().toLowerCase();
+
+					var bHasPartialMatches = this._.__hasPartialMatches;
+
+					var bFilter = this.getProperty('filter');
+
+					if (this._.__lastFilteredValue != sLabel) {
+						this._.__lastFilteredValue = sLabel;
+
+						var aOptions = this.getProperty('options');
+
+						bHasPartialMatches = false;
+						for (var i = 0, iMax = aOptions.length; iMax > i; i++) {
+							var oOption = aOptions[i];
+
+							var sOptionLabel = oOption.getProperty('text').toLowerCase();
+
+							var bFullMatch = (sLabel == sOptionLabel);
+							var bMatch = (sOptionLabel.indexOf(sLabel) == 0);
+
+							bHasPartialMatches |= bMatch;
+
+							/* If filter is turned on, values that match, are shown and
+							\* values that do not match are hidden. */
+							if (bFilter) {
+								if (bMatch) {
+									oOption.setProperty('filtered', false);
+								} else {
+									oOption.setProperty('filtered', true);
+								}
+							}
+
+							if (bFullMatch) {
+								oOption.setProperty('selected', true);
+							} else {
+								oOption.setProperty('selected', false);
+							}
+
+						}
+						this._.__hasPartialMatches = bHasPartialMatches;
+					}
+
+					/* TODO: move skin related code */
+					if (bFilter){
+						if (bHasPartialMatches) {
+							this.open();
+						} else {
+							if (this._.__emptyDiv == undefined) {
+								this._.__emptyDiv = document.createElement('div');
+								this._.__emptyDiv.innerHTML = '&#160;';
+								this._.__emptyDiv = this.getProperty('dropDownElement').appendChild(this._.__emptyDiv);
+								// XXX: could be removed?
+								this.setProperty('highlightIndex', this.getProperty('selectedIndex'));
+							}
+						}
+					}
+					return bHasPartialMatches;
+				]]></d:body>
+			</d:method>
+
+			<d:method name="resetFilter">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var aOptions = this.getProperty('options');
+					this._.__lastFilteredValue = null;
+					for (var i = aOptions.length - 1; i >= 0; i--) {
+						aOptions[i].setProperty('filtered', false);
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="close">
+				
+				<d:body type="text/javascript"><![CDATA[
+					this.setProperty('highlightIndex', this.getProperty('selectedIndex'));
+					this.resetFilter();
+					this.callSuper('close');
+				]]></d:body>
+			</d:method>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				this.callSuper();
+				// set the initial selection when necessary
+				var oSelectedOption = this.getProperty('selectedOption');
+				if (!oSelectedOption && this.getProperty('readOnly')) {
+					var aOptions = this.getProperty('options');
+					if (aOptions.length) {
+						// @TODO: maybe set attribute instead of property? since it will set the default selected state.
+						aOptions[0].setProperty('selected', true);
+					}
+				}
+			]]></d:constructor>
+
+			<d:handler event="change" type="text/javascript"><![CDATA[
+				if (this.getProperty("selectedIndex") == -1) {
+					this.setValue(this.getProperty("value"));
+				}
+			]]></d:handler>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				// @TODO: Move to skin as this is only done to update the view.
+				var oSelectedOption = this.getProperty('selectedOption');
+				if (oSelectedOption) {
+					this.setLabel(oSelectedOption.getProperty('text'));
+					this.setValue(this.getProperty("value"));
+					this.setProperty('highlightIndex', this.getProperty('selectedIndex'));
+				}
+
+				// @TODO: move to skin (because it is a visual fix)
+				if (bb.browser.ie) {// workaround for bug 7229
+					var sDisplay = this.viewNode.style.display;
+					this.viewNode.style.display = "inline";
+					var oForceRedraw = function(oNode){return function(){oNode.style.display = sDisplay}}(this.viewNode);
+					setTimeout(oForceRedraw, '0');
+				}
+			]]></d:handler>
+
+			<d:handler event="mousedown" type="text/javascript"><![CDATA[
+				if (event.button == 0){
+					if (!this.getProperty('open')){
+						if(this.getProperty('readOnly') ||
+								bb.selector.queryAncestor(event.viewTarget, '.btl-comboBox-button', this.viewNode))
+							this.open();
+
+					} else {
+						if (this.getProperty('readOnly') &&
+								!bb.selector.queryAncestor(event.viewTarget, '.btl-comboBox-dropDown', this.viewNode) ||
+								bb.selector.queryAncestor(event.viewTarget, '.btl-comboBox-button', this.viewNode))
+							this.close();
+					}
+
+					// prevent focus from being lost when clicking inside the comboBox but outside the input
+					if (!bb.browser.ie && this.__mouseDown)
+						event.preventDefault();
+				}
+
+				// set focus to the input no matter where the element is clicked
+				if (!bb.browser.ie)
+					this.focus();
+			]]></d:handler>
+
+			<d:handler event="mouseup" type="text/javascript"><![CDATA[
+				// @TODO: find out why this.__mousedown is set.
+				if (this.__mouseDown) { //???
+
+					// Handler to deal with the selection of an option when the mouseup event is dispatch on an option or its contents
+
+					var oTarget = event.target;
+					if (event.button == 0) {
+						var oOption;
+						// Check if the event.target is or is inside a comboBoxOption and if it is, get the option.
+						while (oTarget != this) {
+							if (bb.instanceOf(oTarget, 'http://www.backbase.com/2006/btl', 'comboBoxOptionBase')) {
+								oOption = oTarget;
+								break; // no need to set oTarget once an option is found.
+							}
+							oTarget = oTarget.getProperty('parentNode');
+						}
+
+						// If mouseup was on an option, it should be selected and the comboBox should close.
+						if (oOption) {
+							this.close();
+							var bSelected = oOption.getProperty('selected');
+							oOption.setProperty('selected', true);
+
+							if (this.getProperty('selectedIndexBeforeChange') != this.getProperty('selectedIndex')) {
+								bb.command.fireEvent(this, 'change', true, false);
+							}
+						}
+					}
+				}
+
+				this.__mouseDown = false;
+			]]></d:handler>
+
+			<d:handler event="mouseleave" type="text/javascript"><![CDATA[
+				this.__mouseDown = false;
+			]]></d:handler>
+
+			<d:handler event="keydown" type="text/javascript"><![CDATA[
+				switch (event.keyIdentifier) {
+					case 'Down':
+							// prevent scrolling
+							event.preventDefault();
+
+							// Open or close when ALT is pressed
+							if (event.altKey) {
+								if (!this.getProperty('open')) {
+									this.open();
+								} else {
+									this.close();
+								}
+							} else {
+								var aOptions = this.getProperty('options');
+								var iMax = aOptions.length - 1;
+								var iNextIndex = this.getProperty('highlightIndex') + 1;
+
+								while (iNextIndex <= iMax) {
+									// The next option should be selectable, when it is not filtered
+									var oNext = aOptions[iNextIndex];
+									if (!oNext.getProperty('filtered')) {
+										oNext.setProperty('selected', true);
+
+										// scrolls element into view when using keys to navigate through options
+										if (this.getProperty('open')) {
+											bb.html.scrollIntoView(this.viewGate.rows[iNextIndex]);
+										}
+
+										// Since a valid new selection is made, there is no need to keep looking.
+										break;
+									}
+									iNextIndex++;
+								}
+							}
+
+							break;
+					case 'Up':
+							// prevent scrolling
+							event.preventDefault();
+
+							// Open or close when ALT is pressed
+							if (event.altKey) {
+								if (!this.getProperty('open')) {
+									this.open();
+								} else {
+									this.close();
+								}
+							} else {
+								var aOptions = this.getProperty('options');
+								var iMin = this.getProperty('readOnly') ? 0 : -1;
+								var iPrecedingIndex = this.getProperty('highlightIndex') - 1;
+
+								while (iPrecedingIndex >= iMin) {
+									// The preceding option should be selectable, when it is not filtered
+
+									if (iPrecedingIndex == -1) {
+										this.setProperty('selectedIndex', -1);
+									} else {
+										var oPreceding = aOptions[iPrecedingIndex];
+										if (!oPreceding.getProperty('filtered')) {
+											oPreceding.setProperty('selected', true);
+
+											// scrolls element into view when using keys to navigate through options
+											if (this.getProperty('open')) {
+												bb.html.scrollIntoView(this.viewGate.rows[iPrecedingIndex]);
+											}
+
+											// Since a valid new selection is made, there is no need to keep looking.
+											break;
+										}
+									}
+									iPrecedingIndex--;
+								}
+							}
+
+							break;
+
+					case 'Enter':
+						if (this.getProperty('open')) {
+							var iHighlightIndex = this.getProperty('highlightIndex');
+							if (iHighlightIndex > -1) {
+								var aOptions = this.getProperty('options');
+								aOptions[iHighlightIndex].setProperty('selected', true);
+							}
+
+							this.close();
+							//prevent form submit
+							event.preventDefault();
+
+							// Dispatch change event when the value has changed
+							if (this.getProperty('valueBeforeChange') != this.getProperty('value')) {
+								bb.command.fireEvent(this, 'change', true, false);
+							}
+						}
+						break;
+
+					case 'U+001B': // Escape
+						var iSelectedIndexBeforeChange = this.getProperty('selectedIndexBeforeChange');
+
+						if (this.getProperty('selectedIndex') != iSelectedIndexBeforeChange) {
+							this.setProperty('selectedIndex', iSelectedIndexBeforeChange);
+						}
+
+						if (this.getProperty('open')) {
+							this.close();
+						}
+						break;
+
+					default:
+						break;
+				}
+			]]></d:handler>
+
+			<d:handler event="textInput" type="text/javascript"><![CDATA[
+				if (!this.getProperty('readOnly') && (event.data.charCodeAt(0) != 27)) { //if not Esc key
+					if (this.__timeoutFilter)
+						clearTimeout(this.__timeoutFilter);
+
+					var oComboBox = this;
+
+					this.__timeoutFilter = setTimeout(
+						function(){
+							oComboBox.filter();
+							this.__timeoutFilter = null;
+						}, 200);
+					this.open();
+				}
+			]]></d:handler>
+
+			<d:handler event="keyup" type="text/javascript"><![CDATA[
+				if (!this.getProperty('readOnly')) {
+					switch (event.keyIdentifier ) {
+						case 'U+0008': // backspace
+						case 'U+002E': // delete
+							if (this.__timeoutFilter)
+								clearTimeout(this.__timeoutFilter);
+
+							var oComboBox = this;
+
+							this.__timeoutFilter = setTimeout(
+								function(){
+									oComboBox.filter();
+									this.__timeoutFilter = null;
+								}, 200);
+
+							break;
+					}
+				}
+			]]></d:handler>
+
+			<d:handler event="focus" type="text/javascript"><![CDATA[
+				/* Store current value and selectedIndex.
+				\* They will be used when deciding to dispatch the change event. */
+
+				this.setProperty('valueBeforeChange', this.getProperty('value'));
+				this.setProperty('selectedIndexBeforeChange', this.getProperty('selectedIndex'));
+			]]></d:handler>
+
+			<d:handler event="change" type="text/javascript"><![CDATA[
+				/* Whenever the value has changed, the valueBeforeChange and selectedIndexBeforeChange
+				\* properties need to be updated. */
+
+				this.setProperty('valueBeforeChange', this.getProperty('value'));
+				this.setProperty('selectedIndexBeforeChange', this.getProperty('selectedIndex'));
+			]]></d:handler>
+
+			<d:handler event="blur" type="text/javascript"><![CDATA[
+				if (!this.__mouseDown && this.getProperty('open'))
+					this.close()
+
+				if (this.getProperty('filter')) {
+					this.resetFilter();
+				}
+
+				// Dispatch change event when value has been changed since the previous change
+				if (this.getProperty('valueBeforeChange') != this.getProperty('value')) {
+					bb.command.fireEvent(this, 'change', true, false);
+				}
+			]]></d:handler>
+
+			<d:handler event="DOMNodeInserted" type="text/javascript"><![CDATA[
+				var oTarget = event.target;
+				if (bb.instanceOf(oTarget, 'http://www.backbase.com/2006/btl', 'comboBoxOptionBase')) {
+					if (oTarget.getProperty('selected')) {
+						this.handleSelectedOption(oTarget);
+					} else {
+						/* The highlightIndex needs to be updated when the element inserted is an option
+						\* and the position is lower than or equal to the current highlightIndex.*/
+						var iHighlightIndex = this.getProperty('highlightIndex');
+						if (iHighlightIndex > -1) {
+							var iIndex = 0;
+							var oPreceding = oTarget;
+							while (oPreceding = oPreceding.getProperty('previousSibling')) {
+								if (bb.instanceOf(oPreceding, 'http://www.backbase.com/2006/btl', 'comboBoxOptionBase'))
+									iIndex++;
+							}
+
+							if (iHighlightIndex >= iIndex){
+								this.setProperty('highlightIndex', iHighlightIndex + 1);
+							}
+						}
+					}
+				}
+			]]></d:handler>
+
+			<d:handler event="DOMNodeRemoved" type="text/javascript"><![CDATA[
+				var oTarget = event.target;
+				if (bb.instanceOf(oTarget, 'http://www.backbase.com/2006/btl', 'comboBoxOptionBase')) {
+					/* If the option that is removed was selected, the label is and highlightIndex are cleared. */
+					if (oTarget.getProperty('selected')) {
+						this.setLabel('');
+						this.setValue('');
+						this.setProperty('highlightIndex', -1);
+					} else {
+						/* The highlightIndex needs to be updated when the element removed is an option
+						\* and the position is lower than the current highlightIndex.*/
+						var iHighlightIndex = this.getProperty('highlightIndex');
+						if (iHighlightIndex > -1) {
+							var iIndex = 0;
+							var oPreceding = oTarget;
+							while (oPreceding = oPreceding.getProperty('previousSibling')) {
+								if (bb.instanceOf(oPreceding, 'http://www.backbase.com/2006/btl', 'comboBoxOptionBase'))
+									iIndex++;
+							}
+
+							if (iHighlightIndex > iIndex){
+								// proceeding only internal state of the property to avoiding calling
+								// setter as it will produce the wrong highlighting as the option
+								// is still in the tree on the moment of this event
+								this._._highlightIndex = iHighlightIndex - 1;
+							}
+						}
+					}
+				}
+			]]></d:handler>
+		</d:element>
+
+		<d:element name="comboBoxOptionBase" extends="b:formListOption" abstract="true">
+			
+
+			<d:property name="selected">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					// if no value has been defined, store the property and return what has been set in the attribute
+					if (this._._selected === undefined){
+						var sSelected = this.getAttribute('selected');
+						this._._selected = btl.isTrueValue('selected', sSelected);
+					}
+					return this._['_selected'];
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					value = Boolean(value);
+
+					if (this._._selected == value) {
+						// no need to do anything when the value has not changed
+						return;
+					}
+
+					// store value
+					this._._selected = value;
+
+					// let the comboBoxBase deal with the change in selection
+					var oParent = this.getProperty('parentNode');
+					if (oParent && bb.instanceOf(oParent, 'http://www.backbase.com/2006/btl', 'comboBoxBase')) {
+						value ? oParent.handleSelectedOption(this) : oParent.handleDeselectedOption(this);
+					}
+
+					// determining type of event
+					var sEvent = value ? 'select' : 'deselect';
+					bb.command.fireEvent(this, sEvent, false, false);
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="filtered">
+				
+			</d:property>
+		</d:element>
+
+		<d:interface name="iComboBox">
+			
+
+			<d:method name="getForm">
+				
+			</d:method>
+
+			<d:method name="getLabel">
+				
+			</d:method>
+
+			<d:method name="setLabel">
+				
+				<d:argument name="label">
+					
+				</d:argument>
+			</d:method>
+
+			<d:method name="getValue">
+				
+			</d:method>
+
+			<d:method name="setValue">
+				
+				<d:argument name="value">
+					
+				</d:argument>
+			</d:method>
+
+			<d:method name="setHighlight">
+				
+				<d:argument name="highlightIndex">
+					
+				</d:argument>
+			</d:method>
+
+			<d:method name="removeHighlight">
+				
+				<d:argument name="highlightIndex">
+					
+				</d:argument>
+			</d:method>
+		</d:interface>
+	</d:namespace>
+</d:tdl>

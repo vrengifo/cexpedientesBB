@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="element" src="../element/element.xml"/>
+
+		<d:element name="populatorBase" extends="b:element" abstract="true">
+			
+
+			<d:resource type="text/javascript"><![CDATA[
+				btl.populator = {};
+
+				btl.populator.lazyLoad = function(eEvent){
+					var oController = eEvent.currentTarget;
+					var oPopulator = oController._._populator;
+
+					// @TODO: previously the populator had error in the code which
+					// resulted in the following - although by design populator
+					// was expected not to load if the actual target of event is
+					// not the element the listener was attached to, due to error
+					// in the code it actually did load when event bubbled. When
+					// fixing bug 8274 the behavior was corrected, but this results
+					// in the breaking of backwards compatibility. Current iteration
+					// (4.3.1) is not expected to break backwards compatibility, so
+					// I'm commenting out the fix. Still the behavior should be 
+					// addressed in the future.
+
+					/*
+					// The populator should not load ...
+					// - when the event was not dispatched on the controller that contains the populator
+					// AND
+					// - when the populator does not have a viewNode //XXX: but why??
+					if (oController != eEvent.target && oPopulator.viewNode) {
+						return;
+					}
+					*/
+					if (oPopulator.getAttribute('type') != 'always') {
+						var aEvent = oPopulator.getProperty('events');
+						for (var i = 0, iMax = aEvent.length; iMax > i ; i++){
+							oController.removeEventListener(aEvent[i], btl.populator.lazyLoad, false);
+						}
+					}
+
+					oPopulator.populate();
+				};
+			]]></d:resource>
+
+			<d:attribute name="events" default="select">
+				
+			</d:attribute>
+
+			<d:attribute name="type" default="once">
+				
+			</d:attribute>
+
+			<d:attribute name="url">
+				
+			</d:attribute>
+
+			<d:property name="events">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					return this.getAttribute('events').split(' ');
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="url">
+				
+				<d:getter type="text/javascript"><![CDATA[
+					return bb.uri.resolveUri(this.getAttribute('url'), this.getProperty('baseURI'));
+				]]></d:getter>
+			</d:property>
+
+			<d:property name="loaded">
+				
+			</d:property>
+
+			<d:property name="loadedNode">
+				
+			</d:property>
+
+			<d:method name="populate">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var oParent = this.getProperty('parentNode');
+
+					// Do not populate ...
+					// - when the loading process has started
+					// OR
+					// - when there is no parentNode
+					if (this.getProperty('loading') || !oParent) {
+						return;
+					}
+
+					// remove the previously loaded node if it exists
+					var oLoadedNode = this.getProperty('loadedNode');
+					if (oLoadedNode) {
+						// always set the loadedNode property to null
+						this.setProperty('loadedNode', null);
+						// only destruct the loadedNode when it still exists
+						if (oLoadedNode._) {
+							bb.destruct(oLoadedNode);
+						}
+					}
+
+					this.setProperty('loading', true);
+
+					var oPopulator = this;
+
+					setTimeout(
+						function() {
+							// XXX: is this necessary? A populator should not be placed in elements without a viewNode and a same check is executed in the load callback function
+							// XXX: Might actually check for viewGate, since that is where the new content should be appended to
+							if (!oParent.viewNode) {
+								oPopulator.setProperty('loading', false);
+								return;
+							}
+
+							/* do the actual loading */
+							bb.command.load(oPopulator.getProperty('url'), 'GET', null, null, null, null,
+								function(oRequest, oXmlElement) {
+									// No need to continue ...
+									// - when there is no viewNode to append the loaded content on //XXX: does not seem to be required
+									// OR
+									// - when no xml element is returned (nothing to construct)
+
+									// XXX: Might actually check for viewGate, since that is where the new content should be appended to
+									if (!oParent.viewNode || !oXmlElement) {
+										oPopulator.setProperty('loading', false);
+										return;
+									}
+
+									bb.construct(oXmlElement, function(){
+										var oElement = bb.getControllerFromModel(oXmlElement);
+										oPopulator.setProperty('loading', false);
+										var oNextSibling = oPopulator.getProperty('nextSibling');
+										oParent.insertBefore(oElement, oNextSibling);
+										oPopulator.setProperty('loadedNode', oElement);
+										oPopulator.setProperty('loaded', true);
+										bb.command.fireEvent(oParent, 'load', false, false);
+									});
+								}
+							);
+						}, 1
+					);
+				]]></d:body>
+			</d:method>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				var oParent = this.getProperty('parentNode');
+				if (!oParent || oParent._._populator == this){
+					return;
+				}
+				oParent._._populator = this;
+
+				var aEvent = this.getProperty('events');
+				for (var i = 0, iMax = aEvent.length; iMax > i ; i++) {
+					if (aEvent[i] == 'DOMNodeInsertedIntoDocument'){
+						setTimeout(
+							function(){
+								btl.populator.lazyLoad.call(oParent, {currentTarget: oParent, target: oParent})
+							},
+							10
+						);
+					} else {
+						oParent.addEventListener(aEvent[i], btl.populator.lazyLoad, false);
+					}
+				}
+			]]></d:handler>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				this.setProperty('loaded', false);
+			]]></d:constructor>
+		</d:element>
+
+		<d:interface name="iPopulator">
+			
+
+			<d:property name="loading">
+				
+			</d:property>
+		</d:interface>
+	</d:namespace>
+</d:tdl>

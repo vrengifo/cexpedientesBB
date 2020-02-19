@@ -1,0 +1,12 @@
+<fragment
+	xmlns="http://www.backbase.com/2006/client"
+	xmlns:b="http://www.backbase.com/2006/btl"
+	xmlns:c="http://www.backbase.com/2006/command"
+	xmlns:e="http://www.backbase.com/2006/xel"
+	xmlns:t="http://www.backbase.com/2007/debugger"
+	xmlns:xi="http://www.w3.org/2001/XInclude">
+	<xi:include href="config.xml" />
+	<b:window e:behavior="t:debugger" class="bb-debugger" label="Backbase Debugger" buttons="maximize close" resizeMinWidth="450px" resizeMinHeight="350px" >
+		<xi:include href="include.xml" />
+	</b:window>
+</fragment>

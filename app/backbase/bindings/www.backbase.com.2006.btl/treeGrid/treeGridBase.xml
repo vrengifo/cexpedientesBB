@@ -1,0 +1,574 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl" xmlns:bb="http://www.backbase.com/2006/client"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="listGridBase listGridColBase fieldCreator fieldDestroyer fieldUpdater" src="../listGrid/listGridBase.xml"/>
+
+		<d:element name="treeGridBase" extends="b:listGridBase" abstract="true">
+			
+
+			
+
+			
+
+			
+
+			<d:resource type="text/javascript"><![CDATA[if(!window.btl) window.btl = {};
+
+if(!btl.treeGrid) btl.treeGrid = {};
+
+btl.treeGrid.createRowExpander = function btl_treeGrid_createRowExpander(){
+		var oSpan = document.createElement('span');
+		oSpan.className = "btl-treeGrid-treeIcon";
+		return oSpan;
+}
+
+//called in context of treeGridCol
+btl.treeGrid.fieldCreator = function btl_treeGrid_fieldCreator( viewNode, controller, recordId, value){
+	var obj = null; //object to return
+
+	if( this._['_fieldCreator']) //call custom field creator
+		obj = this._['_fieldCreator'].call( this, viewNode, controller, recordId, value);
+	else
+		viewNode.innerHTML = value;
+
+	if( this.getProperty('isTreeColumn')){ //render extender
+		var oSource = controller.getProperty('dataSource');
+		var oAttr = controller._.oRecords.attributes[ recordId];
+
+		oAttr.expanderHome = viewNode;
+		var oRow = controller._.oRecords.rows[ recordId];
+
+		if( oAttr.isHidden)
+			bb.html.addClass( oRow, 'btl-grid-row-hidden');
+
+		if( oAttr.isExpandable)
+			bb.html.addClass( oRow, 'btl-treeGrid-row-expandable');
+
+		viewNode.insertBefore( btl.treeGrid.createRowExpander(), viewNode.firstChild);
+
+		if( oAttr.isOpen)
+			bb.html.addClass( oRow, 'btl-treeGrid-row-open');
+
+		if( oAttr.deep)
+			viewNode.style.paddingLeft =  (oAttr.deep * 16) + 'px';
+	}
+
+	return obj;
+}
+
+// oGrid - treeGrid control
+// sRecordId - parent id
+// bClear - clear children before loading/reloading
+btl.treeGrid.loadChildren = function btl_treeGrid_loadChildren( oGrid, sRecordId, bClear){
+	var oEvent = bb.document.createEvent('Events');
+	oEvent.initEvent('populate', false, true);
+	oEvent.recordId = sRecordId;
+	if( !oGrid.dispatchEvent(oEvent)) return;
+	//disable paging, but still need sorting
+	var oState = oGrid.getProperty('state');
+	oState.select = {};
+
+	oState.select['parent'] = sRecordId;
+	if( bClear){
+		var aClear = [];
+		function listChildren( sRecId){
+			var aChildren = oGrid._.oRecords.attributes[ sRecId].children;
+			for(var j=0, jMax = aChildren.length; jMax > j; j++){
+				aClear[ aClear.length] = aChildren[j];
+				arguments.callee( aChildren[j]);
+			}
+			oGrid._.oRecords.attributes[ sRecId].isLoaded = false;
+		}
+		listChildren( sRecordId);
+		btl.listGrid.dataUpdate( oGrid, 'delete', aClear);
+		for(var j=0, jMax = aClear.length; jMax > j; j++)
+			delete oGrid._.oRecords.attributes[ aClear[j]];
+	}
+	oGrid.setProperty('state', oState);
+	oState = oGrid.getProperty('state');
+	delete oState.page;
+	delete oState.rows;
+	btl.dataSource.actionRequest( oGrid, 'read', {'attributes' : oState});
+}
+
+//returns list of children
+btl.treeGrid.listChildren = function btl_treeGrid_listChildren( oGrid, sRecordId, bVisible){
+	var aList = [];
+	function listChildren( sRecId){
+		if( !bVisible || oGrid._.oRecords.attributes[ sRecId].isOpen){
+			var aChildren = oGrid._.oRecords.attributes[ sRecId].children;
+			for(var j=0, jMax = aChildren.length; jMax > j; j++){
+				aList[ aList.length] = aChildren[j];
+				arguments.callee( aChildren[j]);
+			}
+		}
+	}
+	listChildren( sRecordId);
+	return aList;
+}
+
+//switches or sets row open state
+btl.treeGrid.setRowDisplay = function btl_treeGrid_setRowDisplay( oGrid, sRecordId, bState){
+	var sPopulate = oGrid.getAttribute('populate');
+
+	var oAttr = oGrid._.oRecords.attributes[ sRecordId];
+	if( oAttr){
+		var bOpen = bState === true ? true : ( bState === false ? false : !oAttr.isOpen);
+		if( bOpen == oAttr.isOpen) return; // nothing to do
+
+		var oEvent = bb.document.createEvent('Events');
+		oEvent.initEvent(bOpen ? 'open' : 'close', false, true);
+		oEvent.recordId = sRecordId;
+		if( !oGrid.dispatchEvent(oEvent)) return;
+
+		var oRow = oGrid._.oRecords.rows[ sRecordId];
+
+		if( bOpen){ //open - load children if they are not loaded yet
+			var bAlways = sPopulate == 'always';
+			oAttr.isOpen = true; //need to be here to immediatly show children
+			//no set open state on data - other controls will open also
+			//btl.dataSource.setValue(oGrid.getProperty('dataSource'), sRecordId, oGrid.getAttribute('openQuery'), 'true');
+			if( !oAttr.isLoaded || bAlways){ //load children
+				btl.treeGrid.loadChildren( oGrid, sRecordId, bAlways);
+			} else {
+				function showChildren( sRecId){
+					var aChildren = oGrid._.oRecords.attributes[ sRecId].children;
+					for(var j=0, jMax = aChildren.length; jMax > j; j++){
+						oGrid._.oRecords.attributes[ aChildren[j]].isHidden = false;
+						bb.html.removeClass( oGrid._.oRecords.rows[ aChildren[j]], 'btl-grid-row-hidden');
+						if( oGrid._.oRecords.attributes[ aChildren[j]].isOpen)
+							arguments.callee( aChildren[j]);
+					}
+				};
+				showChildren( sRecordId);
+				oGrid.zebrafy();
+			}
+			bb.html.addClass( oRow, 'btl-treeGrid-row-open');
+		} else { //close
+			var iZebra = 0; //optimize zebrafying
+			function hideChildren( sRecId){
+				var aChildren = oGrid._.oRecords.attributes[ sRecId].children;
+				for(var j=0, jMax = aChildren.length; jMax > j; j++){
+					bb.html.addClass( oGrid._.oRecords.rows[ aChildren[j]], 'btl-grid-row-hidden');
+					oGrid._.oRecords.attributes[ aChildren[j]].isHidden = true;
+					iZebra++;
+					if( oGrid._.oRecords.attributes[ aChildren[j]].isOpen)
+						arguments.callee( aChildren[j]);
+				}
+			}
+			hideChildren( sRecordId);
+			bb.html.removeClass( oRow, 'btl-treeGrid-row-open');
+			oAttr.isOpen = false;
+			//btl.dataSource.setValue(oGrid.getProperty('dataSource'), sRecordId, oGrid.getAttribute('openQuery'), 'false');
+			var aClasses = oGrid.aRowClasses || [];
+			if( aClasses.length && (iZebra % aClasses.length))
+				oGrid.zebrafy();
+		}
+	}
+}
+]]></d:resource>
+
+			<d:attribute name="populate" default="once">
+				
+			</d:attribute>
+
+			<d:attribute name="openQuery" default="@open">
+				
+			</d:attribute>
+
+			<d:attribute name="sortable" default="true">
+				
+			</d:attribute>
+
+			<d:property name="treeColumnIndex">
+				<d:setter type="text/javascript"><![CDATA[
+					var aColumns = this.getProperty( 'columns');
+					if( isNaN(value) || (0 > value) || (value >= aColumns.length))
+						value = 0;
+
+					if( ('_' + name) in this._)
+						aColumns[ this._['_' + name]].setProperty( 'isTreeColumn', false);
+
+					this._['_' + name] = value;
+					aColumns[ value].setProperty( 'isTreeColumn', true);
+				]]></d:setter>
+			</d:property>
+
+			<d:method name="sort">
+				
+				<d:argument name="sortField">
+					
+				</d:argument>
+				<d:argument name="sortDirection">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					//set state to request with 'select'
+					var oState = this.getProperty('state');
+					oState.select = {};
+					oState.select[ 'parent'] = '';
+					this.setProperty('state', oState);
+					this.callSuper( 'sort', [sortField, sortDirection]);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="dataUpdate">
+				<d:argument name="action"/>
+				<d:argument name="records"/>
+				<d:argument name="actionObj"/>
+				<d:body type="text/javascript"><![CDATA[
+					var oSource = this.getProperty('dataSource');
+					var aIndexes = this.getProperty("indexes");
+					var oAttr = this._.oRecords.attributes;
+					switch( action){
+						case 'read':
+							//put child records in place
+							var oParents = {};     //object to track parent records if they are already initialized
+							var aTopLevel = [];    //top level records
+							var bChildrenLoaded = false, oChildren = {};
+
+							for(var i=0, iMax = records.length; iMax > i; i++){
+								var sRecId = records[i];
+								var bOpen = btl.dataSource.getValue(oSource, sRecId, this.getAttribute('openQuery')) == 'true';
+								var bExpandable = bOpen || (btl.dataSource.getValue(oSource, sRecId, 'expandable') == 'true');
+								var sParentId = btl.dataSource.getValue(oSource, sRecId, 'parent');
+								if(!(sRecId in oAttr))// create record data
+									oAttr[ sRecId] = {'children' : [], 'isOpen' : bOpen, 'isExpandable' : bExpandable,
+													  'parent' : sParentId, 'isLoaded' : false, 'deep' : 0, 'isHidden' : false,
+													  'expanderHome' : null};
+								else {
+									oAttr[ sRecId].isExpandable = bExpandable;
+									oAttr[ sRecId].parent = sParentId;
+								}
+								if( sParentId && oAttr[ sParentId]){
+									if( !oParents[ sParentId]){ //first child
+										bChildrenLoaded = true;
+										oParents[ sParentId] = true;
+										oAttr[ sParentId].children = []; //clear list of children( probably new was loaded or removed or sorted)
+										oChildren[ sParentId] = {};
+									}
+									oChildren[ sParentId][ sRecId] = true;
+									oAttr[ sParentId].children.push( sRecId);
+									oAttr[ sParentId].isLoaded = true;
+									oAttr[ sRecId].deep = oAttr[ sParentId].deep + 1;
+									oAttr[ sRecId].isHidden = oAttr[ sRecId].deep == 0 ? false : (oAttr[ sParentId].isHidden || !oAttr[ sParentId].isOpen);
+								} else if( !sParentId) {
+									aTopLevel.push( sRecId);
+								}
+								if( bExpandable && !oAttr[ sRecId].isLoaded && ( bOpen || this.getAttribute('populate') == 'all'))
+									this._.aLoadQueue.push( sRecId);
+							}//for
+
+							var aNewIndexes = [];
+							if( aTopLevel.length){
+								for(var i=0, iMax = aTopLevel.length; iMax > i; i++){
+									var sRecId = aTopLevel[i];
+									aNewIndexes[ aNewIndexes.length] = sRecId;
+
+									var aList = btl.treeGrid.listChildren(this, sRecId);
+									for(var j=0, jMax = aList.length; jMax > j; j++)
+										aNewIndexes[ aNewIndexes.length] = aList[j];
+
+									if( jMax && !oAttr[ sRecId].isLoaded)
+										oAttr[ sRecId].isLoaded = true; //children were already loaded
+								}
+								aIndexes = aNewIndexes;
+							} else { //update 'indexes'
+								for(var sParentId in oParents) //updated parents
+									if( !(oParents[ sParentId] instanceof Function)){ //modify indexes
+										//find a parent in the current list
+										var oCurChildren = oChildren[sParentId];
+										for(var i=0, iMax = aIndexes.length; (iMax > i) && (sParentId != aIndexes[i]); i++)
+											if( !oCurChildren || !oCurChildren[ aIndexes[i]])
+												aNewIndexes.push( aIndexes[i]);
+
+										if( oCurChildren && !oAttr[ sParentId].isLoaded)
+											oAttr[ sParentId].isLoaded = true; //children were already loaded
+
+										if( (sParentId == aIndexes[i]) || !(i in aIndexes)){
+											aNewIndexes.push( sParentId);
+											i++;
+											var aList = btl.treeGrid.listChildren( this, sParentId);
+											for(var j=0, jMax = aList.length; jMax > j; j++)
+												aNewIndexes.push( aList[j]);
+										}
+										for(; iMax > i; i++) //push the rest
+											if( !oCurChildren || !oCurChildren[ aIndexes[i]])
+												aNewIndexes.push( aIndexes[i]);
+										aIndexes = aNewIndexes;
+										aNewIndexes = [];
+									}
+							}
+							if( !aIndexes.length) //it's empty if records were deleted
+								aIndexes = records;
+							btl.listGrid.dataUpdate(this, action, aIndexes);
+
+							//rectore expanders
+							for(var j=0, jMax = aIndexes.length; jMax > j; j++){
+								var oDiv = oAttr[ aIndexes[j]].expanderHome;
+								if (oDiv && (!oDiv.firstChild || oDiv.firstChild.nodeType != 1 ||
+										oDiv.firstChild.className != "btl-treeGrid-treeIcon"))
+									oDiv.insertBefore( btl.treeGrid.createRowExpander(), oDiv.firstChild);
+							}
+							break;
+						case 'sort': //need reoder child nodes, 'records' contains only top level records
+								var aNewIndexes = [];
+								for(var i=0, iMax = records.length; iMax > i; i++){
+									aNewIndexes[ aNewIndexes.length] = records[i];
+									var aList = btl.treeGrid.listChildren(this, records[i]);
+									for(var j=0, jMax = aList.length; jMax > j; j++)
+										aNewIndexes[ aNewIndexes.length] = aList[j];
+								}
+
+								btl.listGrid.dataUpdate(this, action, aNewIndexes);
+							break;
+						case 'delete':
+							for(var i=0, iMax = records.length; iMax > i; i++){
+								var attr = oAttr[ records[i]];
+								if( attr){
+									if( attr.parent && oAttr[ attr.parent]){ //remove from the parent
+										var aChildren = oAttr[ attr.parent].children;
+										for(var j=0, jMax=aChildren.length; jMax > j; j++)
+											if( aChildren[j] == records[i]){
+												aChildren.splice(j, 1);
+												break;
+											}//if
+									}//if parent
+									delete oAttr[ records[i]];
+								}//if attr
+							} //for
+							btl.listGrid.dataUpdate(this, action, records);
+							break;
+						case 'update':
+							btl.listGrid.dataUpdate(this, action, records);
+							for(var j=0, jMax = records.length; jMax > j; j++){ //rectore expanders
+								if( oAttr.hasOwnProperty( records[j])){ //our record
+									var oDiv = oAttr[ records[j]].expanderHome;
+									if( oDiv && (!oDiv.firstChild || oDiv.firstChild.nodeType != 1
+											 || oDiv.firstChild.className != "btl-treeGrid-treeIcon"))
+										oDiv.insertBefore( btl.treeGrid.createRowExpander(), oDiv.firstChild);
+								}
+							}
+							break;
+					}
+
+					while( this._.aLoadQueue.length){ //load queued children requests
+						var sRecId = this._.aLoadQueue.shift();
+						if( !oAttr[ sRecId].isLoaded)
+							btl.treeGrid.loadChildren( this, sRecId);
+					}
+					if( btl.listGrid.hasVScrollBar(this)) {
+						bb.html.addClass(this.viewNode, 'btl-grid-scrollbarFillers-hidden');
+					} else {
+						bb.html.removeClass(this.viewNode, 'btl-grid-scrollbarFillers-hidden');
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="deleteSelectedRows">
+				<d:body type="text/javascript"><![CDATA[
+					var oSource = this.getProperty('dataSource');
+					var aIndexes = this.getProperty('selectedIndexes');
+					if( oSource && aIndexes.length){
+						//add children to aIndexes
+						var aAllIndexes = [], oIndexes={};
+						for(var i=0, iMax = aIndexes.length; iMax > i; i++){
+							if( !oIndexes[ aIndexes[i]]){
+								aAllIndexes[ aAllIndexes.length] = aIndexes[i];
+								oIndexes[ aIndexes[i]] = true;
+							}
+							var aList = btl.treeGrid.listChildren(this, aIndexes[i]);
+							for(var j=0, jMax = aList.length; jMax > j; j++)
+								if( !oIndexes[ aList[j]]){
+									aAllIndexes[ aAllIndexes.length] = aList[j];
+									oIndexes[ aList[j]] = true;
+								}
+						}
+						btl.dataSource.actionRequest(this, 'delete', aAllIndexes);
+						if( this.getProperty('page') < this.getProperty('totalPages'))
+							this.refresh( true); //read additional records instead of removed
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="refresh">
+				<d:argument name="updateOnly">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					if(!updateOnly){
+						var aIndexes = this.getProperty('indexes');
+						oAttr = this._.oRecords.attributes
+						for(var i=0; aIndexes.length > i; i++){
+							delete oAttr[ aIndexes[i]];
+						}
+					}
+					//set state to request with 'select', on read request it will be used together with sorting and paging attributes
+					var oState = this.getProperty('state');
+					oState.select = {};
+					oState.select[ 'parent'] = '';
+					this.setProperty('state', oState);
+
+					//read top level records
+					this.callSuper('refresh', [updateOnly]);
+				]]></d:body>
+			</d:method>
+
+			<d:method name="toggleRow">
+				
+				<d:argument name="recordId">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					btl.treeGrid.setRowDisplay(this, recordId); //switches row open state
+					if( btl.listGrid.hasVScrollBar(this)) {
+						bb.html.addClass(this.viewNode, 'btl-grid-scrollbarFillers-hidden');
+					} else {
+						bb.html.removeClass(this.viewNode, 'btl-grid-scrollbarFillers-hidden');
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="openRow">
+				
+				<d:argument name="recordId">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					btl.treeGrid.setRowDisplay(this, recordId, true);
+					if( btl.listGrid.hasVScrollBar(this)) {
+						bb.html.addClass(this.viewNode, 'btl-grid-scrollbarFillers-hidden');
+					} else {
+						bb.html.removeClass(this.viewNode, 'btl-grid-scrollbarFillers-hidden');
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="closeRow">
+				
+				<d:argument name="recordId">
+					
+				</d:argument>
+				<d:body type="text/javascript"><![CDATA[
+					btl.treeGrid.setRowDisplay(this, recordId, false);
+					if( btl.listGrid.hasVScrollBar(this)) {
+						bb.html.addClass(this.viewNode, 'btl-grid-scrollbarFillers-hidden');
+					} else {
+						bb.html.removeClass(this.viewNode, 'btl-grid-scrollbarFillers-hidden');
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				this.callSuper('__constructor');
+				this._.oRecords.attributes = {};
+				this._.aLoadQueue = []; //queue to load children
+			]]></d:constructor>
+
+			<d:handler event="DOMNodeInsertedIntoDocument" type="text/javascript"><![CDATA[
+				if( isNaN( this._[ '_treeColumnIndex']) ){
+					var aColumns = this.getProperty('columns');
+					for(var i = aColumns.length - 1; i >= 0; i--)
+						if( aColumns[i].getAttribute('tree') == 'true'){
+							this.setProperty( 'treeColumnIndex', i);
+							return;
+						}
+				}
+				this.setProperty( 'treeColumnIndex', 0);
+			]]></d:handler>
+
+			<d:handler event="mousedown" match=".btl-treeGrid-treeIcon" type="text/javascript"><![CDATA[
+				if (event.button == 0)
+					event.stopHorizontalPropagation();
+			]]></d:handler>
+
+			<d:handler event="click" match=".btl-treeGrid-treeIcon" type="text/javascript"><![CDATA[
+				if (!event.defaultPrevented && event.button == 0) {
+					event.preventDefault();
+					this.toggleRow(bb.selector.queryAncestor(event.viewTarget, 'tr', this.viewNode).getAttribute('rowid'));
+				}
+			]]></d:handler>
+
+			<d:handler event="keydown" type="text/javascript"><![CDATA[
+				/*
+					In view mode, when Left key is pressed:
+						- If focused item is a parent and it's open, keep focus but close it.
+						- If focused item is a parent and it's closed, focus its parent and select it.
+						- If focused item is a leaf, focus its parent and select it.
+
+					In view mode, when Right key is pressed:
+						- If focused item is a parent and it's open, focus its first child and select it.
+						- If focused item is a parent and it's closed, keep focus but open it.
+
+					@TODO: add support for modifier keys. (what should they do?)
+				*/
+
+				var bEventHandled = false;
+				var sKey = event.keyIdentifier;
+				var sMode = this.getProperty('mode');
+				var sRowId = this.getProperty('focusedRow');
+
+				if( sRowId){
+					var oAttr = this._.oRecords.attributes[ sRowId];
+
+					if(sMode == 'view'){
+						if(sKey == 'Left'){
+							// If focused item is a parent and it's open, keep focus but close it.
+							if( oAttr.isOpen)
+								this.closeRow( sRowId);
+
+							// If focused item is a parent and it's closed, focus its parent and select it.
+							// If focused item is a leaf, focus its parent and select it.
+							else if( oAttr.isExpandable){
+								if( oAttr.parent){
+									this.setProperty('focusedRow', oAttr.parent);
+									this.setAttribute('selectedIndexes', oAttr.parent);
+								}
+							}
+							bEventHandled = true;
+						}
+						else if(sKey == 'Right'){
+							// If focused item is a parent and it's open, focus its first child and select it.
+							if( oAttr.isOpen && oAttr.children.length){
+								this.setProperty('focusedRow', oAttr.children[0]);
+								this.setAttribute('selectedIndexes', oAttr.children[0]);
+							}
+							// If focused item is a parent and it's closed, keep focus but open it.
+							else if( !oAttr.isOpen && oAttr.isExpandable){
+								this.openRow( sRowId);
+							}
+							bEventHandled = true;
+						}
+					}
+					if(bEventHandled){
+						event.stopPropagation();
+						event.preventDefault();
+					}
+				}
+			]]></d:handler>
+
+		</d:element>
+
+		<d:element name="treeGridColBase" extends="b:listGridColBase" abstract="true">
+			<d:attribute name="tree">
+				
+				<d:mapper type="text/javascript"><![CDATA[
+					var oParent = this.getProperty('parentNode');
+					if( oParent)
+						oParent.setProperty( 'treeColumnIndex', this.getProperty('index'));
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:property name="isTreeColumn"/>
+
+			<d:property name="fieldCreator">
+				<d:getter type="text/javascript"><![CDATA[
+					// renders record expander (+ sign)
+					return btl.treeGrid.fieldCreator;
+				]]></d:getter>
+			</d:property>
+
+		</d:element>
+	</d:namespace>
+</d:tdl>

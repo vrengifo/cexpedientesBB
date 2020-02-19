@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><tdl xmlns="http://www.backbase.com/2006/tdl" xmlns:xi="http://www.w3.org/2001/XInclude">
+	<!-- XHTML -->
+	<uses namespace="http://www.w3.org/1999/xhtml" src="www.w3.org.1999.xhtml/xhtml.xml"/>
+
+	<!-- skinSettings for chameleon skin must always be loaded if anything from the btl namespace is found -->
+	<uses namespace="http://www.backbase.com/2006/btl" src="www.backbase.com.2006.btl/skinSettings/chameleon/skinSettings.xml"/>
+
+	<!-- Load BTL and XHTML Forms profiles when Forms namespace is used -->
+	<uses namespace="http://www.backbase.com/2007/forms" src="www.w3.org.1999.xhtml/formsProfile.xml"/>
+	<uses namespace="http://www.backbase.com/2007/forms" src="www.backbase.com.2006.btl/formsProfile.xml"/>
+
+	<!-- Backbase Forms controls -->
+	<namespace name="http://www.backbase.com/2007/forms" xml:base="www.backbase.com.2007.forms/">
+		<uses element="messages message" src="forms/message.xml"/>
+		<uses element="fileInput fileInputParameter" src="forms/fileInput.xml"/>
+	</namespace>
+
+	<!-- BTL controls -->
+	<namespace name="http://www.backbase.com/2006/btl" xml:base="www.backbase.com.2006.btl/">
+		<uses behavior="drag dragBase dragTarget" attribute="dragReceive" src="dragAndDrop/dragAndDrop.xml"/>
+		<uses behavior="localData" src="dataBinding/localData.xml"/>
+		<uses behavior="remoteData" src="dataBinding/remoteData.xml"/>
+		<uses behavior="resize resizeBase" src="resize/resize.xml"/>
+		<uses behavior="staticData" src="dataBinding/staticData.xml"/>
+
+		<uses element="accordion accordionItem" src="accordion/chameleon/accordion.xml"/>
+		<uses element="applet" src="applet/applet.xml"/>
+		<uses element="balloon" src="balloon/chameleon/balloon.xml"/>
+		<uses element="box" src="box/chameleon/box.xml"/>
+		<uses element="broadcaster" src="broadcaster/broadcaster.xml"/>
+		<uses element="button" src="button/chameleon/button.xml"/>
+		<uses element="calendar" src="calendar/chameleon/calendar.xml"/>
+		<uses element="checkBoxGroup checkBoxGroupOption" src="checkBoxGroup/checkBoxGroup.xml"/>
+		<uses element="codeHighlighter" src="codeHighlighter/codeHighlighter.xml"/>
+		<uses element="comboBox comboBoxOption" src="comboBox/chameleon/comboBox.xml"/>
+		<uses element="dataGrid dataGridColGroup dataGridCol" src="dataGrid/chameleon/dataGrid.xml"/>
+		<uses element="dataMenu" src="dataMenu/chameleon/dataMenu.xml"/>
+		<uses element="dataSource dataContainer dataSchema dataField dataFormatter dataObserver dataPagedObserver" src="dataBinding/dataBinding.xml"/>
+		<uses element="dataTree" src="dataTree/chameleon/dataTree.xml"/>
+		<uses element="deck deckItem" src="deck/deck.xml"/>
+		<uses element="enhanceHTML enhanceHTMLRuleSet enhanceHTMLRule enhanceHTMLAttribute" src="enhanceHTML/enhanceHTML.xml"/>
+		<uses element="fieldEditor" src="fieldEditor/fieldEditor.xml"/>
+		<uses element="flash" src="flash/flash.xml"/>
+		<uses element="groupBox" src="groupBox/chameleon/groupBox.xml"/>
+		<uses element="infoBox" src="infoBox/chameleon/infoBox.xml"/>
+		<uses element="itemsSelectControl" behavior="userSelect" interface="UIControl" src="itemsSet/itemsSet.xml"/>
+		<uses element="label" src="label/label.xml"/>
+		<uses element="listBox listBoxOption" src="listBox/chameleon/listBox.xml"/>
+		<uses element="listGrid listGridCol" src="listGrid/chameleon/listGrid.xml"/>
+		<uses element="loadingMessage" src="loadingMessage/chameleon/loadingMessage.xml"/>
+		<uses element="menuBar menuPopUp menuBarItem menuPopUpItem menuBarSeparator menuPopUpSeparator contextMenu" src="menu/chameleon/menu.xml"/>
+		<uses element="modal" src="modal/chameleon/modal.xml"/>
+		<uses element="navBox" src="navBox/chameleon/navBox.xml"/>
+		<uses element="pagerBar pager pagerButton pagerNumbers pagerJumper pagerSeparator" src="pager/chameleon/pager.xml"/>
+		<uses element="panelLayout panelLayoutItem" src="panelLayout/panelLayout.xml"/>
+		<uses element="panelSet panel" src="panelSet/chameleon/panelSet.xml"/>
+		<uses element="populator" src="populator/chameleon/populator.xml"/>
+		<uses element="richTextEditor" src="richTextEditor/richTextEditor.xml"/>
+		<uses element="sliderOption" src="slider/sliderBase.xml"/>
+		<uses element="slider" src="slider/chameleon/slider.xml"/>
+		<uses element="spinner" src="spinner/chameleon/spinner.xml"/>
+		<uses element="stretch" src="stretch/stretch.xml"/>
+		<uses element="suggestBox" src="suggestBox/chameleon/suggestBox.xml"/>
+		<uses element="tabBox tab" src="tabBox/chameleon/tabBox.xml"/>
+		<uses element="taskBar taskBarItem taskBarButton" src="taskBar/chameleon/taskBar.xml"/>
+		<uses element="toolBar toolBarItem toolBarSeparator" src="toolBar/chameleon/toolBar.xml"/>
+		<uses element="toolTip" src="toolTip/chameleon/toolTip.xml"/>
+		<uses element="tree treeBranch treeLeaf" src="tree/chameleon/tree.xml"/>
+		<uses element="treeGrid treeGridCol" src="treeGrid/chameleon/treeGrid.xml"/>
+		<uses element="window" src="window/chameleon/window.xml"/>
+		<uses element="windowArea" src="windowArea/windowArea.xml"/>
+		<uses element="xhtml xml" src="xhtml/xhtml.xml"/>
+	</namespace>
+</tdl>

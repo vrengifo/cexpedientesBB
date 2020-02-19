@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="navBoxBase" src="../navBoxBase.xml"/>
+
+		<d:element name="navBox" extends="b:navBoxBase">
+			
+
+			<d:resource type="text/css"><![CDATA[.btl-navBox {
+	overflow: hidden;
+	background-color: ButtonFace;
+}
+.btl-navBox-head {
+	cursor: pointer;
+}
+.btl-navBox-button {
+	float: right;
+	margin-top: 4px;
+	margin-right: 4px;
+	height: 11px;
+	width: 11px;
+	background-image: url(media/openClose.png);
+}
+.btl-navBox-body-container {
+	overflow: hidden;
+	background-color: Window;
+}
+.btl-navBox-body {
+	position: relative;
+	overflow: auto;
+}
+.btl-navBox-open .btl-navBox-button {
+	background-position: 0 -33px;
+}
+.btl-navBox-open .btl-navBox-button-press {
+	background-position: 0 -55px;
+}
+.btl-navBox-closed .btl-navBox-button {
+	background-position: 0 0;
+}
+.btl-navBox-closed .btl-navBox-button-press {
+	background-position: 0 -22px;
+}
+.btl-navBox-open .btl-navBox-body-container,
+.btl-navBox-open .btl-navBox-body {
+	display: block;
+}
+.btl-navBox-closed .btl-navBox-body-container,
+.btl-navBox-closed .btl-navBox-body {
+	display: none;
+}
+.btl-disabled .btl-navBox-head {
+	color: GrayText;
+}
+/* fixes */
+.btl-navBox {
+	/* for focusElement */
+	position: relative;
+}
+.ie .btl-navBox {
+	/* for opacity */
+	zoom: 1.0;
+}
+.ie .btl-navBox-button {
+	/* prevent font from stretching the button size */
+	overflow: hidden;
+}
+.ie .btl-navBox-body {
+	/* fix for scrolling if content is wider than navBox */
+	width: 100%;
+}
+.ie6 .btl-navBox-head {
+	/* icon was not visible in BB explorer */
+	zoom: 1.0;
+}]]></d:resource>
+			<d:resource type="image/png" src="media/openClose.png"/>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-navBox">
+					<input class="btl-invisibleFocusInput" onbeforedeactivate="return this.parentNode.controller.__passingFocus ? false : true" style="position:absolute;top:0;left:0;" readonly="readonly"/>
+					<div class="btl-navBox-head btl-head btl-bevel-top-bottom">
+						<div class="btl-navBox-button"/>
+						<div class="btl-focusIndicatorContainer">
+							<div class="btl-focusIndicator">
+								<div class="btl-label"> </div>
+							</div>
+						</div>
+					</div>
+					<div class="btl-navBox-body-container btl-bevel-top-bottom" tabindex="-1">
+						<div class="btl-navBox-body">
+							<d:content/>
+						</div>
+					</div>
+				</div>
+			</d:template>
+
+			<d:attribute name="transitionType">
+				
+			</d:attribute>
+
+			<d:property name="height">
+				<d:setter type="text/javascript"><![CDATA[
+					this.viewNode.style.height = value;
+					this._._height = value;
+					bb.ui.reflow(this, true, true);
+				]]></d:setter>
+			</d:property>
+
+			<d:method name="paintOpen">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var sTransitionType = btl.skinSettings.getTransitionType(this);
+
+					switch(sTransitionType) {
+						case 'slide':
+							bb.html.replaceClass(this.viewNode, 'btl-navBox-closed', 'btl-navBox-open');
+							var oHead = bb.selector.query(this.viewNode, '.btl-navBox-head');
+							var oNavBoxHeadBox = bb.html.getBoxObject(oHead);
+							var oBodyContainer = bb.selector.query(this.viewNode, '.btl-navBox-body-container');
+							var oBodyContainerBox = bb.html.getBoxObject(oBodyContainer);
+
+							var iBodyHeight = oBodyContainerBox.height;
+
+							var sHeight = this.getAttribute('height');
+							var sAnimationHeight = sHeight;
+
+
+							if (!sHeight || sHeight == 'auto')
+								oBodyContainer.style.height = 'auto';
+							else
+								oBodyContainer.style.height = sHeight;
+
+							var iH = oBodyContainer.offsetHeight;
+							oBodyContainer.style.height = '1px';
+							iH -= oNavBoxHeadBox.h;
+
+							var oAnimation = {
+								attributeName: 'height',
+								dur: '0.25s',
+								to: iH+'px'
+							}
+
+							var oNavBox = this;
+
+							bb.smil.animate(oBodyContainer, oAnimation, function(){
+								if (sHeight) {
+									oNavBox.viewNode.style.height = sHeight;
+								} else {
+									oBodyContainer.style.height = 'auto';
+									if(bb.browser.ie){
+										/* fix to avoid that content disappears */
+										oBodyContainer.style.height = oBodyContainer.offsetHeight+'px';
+										oBodyContainer.style.height = 'auto';
+									}
+								}
+								bb.ui.reflow(oNavBox, true, true);
+							});
+							break;
+
+						default:
+							bb.html.addClass(this.viewNode, 'btl-navBox-open');
+							bb.html.removeClass(this.viewNode, 'btl-navBox-closed');
+
+							var sHeight = this.getAttribute('height');
+							if(this.hasAttribute('height') && sHeight != 'auto'){
+								this.viewNode.style.height = sHeight;
+								btl.html.stretch(this.viewGate.parentNode);
+							}
+
+							if(bb.browser.ie) {
+								if (this.viewNode.parentNode && this.viewNode.parentNode.style) {
+									var sDisp = this.viewNode.parentNode.style.visibility;
+									if (this.viewNode.parentNode.style.visibility != 'hidden') {
+										this.viewNode.parentNode.style.visibility = 'hidden';
+										this.viewNode.parentNode.style.visibility = sDisp;
+									}
+								}
+							}
+							bb.ui.reflow(this, true, true);
+							break;
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:method name="paintClose">
+				
+				<d:body type="text/javascript"><![CDATA[
+					var sTransitionType = btl.skinSettings.getTransitionType(this);
+
+					switch(sTransitionType) {
+						case 'slide':
+							var oHead = bb.selector.query(this.viewNode, '.btl-navBox-head');
+							var oNavBoxHeadBox = bb.html.getBoxObject(oHead);
+
+							var oBodyContainer = bb.selector.query(this.viewNode, '.btl-navBox-body-container');
+							var oBodyContainerBox = bb.html.getBoxObject(oBodyContainer);
+							var iBodyHeight = oBodyContainerBox.height;
+
+							oBodyContainer.parentNode.style.height = 'auto';
+							var oAnimation = {
+								attributeName: 'height',
+								dur: '0.25s',
+								values: iBodyHeight + 'px;0px'
+							}
+
+							var oNavBox = this;
+							bb.smil.animate(oBodyContainer, oAnimation, function(){
+								bb.html.replaceClass(oNavBox.viewNode, 'btl-navBox-open', 'btl-navBox-closed');
+							});
+							break;
+						default:
+							this.viewNode.style.height = 'auto';
+
+							bb.html.addClass(this.viewNode, 'btl-navBox-closed');
+							bb.html.removeClass(this.viewNode, 'btl-navBox-open');
+
+							if(bb.browser.ie) {
+								if (this.viewNode.parentNode && this.viewNode.parentNode.style) {
+									var sDisp = this.viewNode.parentNode.style.visibility;
+									if (this.viewNode.parentNode.style.visibility != 'hidden') {
+										this.viewNode.parentNode.style.visibility = 'hidden';
+										this.viewNode.parentNode.style.visibility = sDisp;
+									}
+								}
+							}
+							break;
+					}
+				]]></d:body>
+			</d:method>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				bb.html.disableUserSelect(bb.selector.query(this.viewNode, 'div.btl-navBox-head'));
+				bb.ui.reflow.add(this);
+			]]></d:constructor>
+
+			<d:handler event="reflow" type="text/javascript"><![CDATA[
+				/* handle initial open/closed state */
+				if (this.getProperty('open')){
+					bb.html.addClass(this.viewNode, 'btl-navBox-open');
+
+					var oBodyContainer = bb.selector.query(this.viewNode, 'div.btl-navBox-body-container');
+					var oBody = bb.selector.query(this.viewNode, 'div.btl-navBox-body');
+
+					if (this.hasAttribute('height') && this.getAttribute('height') !== 'auto') {
+						this.viewNode.style.height = this.getAttribute('height');
+						btl.html.stretch(oBodyContainer);
+						btl.html.stretch(oBody);
+					} else {
+						this.viewNode.style.height = '';
+						oBodyContainer.style.height = '';
+						oBody.style.height = '';
+					}
+				} else {
+					this.viewNode.style.height = 'auto';
+					bb.html.addClass(this.viewNode, 'btl-navBox-closed');
+				}
+			]]></d:handler>
+
+			<d:handler event="mouseout" type="text/javascript"><![CDATA[
+				this.__passingFocus = false;
+			]]></d:handler>
+
+			<d:handler event="mouseleave" type="text/javascript"><![CDATA[
+				this.__passingFocus = false;
+			]]></d:handler>
+
+			<d:handler event="mousedown" match=".btl-navBox-head" type="text/javascript"><![CDATA[
+				this.__passingFocus = true;
+				this.focus();
+				event.preventDefault();
+
+				var oButton = bb.selector.query(event.currentView, 'div.btl-navBox-button');
+				bb.html.addClass(oButton, 'btl-navBox-button-press');
+			]]></d:handler>
+
+			<d:handler event="mouseup" match=".btl-navBox-head" type="text/javascript"><![CDATA[
+				var oButton = bb.selector.query(event.currentView, 'div.btl-navBox-button');
+				bb.html.removeClass(oButton, 'btl-navBox-button-press');
+			]]></d:handler>
+
+			<d:handler event="mouseleave" match=".btl-navBox-head" type="text/javascript"><![CDATA[
+				var oButton = bb.selector.query(event.currentView, 'div.btl-navBox-button');
+				//undo mousedown
+				bb.html.removeClass(oButton, 'btl-navBox-button-press');
+			]]></d:handler>
+
+			<d:handler event="click" match=".btl-navBox-head" type="text/javascript"><![CDATA[
+				if(event.button === 0){
+					if (btl.isTrueValue('open', this.getAttribute('open'))){
+						this.setAttribute('open', 'false');
+					} else {
+						this.setAttribute('open', true);
+					}
+				}
+			]]></d:handler>
+
+			<d:handler event="keydown" type="text/javascript"><![CDATA[
+				var oHead = bb.selector.query(this.viewNode, 'div.btl-navBox-head');
+				if(event.viewTarget !== this.viewNode.firstChild){
+					return;
+				}
+				if( !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.keyIdentifier == 'U+0020'){
+					this.__passingFocus = true; //IE fix
+					this.setAttribute('open', this.getAttribute('open') == 'false' ? 'true' : 'false' );
+					event.preventDefault();
+				}
+				this.__passingFocus = false;
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>

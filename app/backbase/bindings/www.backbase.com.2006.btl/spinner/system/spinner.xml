@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?><d:tdl xmlns="http://www.w3.org/1999/xhtml" xmlns:b="http://www.backbase.com/2006/btl"  xmlns:d="http://www.backbase.com/2006/tdl" >
+
+	<d:namespace name="http://www.backbase.com/2006/btl">
+
+		<d:uses element="spinnerBase" src="../spinnerBase.xml"/>
+
+		<d:element name="spinner" extends="b:spinnerBase">
+			
+
+			<d:resource type="text/css"><![CDATA[.btl-spinner {
+	display: inline-block;
+	vertical-align: bottom;
+}
+.btl-spinner-inner-border {
+	position: relative;
+	padding: 1px 15px 1px 3px;
+}
+.btl-spinner-input {
+	width: 100%;
+	border-style: none;
+	padding: 0;
+	text-align: right;
+}
+.btl-spinner-button-container {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	width: 12px;
+	cursor: default;
+	height: 100%;
+}
+.btl-spinner-upButton,
+.btl-spinner-downButton {
+	position: absolute;
+	height: 8px;
+	background-image: url(media/spinner.png);
+	background-repeat: no-repeat;
+	width: 12px;
+	overflow: hidden;
+	cursor: pointer;
+}
+.btl-spinner-upButton {
+	bottom: 50%;
+	right: 0;
+	background-position: 0 0;
+}
+.btl-spinner-downButton {
+	top: 50%;
+	right: 0;
+	background-position: 0 -32px;
+}
+.btl-spinner-upButton-hover {
+	background-position: 0 -8px;
+}
+.btl-spinner-upButton-active {
+	background-position: 0 -16px;
+}
+.btl-spinner-downButton-hover {
+	background-position: 0 -40px;
+}
+.btl-spinner-downButton-active {
+	background-position: 0 -48px;
+}
+.btl-disabled .btl-spinner-downButton,
+.btl-spinner-downButton-disabled {
+	background-position: 0 -56px;
+	cursor: default;
+}
+.btl-disabled .btl-spinner-upButton,
+.btl-spinner-upButton-disabled {
+	background-position: 0 -24px;
+	cursor: default;
+}
+.btl-disabled .btl-spinner-input {
+	color: GrayText;
+}
+/* fixes */
+.btl-spinner,
+.btl-spinner * {
+	box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	-khtml-box-sizing: border-box;
+}
+.gecko .btl-spinner {
+	display: -moz-inline-grid;
+}
+.ie .btl-spinner {
+	overflow: hidden;
+	display: inline;
+	zoom: 1.0;
+}
+.ie .btl-spinner .btl-spinner-input {
+	margin: -1px 0;
+}
+.ie .btl-spinner .btl-spinner-button-container {
+	top: 10px;
+}]]></d:resource>
+			<d:resource type="image/png" src="media/spinner.png"/>
+
+			<d:template type="application/xhtml+xml">
+				<div class="btl-spinner btl-groove">
+					<div class="btl-spinner-inner-border btl-groove-inner">
+						<input type="text" class="btl-spinner-input" onchange="bb.getControllerFromView(this).handleChangeEvent()"/>
+						<input type="text" style="display: none;"/>
+						<div class="btl-spinner-button-container">
+							<div class="btl-spinner-upButton" onmouseout="bb.html.removeClass(this, 'btl-spinner-upButton-active'); bb.html.removeClass(this, 'btl-spinner-upButton-hover');" onmouseover="bb.html.addClass(this, 'btl-spinner-upButton-hover');"> </div>
+							<div class="btl-spinner-downButton" onmouseout="bb.html.removeClass(this, 'btl-spinner-downButton-active'); bb.html.removeClass(this, 'btl-spinner-downButton-hover');" onmouseover="bb.html.addClass(this, 'btl-spinner-downButton-hover');"> </div>
+						</div>
+					</div>
+				</div>
+			</d:template>
+
+			<d:attribute name="width" default="60px"/>
+
+			<d:attribute name="height" onmap="this.viewNode.getElementsByTagName('input')[0].style.height = value"/>
+
+			<d:attribute name="value">
+				<d:mapper type="text/javascript"><![CDATA[
+					this.setProperty('defaultValue', value);
+					this.setProperty('value', value);
+				]]></d:mapper>
+			</d:attribute>
+
+			<d:attribute name="name" onmap="this.viewNode.getElementsByTagName('input')[1].name = value"/>
+
+			<d:property name="defaultValue" onget="return this.viewNode.getElementsByTagName('input')[1].defaultValue">
+				
+				<d:setter type="text/javascript"><![CDATA[
+					value = this.isCorrectValue(value);
+					if(value !== false){
+						this.viewNode.getElementsByTagName('input')[0].defaultValue = this.formatValue(value);
+						this.viewNode.getElementsByTagName('input')[1].defaultValue = this.unformatValue(value);
+						this.modelNode.setAttribute('value', value);
+					}
+				]]></d:setter>
+			</d:property>
+
+			<d:property name="value">
+				<d:getter type="text/javascript"><![CDATA[
+					var sValue = this.unformatValue(this.viewNode.getElementsByTagName('input')[0].value);
+
+					sValue = this.isCorrectValue(sValue);
+					if(sValue === false)
+						sValue = this.viewNode.getElementsByTagName('input')[1].value;
+					return String(sValue);
+				]]></d:getter>
+				<d:setter type="text/javascript"><![CDATA[
+					value = this.isCorrectValue(value);
+					if(value !== false){
+						this.viewNode.getElementsByTagName('input')[0].value = this.formatValue(value);
+						this.viewNode.getElementsByTagName('input')[1].value = this.unformatValue(value);
+
+						var fValue = parseFloat(value);
+						var fMin = parseFloat(this.getAttribute('min'));
+						var fMax = parseFloat(this.getAttribute('max'));
+
+						if ( fValue == fMin )
+							bb.html.addClass(this.viewNode.getElementsByTagName('div')[3], 'btl-spinner-downButton-disabled');
+						else
+							bb.html.removeClass(this.viewNode.getElementsByTagName('div')[3], 'btl-spinner-downButton-disabled');
+
+						if ( fValue == fMax )
+							bb.html.addClass(this.viewNode.getElementsByTagName('div')[2], 'btl-spinner-upButton-disabled');
+						else
+							bb.html.removeClass(this.viewNode.getElementsByTagName('div')[2], 'btl-spinner-upButton-disabled');
+					}
+				]]></d:setter>
+			</d:property>
+
+			<d:constructor type="text/javascript"><![CDATA[
+				bb.html.disableUserSelect(this.viewNode.getElementsByTagName('div')[1]);
+				this.callSuper('__constructor');
+			]]></d:constructor>
+
+			<d:handler event="mousedown" match="btl-spinner-upButton" type="text/javascript"><![CDATA[
+				bb.html.addClass(this.viewNode.getElementsByTagName('div')[2], 'btl-spinner-upButton-active');
+			]]></d:handler>
+
+			<d:handler event="mousedown" match="btl-spinner-downButton" type="text/javascript"><![CDATA[
+				bb.html.addClass(this.viewNode.getElementsByTagName('div')[3], 'btl-spinner-downButton-active');
+			]]></d:handler>
+
+			<d:handler event="mouseup" type="text/javascript"><![CDATA[
+				bb.html.removeClass(this.viewNode.getElementsByTagName('div')[2], 'btl-spinner-upButton-active');
+				bb.html.removeClass(this.viewNode.getElementsByTagName('div')[3], 'btl-spinner-downButton-active');
+			]]></d:handler>
+
+			<d:handler event="keydown" type="text/javascript"><![CDATA[
+				if(event.keyIdentifier == 'Up')
+					bb.html.addClass(this.viewNode.getElementsByTagName('div')[2], 'btl-spinner-upButton-active');
+				else if(event.keyIdentifier == 'Down')
+					bb.html.addClass(this.viewNode.getElementsByTagName('div')[3], 'btl-spinner-downButton-active');
+			]]></d:handler>
+
+			<d:handler event="keyup" type="text/javascript"><![CDATA[
+				bb.html.removeClass(this.viewNode.getElementsByTagName('div')[2], 'btl-spinner-upButton-active');
+				bb.html.removeClass(this.viewNode.getElementsByTagName('div')[3], 'btl-spinner-downButton-active');
+			]]></d:handler>
+		</d:element>
+	</d:namespace>
+</d:tdl>
